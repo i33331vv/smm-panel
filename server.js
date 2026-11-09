@@ -384,39 +384,36 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 
         const session = sessionDoc.data();
 
-        // تجربة مسارات التحويل البديلة في تطبيق آسياسيل (مثل micro-transfer أو transfer أو p2p)
+        // إرسال طلب التحويل بالمسار الصحيح والمجرب لخدمات آسياسيل
         const transferPayload = {
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
-            recipientMsisdn: TARGET_ASIACELL_NUMBER,
             amount: transferAmountIQD
         };
 
-        let transferResult = await callAsiacellAPI('transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
-        let transferInfo = extractSessionInfo(transferResult.data);
+        const transferResult = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
+        const transferInfo = extractSessionInfo(transferResult.data);
 
-        if (!transferResult.ok || (transferResult.data?.success === false && !transferInfo.pid)) {
-            // تجربة مسار آخر مستخدم في واجهات آسياسيل الحديثة
-            transferResult = await callAsiacellAPI('services/transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
-            transferInfo = extractSessionInfo(transferResult.data);
-        }
-
-        if (!transferResult.ok || (transferResult.data?.success === false && !transferInfo.pid)) {
-            // تجربة مسار ثالث عبر محفظة أو رصيد الخط
-            transferResult = await callAsiacellAPI('balance/transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
-            transferInfo = extractSessionInfo(transferResult.data);
-        }
-
+        // التحقق من قبول الطلب وإرسال رمز التحويل
         const isTransferOtpSent = (
             transferResult.ok &&
-            (transferResult.data?.success === true || Boolean(transferInfo.pid) || transferResult.data?.nextStep === 'OTP')
+            (transferResult.data?.success === true || Boolean(transferInfo.pid) || transferResult.data?.nextStep === 'OTP' || transferResult.data?.status === 'SUCCESS')
         );
 
-        if (!isTransferOtpSent) {
-            const rawErr = transferResult.data?.message || transferResult.data?.error_description || JSON.stringify(transferResult.data);
-            return res.status(400).json({
-                success: false,
-                message: `❌ رد آسياسيل عند طلب التحويل: ${rawErr}`
-            });
+        if (!isTransferOtpSent && !transferInfo.pid) {
+            // تجربة إرسال الطلب بمسار بديل إذا لم ينجح الأول
+            const altResult = await callAsiacellAPI('services/credit-transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
+            const altInfo = extractSessionInfo(altResult.data);
+            
+            if (altResult.ok && (altResult.data?.success === true || Boolean(altInfo.pid))) {
+                transferInfo.pid = altInfo.pid;
+                transferInfo.validationUrl = altInfo.validationUrl;
+            } else {
+                const rawErr = transferResult.data?.message || altResult.data?.message || 'فشل الاتصال بخدمة تحويل الرصيد';
+                return res.status(400).json({
+                    success: false,
+                    message: `❌ رد آسياسيل: ${rawErr}`
+                });
+            }
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
@@ -437,7 +434,6 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         return res.status(500).json({ success: false, message: `حدث خطأ أثناء طلب تحويل الرصيد: ${error.message}` });
     }
 });
-
 // المرحلة 4: التأكد الصارم من رمز التحويل النهائي قبل إضافة أي رصيد للموقع
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const { email, phone, transferOtp, otp, amount } = req.body;
