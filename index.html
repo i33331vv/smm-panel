@@ -68,7 +68,6 @@
                 <span class="font-bold text-xl text-dark">MT</span>
             </div>
             
-            <!-- النص المطلوب أسفل الشعار -->
             <div class="px-4 pb-4 border-b border-gray-100 text-center md:text-right flex-shrink-0">
                 <p class="text-xs font-bold text-primary bg-indigo-50 py-2 px-3 rounded-lg shadow-sm">
                     خدمات زيادة متابعين وتفاعل حقيقية فقط
@@ -113,18 +112,33 @@
             <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                 <div class="max-w-5xl mx-auto">
                     
-                    <!-- نموذج الطلب -->
+                    <!-- 1. نموذج الطلب للمستخدم (مقسم حسب القسم والخدمة) -->
                     <div id="new-order-section" class="space-y-6">
                         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                             <form id="orderForm" class="space-y-5">
-                                <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">الخدمة</label>
-                                    <select id="service" onchange="onServiceChange()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50"></select>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <!-- اختيار القسم -->
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">القسم</label>
+                                        <select id="categorySelect" onchange="onCategoryChange()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-medium">
+                                            <option value="">-- اختر القسم --</option>
+                                        </select>
+                                    </div>
+                                    <!-- اختيار الخدمة (تظهر فقط بعد اختيار القسم) -->
+                                    <div id="serviceSelectContainer" class="hidden">
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">الخدمة</label>
+                                        <select id="serviceSelect" onchange="onServiceChange()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-medium">
+                                            <option value="">-- اختر الخدمة --</option>
+                                        </select>
+                                    </div>
                                 </div>
+
+                                <!-- مربع وصف الخدمة -->
                                 <div id="serviceDescriptionBox" class="hidden bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-900 leading-relaxed">
                                     <span class="font-bold block mb-1"><i class="fa-solid fa-circle-info me-1"></i> وصف الخدمة:</span>
                                     <p id="serviceDescText" class="whitespace-pre-wrap"></p>
                                 </div>
+
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">الرابط</label>
                                     <input type="url" id="orderLink" placeholder="https://instagram.com/username" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50" required>
@@ -184,10 +198,7 @@
                                 </select>
                             </div>
                             
-                            <!-- مربع عرض الباركود ومعلومات التحويل -->
-                            <div id="depositInfoBox" class="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-900 font-medium text-center">
-                                <!-- سيتم تحديث هذا القسم عبر جافاسكريبت -->
-                            </div>
+                            <div id="depositInfoBox" class="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-900 font-medium text-center"></div>
 
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">المبلغ المراد شحنه ($ USD)</label>
@@ -202,7 +213,7 @@
                         <div id="depositSuccessMsg" class="hidden max-w-xl bg-green-50 text-green-700 text-xs p-3 rounded-xl font-bold text-center">تم إرسال طلب الشحن بنجاح! بانتظار مراجعة الإدارة.</div>
                     </div>
 
-                    <!-- لوحة المدير -->
+                    <!-- 2 & 3. لوحة المدير وإدارة الخدمات (إضافة، تعديل، حذف) -->
                     <div id="admin-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
                         <div class="flex flex-col sm:flex-row justify-between items-center gap-4 border-b pb-4">
                             <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-shield-halved text-red-500 me-2"></i> لوحة إدارة النظام (Admin Panel)</h3>
@@ -212,6 +223,7 @@
                             </div>
                         </div>
                         
+                        <!-- طلبات الشحن المعلقة -->
                         <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl">
                             <h4 class="font-bold text-lg text-amber-900 mb-3"><i class="fa-solid fa-wallet me-2"></i> طلبات شحن الرصيد المعلقة من العملاء</h4>
                             <div class="overflow-x-auto">
@@ -233,6 +245,7 @@
                             </div>
                         </div>
 
+                        <!-- متابعة طلبات الخدمات -->
                         <div class="mt-6">
                             <h4 class="font-bold text-lg text-dark mb-3">متابعة طلبات الخدمات</h4>
                             <div class="overflow-x-auto">
@@ -253,20 +266,55 @@
                             </div>
                         </div>
 
+                        <!-- نموذج إضافة / تعديل خدمة جديدة -->
                         <div class="mt-8 bg-gray-50 p-6 rounded-2xl border border-gray-200">
-                            <h4 class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام</h4>
+                            <h4 id="adminFormTitle" class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام</h4>
                             <form id="addServiceForm" class="space-y-4">
+                                <input type="hidden" id="editServiceId" value="">
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <input type="text" id="servCategory" placeholder="القسم (مثلاً: انستقرام)" class="px-4 py-2 border rounded-xl bg-white text-sm" required>
-                                    <input type="text" id="servName" placeholder="اسم الخدمة" class="px-4 py-2 border rounded-xl bg-white text-sm" required>
-                                    <input type="number" step="0.01" id="servPrice" placeholder="السعر لكل 1K ($)" class="px-4 py-2 border rounded-xl bg-white text-sm" required>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">القسم</label>
+                                        <input type="text" id="servCategory" placeholder="مثلاً: انستقرام" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">اسم الخدمة</label>
+                                        <input type="text" id="servName" placeholder="اسم الخدمة" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">السعر لكل 1K ($)</label>
+                                        <input type="number" step="0.01" id="servPrice" placeholder="1.50" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
+                                    </div>
                                 </div>
                                 <div>
-                                    <textarea id="servDescription" rows="3" placeholder="وصف الخدمة..." class="w-full px-4 py-2 border rounded-xl bg-white text-sm"></textarea>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">الوصف</label>
+                                    <textarea id="servDescription" rows="3" placeholder="وصف الخدمة..." class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required></textarea>
                                 </div>
-                                <button type="submit" class="bg-primary hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition">إضافة الخدمة للنظام</button>
+                                <div class="flex items-center gap-2">
+                                    <button type="submit" id="saveServiceBtn" class="bg-primary hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition">إضافة الخدمة للنظام</button>
+                                    <button type="button" id="cancelEditBtn" onclick="resetServiceForm()" class="hidden bg-gray-500 hover:bg-gray-600 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition">إلغاء التعديل</button>
+                                </div>
                             </form>
                         </div>
+
+                        <!-- جدول إدارة الخدمات المتاحة (تعديل وحذف) -->
+                        <div class="mt-6 bg-white p-6 rounded-2xl border border-gray-200">
+                            <h4 class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-list-check text-primary me-2"></i> الخدمات المتاحة في النظام (تعديل / حذف)</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-right border-collapse">
+                                    <thead>
+                                        <tr class="bg-gray-50 border-b border-gray-200 text-sm text-gray-600">
+                                            <th class="p-3">القسم</th>
+                                            <th class="p-3">اسم الخدمة</th>
+                                            <th class="p-3">السعر ($)</th>
+                                            <th class="p-3">الوصف</th>
+                                            <th class="p-3">الإجراءات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminServicesTableBody" class="text-sm divide-y divide-gray-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -310,7 +358,7 @@
         </div>
     </div>
 
-    <!-- سكربت العمليات -->
+    <!-- JavaScript المحدث للعمليات -->
     <script>
         let fetchedServices = [];
 
@@ -390,39 +438,85 @@
             refreshUserBalance();
         }
 
+        // جلب الخدمات للأقسام
         async function loadServicesForUser() {
             try {
                 const res = await fetch('/api/services');
                 const data = await res.json();
-                const serviceSelect = document.getElementById('service');
-                serviceSelect.innerHTML = '';
+                const categorySelect = document.getElementById('categorySelect');
+                categorySelect.innerHTML = '<option value="">-- اختر القسم --</option>';
+
                 if (data.success && data.services.length > 0) {
                     fetchedServices = data.services;
-                    data.services.forEach(serv => {
-                        serviceSelect.innerHTML += `<option value="${serv.price}" data-id="${serv.id}">[${serv.category}] ${serv.name} - السعر: $${serv.price.toFixed(2)} لكل 1K</option>`;
+                    const categories = [...new Set(data.services.map(s => s.category))];
+                    categories.forEach(cat => {
+                        categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
                     });
-                    onServiceChange();
                 } else {
                     fetchedServices = [];
-                    serviceSelect.innerHTML = `<option value="0">لا توجد خدمات متوفرة حالياً</option>`;
                 }
-            } catch (err) { console.error('خطأ'); }
+                document.getElementById('serviceSelectContainer').classList.add('hidden');
+                document.getElementById('serviceDescriptionBox').classList.add('hidden');
+            } catch (err) { console.error('خطأ في جلب الخدمات'); }
         }
 
+        // عند تغير القسم
+        function onCategoryChange() {
+            const selectedCat = document.getElementById('categorySelect').value;
+            const serviceContainer = document.getElementById('serviceSelectContainer');
+            const serviceSelect = document.getElementById('serviceSelect');
+            const descBox = document.getElementById('serviceDescriptionBox');
+
+            if (!selectedCat) {
+                serviceContainer.classList.add('hidden');
+                descBox.classList.add('hidden');
+                document.getElementById('charge').value = '';
+                return;
+            }
+
+            const filteredServices = fetchedServices.filter(s => s.category === selectedCat);
+            serviceSelect.innerHTML = '<option value="">-- اختر الخدمة --</option>';
+            filteredServices.forEach(serv => {
+                serviceSelect.innerHTML += `<option value="${serv.id}">${serv.name} - $${serv.price.toFixed(2)}/1K</option>`;
+            });
+
+            serviceContainer.classList.remove('hidden');
+            descBox.classList.add('hidden');
+            document.getElementById('charge').value = '';
+        }
+
+        // عند تغير الخدمة
         function onServiceChange() {
-            calculatePrice();
-            const serviceSelect = document.getElementById('service');
-            const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
-            if (!selectedOption) return;
-            const servId = selectedOption.getAttribute('data-id');
-            const targetServ = fetchedServices.find(s => s.id == servId);
+            const servId = document.getElementById('serviceSelect').value;
             const descBox = document.getElementById('serviceDescriptionBox');
             const descText = document.getElementById('serviceDescText');
+
+            if (!servId) {
+                descBox.classList.add('hidden');
+                document.getElementById('charge').value = '';
+                return;
+            }
+
+            const targetServ = fetchedServices.find(s => s.id == servId);
             if (targetServ && targetServ.description && targetServ.description.trim() !== '') {
                 descText.innerText = targetServ.description;
                 descBox.classList.remove('hidden');
             } else {
                 descBox.classList.add('hidden');
+            }
+            calculatePrice();
+        }
+
+        function calculatePrice() {
+            const servId = document.getElementById('serviceSelect').value;
+            const targetServ = fetchedServices.find(s => s.id == servId);
+            const qty = parseInt(document.getElementById('quantity').value);
+            const charge = document.getElementById('charge');
+
+            if (targetServ && !isNaN(qty) && qty > 0) {
+                charge.value = ((qty / 1000) * targetServ.price).toFixed(4);
+            } else {
+                charge.value = '';
             }
         }
 
@@ -521,6 +615,7 @@
             } catch (err) { alert('خطأ في الاتصال بالخادم'); }
         }
 
+        // لوحة التحكم للمدير
         async function showAdminPanel() {
             hideAllSections();
             document.getElementById('admin-section').classList.remove('hidden');
@@ -533,6 +628,8 @@
                 const data = await res.json();
                 const depRes = await fetch('/api/admin/deposits');
                 const depData = await depRes.json();
+                const servRes = await fetch('/api/services');
+                const servData = await servRes.json();
 
                 if (data.success) {
                     document.getElementById('adminUsersCount').innerText = data.usersCount;
@@ -588,7 +685,82 @@
                         });
                     } else { depTbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-gray-400">لا توجد طلبات شحن معلقة.</td></tr>`; }
                 }
+
+                // عرض جدول الخدمات للتحكم
+                if (servData.success) {
+                    renderAdminServicesTable(servData.services);
+                }
             } catch (err) { alert('خطأ في جلب البيانات.'); }
+        }
+
+        // عرض جدول الخدمات وإتاحة التعديل والحذف
+        function renderAdminServicesTable(services) {
+            const servTbody = document.getElementById('adminServicesTableBody');
+            servTbody.innerHTML = '';
+            if (services && services.length > 0) {
+                services.forEach(serv => {
+                    const servJson = JSON.stringify(serv).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+                    servTbody.innerHTML += `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="p-3 font-bold text-primary">${serv.category}</td>
+                            <td class="p-3 font-bold text-dark">${serv.name}</td>
+                            <td class="p-3 font-bold">$${serv.price.toFixed(2)}</td>
+                            <td class="p-3 text-gray-500 text-xs max-w-xs truncate">${serv.description || '-'}</td>
+                            <td class="p-3 space-x-2 space-x-reverse">
+                                <button onclick="editService('${serv.id}', '${serv.category}', '${serv.name}', ${serv.price}, '${(serv.description || '').replace(/'/g, "\\'")}')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-lg text-xs font-bold transition">تعديل</button>
+                                <button onclick="deleteService('${serv.id}')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-bold transition">حذف</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } else {
+                servTbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-400">لا توجد خدمات مضافة بعد.</td></tr>`;
+            }
+        }
+
+        // بدء تعديل الخدمة
+        function editService(id, category, name, price, description) {
+            document.getElementById('editServiceId').value = id;
+            document.getElementById('servCategory').value = category;
+            document.getElementById('servName').value = name;
+            document.getElementById('servPrice').value = price;
+            document.getElementById('servDescription').value = description;
+
+            document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-500 me-2"></i> تعديل الخدمة الحالية`;
+            const saveBtn = document.getElementById('saveServiceBtn');
+            saveBtn.innerText = 'حفظ التعديلات';
+            saveBtn.className = 'bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+            document.getElementById('cancelEditBtn').classList.remove('hidden');
+
+            document.getElementById('addServiceForm').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // إعادة تعيين نموذج الخدمة
+        function resetServiceForm() {
+            document.getElementById('addServiceForm').reset();
+            document.getElementById('editServiceId').value = '';
+            document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام`;
+            const saveBtn = document.getElementById('saveServiceBtn');
+            saveBtn.innerText = 'إضافة الخدمة للنظام';
+            saveBtn.className = 'bg-primary hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+            document.getElementById('cancelEditBtn').classList.add('hidden');
+        }
+
+        // حذف الخدمة
+        async function deleteService(id) {
+            if (!confirm('هل أنت تأكد من رغبتك في حذف هذه الخدمة؟')) return;
+            try {
+                const res = await fetch('/api/admin/delete-service', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('تم حذف الخدمة بنجاح.');
+                    showAdminPanel();
+                } else { alert('فشل حذف الخدمة.'); }
+            } catch (err) { alert('خطأ في الاتصال.'); }
         }
 
         function viewReceipt(imgName) {
@@ -612,26 +784,31 @@
             } catch (err) { alert('خطأ في الاتصال بالخادم'); }
         }
 
+        // حفظ أو تعديل الخدمة
         document.getElementById('addServiceForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            const editId = document.getElementById('editServiceId').value;
             const category = document.getElementById('servCategory').value;
             const name = document.getElementById('servName').value;
             const price = parseFloat(document.getElementById('servPrice').value);
             const description = document.getElementById('servDescription').value;
 
+            const endpoint = editId ? '/api/admin/update-service' : '/api/admin/add-service';
+            const payload = editId ? { id: editId, category, name, price, description } : { category, name, price, description };
+
             try {
-                const res = await fetch('/api/admin/add-service', {
+                const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ category, name, price, description })
+                    body: JSON.stringify(payload)
                 });
                 const data = await res.json();
                 if (data.success) {
-                    alert('تمت إضافة الخدمة بنجاح!');
-                    this.reset();
+                    alert(editId ? 'تم تعديل الخدمة بنجاح!' : 'تمت إضافة الخدمة بنجاح!');
+                    resetServiceForm();
                     showAdminPanel();
-                } else { alert('فشل إضافة الخدمة'); }
-            } catch (err) { alert('خطأ في الاتصال'); }
+                } else { alert('حدث خطأ أثناء حفظ الخدمة.'); }
+            } catch (err) { alert('خطأ في الاتصال.'); }
         });
 
         async function updateOrderStatus(orderId, status) {
@@ -656,16 +833,7 @@
             }
         });
 
-        function calculatePrice() {
-            const serviceSelect = document.getElementById('service');
-            const rate = parseFloat(serviceSelect.value);
-            const qty = parseInt(document.getElementById('quantity').value);
-            const charge = document.getElementById('charge');
-            if (!isNaN(rate) && !isNaN(qty) && qty > 0) {
-                charge.value = ((qty / 1000) * rate).toFixed(4);
-            } else { charge.value = ''; }
-        }
-
+        // تقديم طلب للمستخدم
         document.getElementById('orderForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const sessionStr = localStorage.getItem('smm_session');
@@ -675,8 +843,11 @@
             const quantity = parseInt(document.getElementById('quantity').value);
             if (isNaN(quantity) || quantity < 1000) return alert('عذراً، الحد الأدنى للطلب هو 1000.');
 
-            const serviceSelect = document.getElementById('service');
-            const serviceName = serviceSelect.options[serviceSelect.selectedIndex].text;
+            const servId = document.getElementById('serviceSelect').value;
+            const targetServ = fetchedServices.find(s => s.id == servId);
+            if (!targetServ) return alert('الرجاء اختيار الخدمة أولاً.');
+
+            const serviceName = `[${targetServ.category}] ${targetServ.name}`;
             const link = document.getElementById('orderLink').value;
             const charge = parseFloat(document.getElementById('charge').value);
 
@@ -697,6 +868,8 @@
                     successMsg.innerText = `تم إنشاء الطلب بنجاح! رقم الطلب: #${data.orderId}`;
                     successMsg.classList.remove('hidden');
                     this.reset();
+                    document.getElementById('serviceSelectContainer').classList.add('hidden');
+                    document.getElementById('serviceDescriptionBox').classList.add('hidden');
                     document.getElementById('charge').value = '';
                     setTimeout(() => successMsg.classList.add('hidden'), 5000);
                 } else { alert(data.message); }
