@@ -7,7 +7,7 @@ const sharp = require('sharp');
 const fs = require('fs');
 const https = require('https');
 
-// إعدادات بوتات التليجرام الخاصة بك
+// إعدادات بوتات التليجرام ومعرف الشات الخاص بك
 const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
 const ORDERS_BOT_TOKEN = '9023175997:AAGuvzz3eLywKIBkTjs3w9NCVnmutRblCEc';
 const ADMIN_CHAT_ID = '8671448765';
@@ -59,7 +59,7 @@ function getFormattedDateTime() {
     });
 }
 
-// دالة إرسال رسالة نصية أو مع صورة إلى تليجرام
+// دالة إرسال رسالة مع صورة أو نص إلى تليجرام مع الأزرار الشفافة
 function sendTelegramMessage(token, chatId, text, replyMarkup = null, photoPath = null) {
     const boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW';
     let postData = '';
@@ -127,7 +127,59 @@ function sendTelegramMessage(token, chatId, text, replyMarkup = null, photoPath 
     }
 }
 
-// مسار تسجيل الحساب والدخول
+// دالة لتعديل الرسالة بعد الضغط على الزر في التليجرام
+function sendTelegramEditMessage(token, chatId, messageId, newText, replyMarkup) {
+    const data = JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        caption: newText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup
+    });
+
+    const options = {
+        hostname: 'api.telegram.org',
+        path: `/bot${token}/editMessageCaption`,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data)
+        }
+    };
+
+    const req = https.request(options, (res) => {});
+    req.on('error', (e) => {});
+    req.write(data);
+    req.end();
+}
+
+// دالة لتعديل رسالة نصية بحتة (للخدمات)
+function sendTelegramEditTextOnly(token, chatId, messageId, newText, replyMarkup) {
+    const data = JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        text: newText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup
+    });
+
+    const options = {
+        hostname: 'api.telegram.org',
+        path: `/bot${token}/editMessageText`,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data)
+        }
+    };
+
+    const req = https.request(options, (res) => {});
+    req.on('error', (e) => {});
+    req.write(data);
+    req.end();
+}
+
+// مسار تسجيل الحساب
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
     try {
@@ -144,6 +196,7 @@ app.post('/api/register', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: 'خطأ في الخادم.' }); }
 });
 
+// مسار تسجيل الدخول
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -164,9 +217,9 @@ app.get('/api/user/:email', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// 1. استقبال طلب الشحن وإرساله لبوت تليجرام مع صورة الإيصال والأزرار (شحن / رفض)
+// 1. استقبال طلب الشحن وإرساله لبوت التليجرام مع صورة الإيصال والأزرار (شحن / رفض)
 app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) => {
-    const { email, gateway, amount, reference_id } = req.body;
+    const { email, gateway, amount } = req.body;
     const uploadedFile = req.file;
 
     if (!email || !gateway || !amount || !uploadedFile) {
@@ -189,7 +242,6 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
             created_at: dateTime
         });
 
-        // إرسال الإشعار لبوت الشحن مع أزرار شفافة
         const text = `📥 <b>طلب شحن رصيد جديد</b>\n\n👤 <b>المستخدم:</b> ${username}\n📧 <b>البريد:</b> ${email}\n💰 <b>المبلغ:</b> $${amount}\n💳 <b>البوابة:</b> ${gateway}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}`;
         const replyMarkup = {
             inline_keyboard: [
@@ -237,8 +289,7 @@ app.post('/api/order', async (req, res) => {
             });
         });
 
-        // إرسال الإشعار لبوت الخدمات مع زر قيد التنفيذ
-        const text = `🚀 <b>طلب خدمة جديد</b>\n\n🆔 <b>رقم الطلب:</b> #${orderId}\n👤 <b>المستخدم:</b> ${username}\n📌 <b>الخدمة:</b> ${service}\n🔗 <b>الرابط:</b> ${link}\n📦 <b>الكمية:</b> ${quantity}\n💵 <b>السعر:</b> $${charge}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}`;
+        const text = `🚀 <b>طلب خدمة جديد</b>\n\n🆔 <b>رقم الطلب:</b> #${orderId}\n👤 <b>المستخدم:</b> ${username}\n📌 <b>الخدمة:</b> ${service}\n🔗 <b>الرابط:</b> ${link}\n📦 <b>الكمية:</b> ${quantity}\n💵 <b>السعر:</b> $${charge}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}\n\n🔄 <b>الحالة: قيد المعالجة</b>`;
         const replyMarkup = {
             inline_keyboard: [
                 [{ text: '🔄 قيد التنفيذ', callback_data: `ord_progress_${orderId}` }]
@@ -249,6 +300,66 @@ app.post('/api/order', async (req, res) => {
 
         res.json({ success: true, newBalance, orderId });
     } catch (e) { res.status(500).json({ success: false, message: 'خطأ في الخادم.' }); }
+});
+
+// 3. مسار استقبال الأزرار الشفافة وتحديث النظام فوراً (Webhook)
+app.post('/api/telegram-webhook/:type', async (req, res) => {
+    const type = req.params.type; // 'deposit' أو 'order'
+    const update = req.body;
+
+    if (update.callback_query) {
+        const callbackQuery = update.callback_query;
+        const data = callbackQuery.data;
+        const chatId = callbackQuery.message.chat.id;
+        const messageId = callbackQuery.message.message_id;
+        const token = type === 'deposit' ? DEPOSIT_BOT_TOKEN : ORDERS_BOT_TOKEN;
+
+        try {
+            if (data.startsWith('dep_accept_')) {
+                const parts = data.split('_');
+                const depId = parts[2];
+                const email = parts[3];
+                const amount = parseFloat(parts[4]);
+
+                const userSnap = await db.collection('users').where('email', '==', email).get();
+                if (!userSnap.empty) {
+                    const userRef = userSnap.docs[0].ref;
+                    const userData = userSnap.docs[0].data();
+                    const newBalance = (userData.balance || 0) + amount;
+
+                    await userRef.update({ balance: newBalance });
+                    await db.collection('deposit_requests').doc(depId).update({ status: 'مقبول' });
+
+                    sendTelegramEditMessage(token, chatId, messageId, callbackQuery.message.caption + `\n\n✅ <b>الحالة: تم شحن الرصيد بنجاح ($${amount}) للمستخدم!</b>`, null);
+                }
+            } else if (data.startsWith('dep_reject_')) {
+                const depId = data.split('_')[2];
+                await db.collection('deposit_requests').doc(depId).update({ status: 'مرفوض' });
+
+                sendTelegramEditMessage(token, chatId, messageId, callbackQuery.message.caption + `\n\n❌ <b>الحالة: تم رفض طلب الشحن.</b>`, null);
+            } else if (data.startsWith('ord_progress_')) {
+                const orderId = data.split('_')[2];
+                await db.collection('orders').doc(orderId).update({ status: 'قيد التنفيذ' });
+
+                const newText = callbackQuery.message.text.replace('🔄 قيد المعالجة', '🔄 قيد التنفيذ');
+                const newMarkup = {
+                    inline_keyboard: [
+                        [{ text: '✔️ تم الاكتمال', callback_data: `ord_complete_${orderId}` }]
+                    ]
+                };
+                sendTelegramEditTextOnly(token, chatId, messageId, newText + `\n\n✔️ <b>الحالة: قيد التنفيذ حالياً</b>`, newMarkup);
+            } else if (data.startsWith('ord_complete_')) {
+                const orderId = data.split('_')[2];
+                await db.collection('orders').doc(orderId).update({ status: 'مكتمل' });
+
+                const newText = callbackQuery.message.text.replace('قيد التنفيذ حالياً', 'تم الاكتمال بنجاح');
+                sendTelegramEditTextOnly(token, chatId, messageId, newText + `\n\n✅ <b>الحالة: تم إكمال الطلب بنجاح!</b>`, null);
+            }
+        } catch (e) {
+            console.error('خطأ في معالجة تفاعل التليجرام:', e);
+        }
+    }
+    res.sendStatus(200);
 });
 
 app.get('/api/orders/:username', async (req, res) => {
@@ -291,9 +402,6 @@ app.post('/api/admin/delete-service', async (req, res) => {
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false }); }
 });
-
-// نظام تلقي ضغطات الأزرار من تليجرام (Webhook مبسط أو ملقم استعلام)
-// ملاحظة: يمكنك تفعيل الـ Webhook لبوتاتك لتستقبل الأزرار، أو ربطها بالاستعلامات المباشرة.
 
 app.listen(port, () => {
     console.log(`الخادم السحابي يعمل بنجاح على الرابط: http://localhost:${port}`);
