@@ -127,14 +127,14 @@ function sendTelegramMessage(token, chatId, text, replyMarkup = null, photoPath 
     }
 }
 
-// دالة لتعديل تعليق (Caption) رسالة الصورة في التليجرام وإزالة الأزرار
+// دالة لتعديل وصف الصورة (Caption) وإزالة الأزرار نهائياً وتحديث النص
 function editTelegramCaption(token, chatId, messageId, newCaption) {
     const data = JSON.stringify({
         chat_id: chatId,
         message_id: messageId,
         caption: newCaption,
         parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: [] } // إزالة الأزرار نهائياً
+        reply_markup: { inline_keyboard: [] } // إرسال مصفوفة فارغة لإزالة الأزرار فوراً
     });
 
     const options = {
@@ -330,7 +330,7 @@ app.post('/api/telegram-webhook/:type', async (req, res) => {
                     await userRef.update({ balance: newBalance });
                     await db.collection('deposit_requests').doc(depId).update({ status: 'مقبول' });
 
-                    // تعديل نفس رسالة الصورة، إزالة الأزرار، وإضافة جملة النجاح تحت التاريخ والوقت مباشرة
+                    // تعديل وصف الصورة، إضافة عبارة النجاح تحت التاريخ والوقت، وإزالة الأزرار تماماً
                     const originalText = callbackQuery.message.caption || '';
                     const updatedText = originalText + `\n\n✅ <b>تم شحن الرصيد بنجاح ($${amount}) للمستخدم!</b>`;
                     editTelegramCaption(token, chatId, messageId, updatedText);
@@ -347,7 +347,6 @@ app.post('/api/telegram-webhook/:type', async (req, res) => {
                 await db.collection('orders').doc(orderId).update({ status: 'قيد التنفيذ' });
 
                 const originalText = callbackQuery.message.text || '';
-                // استبدال حالة قيد المعالجة إلى قيد التنفيذ وإظهار زر تم الاكتمال
                 const updatedText = originalText.replace('🔄 الحالة: قيد المعالجة', '🔄 الحالة: قيد التنفيذ حالياً');
                 const newMarkup = {
                     inline_keyboard: [
