@@ -58,13 +58,13 @@ function getFormattedDateTime() {
     });
 }
 
-// دالة إرسال رسالة نصية بحتة مع الأزرار الشفافة (تمنع مشاكل معاينة الروابط وتضمن سرعة استجابة الأزرار)
+// دالة إرسال رسالة نصية بحتة مع الأزرار الشفافة
 function sendTelegramTextMessage(token, chatId, text, replyMarkup = null) {
     const data = JSON.stringify({
         chat_id: chatId,
         text: text,
         parse_mode: 'HTML',
-        disable_web_page_preview: true, // إلغاء معاينة الروابط لضمان عمل الأزرار 100%
+        disable_web_page_preview: true,
         reply_markup: replyMarkup
     });
 
@@ -84,15 +84,39 @@ function sendTelegramTextMessage(token, chatId, text, replyMarkup = null) {
     req.end();
 }
 
-// دالة لتعديل الرسالة النصية وإزالة الأزرار فوراً عند الضغط
-function editTelegramTextMessage(token, chatId, messageId, newText, replyMarkup = { inline_keyboard: [] }) {
+// دالة لإيقاف دوران الزر في تليجرام فوراً
+function answerCallbackQuery(token, callbackQueryId, text) {
+    const data = JSON.stringify({
+        callback_query_id: callbackQueryId,
+        text: text,
+        show_alert: false
+    });
+
+    const options = {
+        hostname: 'api.telegram.org',
+        path: `/bot${token}/answerCallbackQuery`,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data)
+        }
+    };
+
+    const req = https.request(options, (res) => {});
+    req.on('error', (e) => {});
+    req.write(data);
+    req.end();
+}
+
+// دالة لتعديل الرسالة النصية وإزالة الأزرار نهائياً
+function editTelegramTextMessage(token, chatId, messageId, newText) {
     const data = JSON.stringify({
         chat_id: chatId,
         message_id: messageId,
         text: newText,
         parse_mode: 'HTML',
         disable_web_page_preview: true,
-        reply_markup: replyMarkup
+        reply_markup: { inline_keyboard: [] }
     });
 
     const options = {
@@ -149,7 +173,7 @@ app.get('/api/user/:email', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// 1. استقبال طلب الشحن وإرساله لبوت التليجرام كرسالة نصية مع رابط الإيصال والأزرار الفورية
+// 1. استقبال طلب الشحن وإرساله لبوت التليجرام
 app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) => {
     const { email, gateway, amount } = req.body;
     const uploadedFile = req.file;
@@ -174,9 +198,7 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
             created_at: dateTime
         });
 
-        // رابط صورة الإيصال المباشر
         const receiptUrl = `https://mtnajm.com/${uploadedFile.filename}`;
-
         const text = `📥 <b>طلب شحن رصيد جديد</b>\n\n👤 <b>المستخدم:</b> ${username}\n📧 <b>البريد:</b> ${email}\n💰 <b>المبلغ:</b> $${amount}\n💳 <b>البوابة:</b> ${gateway}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}\n\n🔗 <a href="${receiptUrl}"><b>[ اضغط هنا لعرض صورة إيصال الدفع ]</b></a>`;
         
         const replyMarkup = {
@@ -197,7 +219,7 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
     }
 });
 
-// 2. استقبال طلب الخدمة وإرساله لبوت الخدمات مع زر (قيد التنفيذ)
+// 2. استقبال طلب الخدمة
 app.post('/api/order', async (req, res) => {
     const { username, service, link, quantity, charge } = req.body;
 
@@ -238,17 +260,21 @@ app.post('/api/order', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: 'خطأ في الخادم.' }); }
 });
 
-// 3. مسار استقبال الأزرار الشفافة وتحديث النظام فوراً (Webhook)
+// 3. مسار استقبال الأزرار الشفافة وتحديث النظام فوراً (Webhook) مع الرد الفوري
 app.post('/api/telegram-webhook/:type', async (req, res) => {
-    const type = req.params.type; // 'deposit' أو 'order'
+    const type = req.params.type; 
     const update = req.body;
 
     if (update.callback_query) {
         const callbackQuery = update.callback_query;
+        const callbackQueryId = callbackQuery.id;
         const data = callbackQuery.data;
         const chatId = callbackQuery.message.chat.id;
         const messageId = callbackQuery.message.message_id;
         const token = type === 'deposit' ? DEPOSIT_BOT_TOKEN : ORDERS_BOT_TOKEN;
+
+        // إيقاف دوران الزر فوراً في تليجرام
+        answerCallbackQuery(token, callbackQueryId, 'جاري معالجة الطلب...');
 
         try {
             if (data.startsWith('dep_accept_')) {
@@ -257,18 +283,22 @@ app.post('/api/telegram-webhook/:type', async (req, res) => {
                 const email = parts[3];
                 const amount = parseFloat(parts[4]);
 
+                // البحث عن المستخدم وتحديث رصيده
                 const userSnap = await db.collection('users').where('email', '==', email).get();
                 if (!userSnap.empty) {
-                    const userRef = userSnap.docs[0].ref;
-                    const userData = userSnap.docs[0].data();
-                    const newBalance = (userData.balance || 0) + amount;
+                    const userDoc = userSnap.docs[0];
+                    const userRef = userDoc.ref;
+                    const userData = userDoc.data();
+                    const currentBalance = parseFloat(userData.balance || 0);
+                    const newBalance = currentBalance + amount;
 
+                    // تحديث الرصيد وحالة طلب الشحن في قاعدة البيانات
                     await userRef.update({ balance: newBalance });
                     await db.collection('deposit_requests').doc(depId).update({ status: 'مقبول' });
 
                     const originalText = callbackQuery.message.text || '';
-                    const updatedText = originalText + `\n\n✅ <b>تم شحن الرصيد بنجاح ($${amount}) للمستخدم!</b>`;
-                    editTelegramTextMessage(token, chatId, messageId, updatedText, { inline_keyboard: [] });
+                    const updatedText = originalText + `\n\n✅ <b>تم شحن الرصيد بنجاح ($${amount}) للمستخدم وإضافته لحسابه!</b>`;
+                    editTelegramTextMessage(token, chatId, messageId, updatedText);
                 }
             } else if (data.startsWith('dep_reject_')) {
                 const depId = data.split('_')[2];
@@ -276,7 +306,7 @@ app.post('/api/telegram-webhook/:type', async (req, res) => {
 
                 const originalText = callbackQuery.message.text || '';
                 const updatedText = originalText + `\n\n❌ <b>تم رفض طلب شحن الرصيد.</b>`;
-                editTelegramTextMessage(token, chatId, messageId, updatedText, { inline_keyboard: [] });
+                editTelegramTextMessage(token, chatId, messageId, updatedText);
             } else if (data.startsWith('ord_progress_')) {
                 const orderId = data.split('_')[2];
                 await db.collection('orders').doc(orderId).update({ status: 'قيد التنفيذ' });
@@ -288,14 +318,30 @@ app.post('/api/telegram-webhook/:type', async (req, res) => {
                         [{ text: '✔️ تم الاكتمال', callback_data: `ord_complete_${orderId}` }]
                     ]
                 };
-                editTelegramTextMessage(token, chatId, messageId, updatedText, newMarkup);
+
+                // تعديل رسالة الطلب مع زر تم الاكتمال
+                const editData = JSON.stringify({
+                    chat_id: chatId,
+                    message_id: messageId,
+                    text: updatedText,
+                    parse_mode: 'HTML',
+                    disable_web_page_preview: true,
+                    reply_markup: newMarkup
+                });
+                https.request({
+                    hostname: 'api.telegram.org',
+                    path: `/bot${token}/editMessageText`,
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(editData) }
+                }).end(editData);
+
             } else if (data.startsWith('ord_complete_')) {
                 const orderId = data.split('_')[2];
                 await db.collection('orders').doc(orderId).update({ status: 'مكتمل' });
 
                 const originalText = callbackQuery.message.text || '';
                 const updatedText = originalText.replace('🔄 الحالة: قيد التنفيذ حالياً', '✅ الحالة: تم إكمال الطلب بنجاح');
-                editTelegramTextMessage(token, chatId, messageId, updatedText, { inline_keyboard: [] });
+                editTelegramTextMessage(token, chatId, messageId, updatedText);
             }
         } catch (e) {
             console.error('خطأ في معالجة تفاعل التليجرام:', e);
