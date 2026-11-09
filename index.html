@@ -12,11 +12,7 @@
             theme: {
                 extend: {
                     fontFamily: { sans: ['Tajawal', 'sans-serif'] },
-                    colors: { 
-                        primary: '#6b1d2f', 
-                        secondary: '#8a253d', 
-                        dark: '#1e293b' 
-                    }
+                    colors: { primary: '#6b1d2f', secondary: '#8a253d', dark: '#1e293b' }
                 }
             }
         }
@@ -38,9 +34,7 @@
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center h-20">
                     <div class="flex-shrink-0 flex items-center space-x-2 space-x-reverse">
-                        <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-xl shadow-md">
-                            MT
-                        </div>
+                        <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-xl shadow-md">MT</div>
                         <span class="font-extrabold text-xl text-dark tracking-wide">mtnajm</span>
                     </div>
                     <div class="flex items-center space-x-4 space-x-reverse">
@@ -50,7 +44,6 @@
                 </div>
             </div>
         </header>
-
         <main class="flex-grow hero-bg">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 text-center">
                 <h1 class="text-4xl md:text-6xl font-extrabold text-dark tracking-tight mb-6 leading-tight">
@@ -70,9 +63,7 @@
     <div id="dashboard-page" class="hidden min-h-screen bg-[#f8fafc] flex flex-col md:flex-row transition-opacity duration-300">
         <aside class="w-full md:w-64 bg-white border-l border-gray-200 shadow-sm flex-shrink-0 flex flex-col">
             <div class="h-20 flex items-center justify-center md:justify-start md:px-6 flex-shrink-0 space-x-3 space-x-reverse">
-                <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-lg shadow-md">
-                    MT
-                </div>
+                <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-lg shadow-md">MT</div>
                 <div class="flex flex-col">
                     <span class="font-extrabold text-lg text-dark leading-none">mtnajm</span>
                     <span class="text-[10px] text-gray-400 mt-1">SMM Panel</span>
@@ -86,18 +77,10 @@
             </div>
 
             <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
-                <a href="#" id="navNewOrder" onclick="showNewOrderPage()" class="flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer">
-                    <i class="fa-solid fa-plus-circle w-6 text-center text-lg me-3"></i> طلب جديد
-                </a>
-                <a href="#" id="navOrders" onclick="showOrdersPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer">
-                    <i class="fa-solid fa-list w-6 text-center text-lg me-3"></i> الطلبات
-                </a>
-                <a href="#" id="navDeposit" onclick="showDepositPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer">
-                    <i class="fa-solid fa-wallet w-6 text-center text-lg me-3"></i> شحن الرصيد
-                </a>
-                <a href="#" id="adminNavLink" onclick="showAdminPanel()" class="hidden items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-medium transition cursor-pointer">
-                    <i class="fa-solid fa-shield-halved w-6 text-center text-lg me-3"></i> لوحة المدير
-                </a>
+                <a href="#" id="navNewOrder" onclick="showNewOrderPage()" class="flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer"><i class="fa-solid fa-plus-circle w-6 text-center text-lg me-3"></i> طلب جديد</a>
+                <a href="#" id="navOrders" onclick="showOrdersPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer"><i class="fa-solid fa-list w-6 text-center text-lg me-3"></i> الطلبات</a>
+                <a href="#" id="navDeposit" onclick="showDepositPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer"><i class="fa-solid fa-wallet w-6 text-center text-lg me-3"></i> شحن الرصيد</a>
+                <a href="#" id="adminNavLink" onclick="showAdminPanel()" class="hidden items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-medium transition cursor-pointer"><i class="fa-solid fa-shield-halved w-6 text-center text-lg me-3"></i> لوحة المدير</a>
             </nav>
         </aside>
 
@@ -118,7 +101,6 @@
             <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                 <div class="max-w-5xl mx-auto space-y-4">
                     
-                    <!-- شريط الموثوقية والهوية العراقية الجديد -->
                     <div class="bg-gradient-to-r from-[#6b1d2f] to-[#8a253d] text-white p-3.5 rounded-2xl shadow-md flex items-center justify-center space-x-3 space-x-reverse text-center">
                         <i class="fa-solid fa-shield-halved text-yellow-300 text-lg"></i>
                         <span class="text-xs sm:text-sm font-bold tracking-wide">منصة عراقية موثوقة 100% — صُنعت بِسواعد وعقول عراقية لخدمتكم بثقة وأمان</span>
@@ -197,7 +179,6 @@
                             <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-wallet text-primary me-2"></i> شحن الرصيد</h3>
                             <p class="text-sm text-gray-500 mt-1">اختر بوابة الدفع، قم بالتحويل ثم أرفع صورة الإيصال.</p>
                         </div>
-
                         <form id="universalDepositForm" onsubmit="handleDepositSubmit(event)" class="max-w-xl space-y-4">
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-2">طريقة الدفع</label>
@@ -208,9 +189,7 @@
                                     <option value="Binance">بينانس (Binance)</option>
                                 </select>
                             </div>
-                            
                             <div id="depositInfoBox" class="p-4 bg-[#fdf2f4] border border-[#f7d6dd] rounded-xl text-sm text-[#531423] font-medium text-center"></div>
-
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">المبلغ المراد شحنه ($ USD)</label>
                                 <input type="number" step="0.01" id="depAmountInput" placeholder="10" class="w-full px-3 py-2 border rounded-xl bg-white text-sm" required>
@@ -221,10 +200,10 @@
                             </div>
                             <button type="submit" class="w-full bg-primary hover:bg-[#531423] text-white font-bold py-3 rounded-xl text-sm transition">إرسال إيصال الشحن للمراجعة</button>
                         </form>
-                        <div id="depositSuccessMsg" class="hidden max-w-xl bg-green-50 text-green-700 text-xs p-3 rounded-xl font-bold text-center">تم إرسال طلب الشحن بنجاح! بانتظار مراجعة الإدارة.</div>
+                        <div id="depositSuccessMsg" class="hidden max-w-xl text-xs p-3 rounded-xl font-bold text-center"></div>
                     </div>
 
-                    <!-- لوحة المدير -->
+                    <!-- لوحة المدير (تم تنظيفها لتشمل الإحصائيات وإدارة الخدمات فقط) -->
                     <div id="admin-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
                         <div class="flex flex-col sm:flex-row justify-between items-center gap-4 border-b pb-4">
                             <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-shield-halved text-red-500 me-2"></i> لوحة إدارة النظام (Admin Panel)</h3>
@@ -233,49 +212,10 @@
                                 <div class="bg-green-50 text-green-700 px-4 py-2 rounded-xl text-sm font-bold">إجمالي المبيعات: $<span id="adminTotalSales">0.00</span></div>
                             </div>
                         </div>
-                        
-                        <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl">
-                            <h4 class="font-bold text-lg text-amber-900 mb-3"><i class="fa-solid fa-wallet me-2"></i> طلبات شحن الرصيد المعلقة من العملاء</h4>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-right border-collapse bg-white rounded-xl overflow-hidden shadow-sm">
-                                    <thead>
-                                        <tr class="bg-gray-100 border-b text-xs text-gray-600">
-                                            <th class="p-3">ID</th>
-                                            <th class="p-3">المستخدم</th>
-                                            <th class="p-3">البريد الإلكتروني</th>
-                                            <th class="p-3">البوابة</th>
-                                            <th class="p-3">المبلغ ($)</th>
-                                            <th class="p-3">الإيصال</th>
-                                            <th class="p-3">الحالة</th>
-                                            <th class="p-3">الإجراء</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="adminDepositsTableBody" class="text-xs divide-y"></tbody>
-                                </table>
-                            </div>
-                        </div>
 
-                        <div class="mt-6">
-                            <h4 class="font-bold text-lg text-dark mb-3">متابعة طلبات الخدمات</h4>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-right border-collapse">
-                                    <thead>
-                                        <tr class="bg-gray-50 border-b border-gray-200 text-sm text-gray-600">
-                                            <th class="p-3">رقم الطلب</th>
-                                            <th class="p-3">المستخدم</th>
-                                            <th class="p-3">الخدمة</th>
-                                            <th class="p-3">الرابط</th>
-                                            <th class="p-3">السعر ($)</th>
-                                            <th class="p-3">الحالة</th>
-                                            <th class="p-3">إجراءات التحكم</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="adminOrdersTableBody" class="text-sm divide-y divide-gray-100"></tbody>
-                                </table>
-                            </div>
-                        </div>
+                        <!-- تم إزالة الجداول الخاصة بالطلبات وشحن الرصيد لأنها تدار من تليجرام -->
 
-                        <div class="mt-8 bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                        <div class="mt-4 bg-gray-50 p-6 rounded-2xl border border-gray-200">
                             <h4 id="adminFormTitle" class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام</h4>
                             <form id="addServiceForm" class="space-y-4">
                                 <input type="hidden" id="editServiceId" value="">
@@ -328,15 +268,6 @@
         </main>
     </div>
 
-    <!-- نافذة معاينة صورة الإيصال -->
-    <div id="receiptModal" class="modal fixed inset-0 z-[150] flex items-center justify-center bg-dark/70 backdrop-blur-sm">
-        <div class="bg-white p-4 rounded-2xl max-w-lg w-full relative text-center">
-            <button onclick="closeModal('receiptModal')" class="absolute top-2 left-2 text-gray-500 hover:text-red-500 text-xl font-bold"><i class="fa-solid fa-xmark"></i></button>
-            <h4 class="font-bold text-lg mb-3">معاينة إيصال الدفع</h4>
-            <img id="modalReceiptImg" src="" alt="الإيصال" class="max-h-[70vh] mx-auto rounded-xl border">
-        </div>
-    </div>
-
     <!-- نوافذ الدخول والتسجيل -->
     <div id="registerModal" class="modal fixed inset-0 z-[100] flex items-center justify-center bg-dark/60 backdrop-blur-sm">
         <div class="modal-content bg-white w-full max-w-md rounded-2xl p-8 relative mx-4">
@@ -365,7 +296,7 @@
         </div>
     </div>
 
-    <!-- JavaScript المحدث -->
+    <!-- JavaScript المحدث لتنظيف السكربتات الخاصة بالإدارة -->
     <script>
         let fetchedServices = [];
 
@@ -403,7 +334,6 @@
             const sessionStr = localStorage.getItem('smm_session');
             if (!sessionStr) return;
             const session = JSON.parse(sessionStr);
-
             try {
                 const res = await fetch(`/api/user/${session.email}`);
                 const data = await res.json();
@@ -413,16 +343,12 @@
                     session.username = data.user.username;
                     localStorage.setItem('smm_session', JSON.stringify(session));
                 }
-            } catch (err) {
-                console.error('خطأ في تحديث الرصيد');
-            }
+            } catch (err) {}
         }
 
         setInterval(() => {
             const session = localStorage.getItem('smm_session');
-            if (session) {
-                refreshUserBalance();
-            }
+            if (session) refreshUserBalance();
         }, 3000);
 
         function hideAllSections() {
@@ -455,39 +381,25 @@
                 if (data.success && data.services.length > 0) {
                     fetchedServices = data.services;
                     const categories = [...new Set(data.services.map(s => s.category))];
-                    categories.forEach(cat => {
-                        categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
-                    });
+                    categories.forEach(cat => { categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`; });
                 } else {
                     fetchedServices = [];
                 }
                 document.getElementById('serviceSelectContainer').classList.add('hidden');
                 document.getElementById('serviceDescriptionBox').classList.add('hidden');
                 document.getElementById('orderDetailsContainer').classList.add('hidden');
-            } catch (err) { console.error('خطأ في جلب الخدمات'); }
+            } catch (err) {}
         }
 
         function updateLinkPlaceholder(categoryName) {
             const linkInput = document.getElementById('orderLink');
             if (!categoryName) return;
-
             const catLower = categoryName.toLowerCase();
-            
-            if (catLower.includes('انستقرام') || catLower.includes('instagram')) {
-                linkInput.placeholder = 'https://instagram.com/username';
-            } else if (catLower.includes('فيس بوك') || catLower.includes('فيسبوك') || catLower.includes('facebook')) {
-                linkInput.placeholder = 'https://facebook.com/username';
-            } else if (catLower.includes('تيك توك') || catLower.includes('tiktok')) {
-                linkInput.placeholder = 'https://tiktok.com/@username';
-            } else if (catLower.includes('سناب') || catLower.includes('سناب شات') || catLower.includes('snapchat')) {
-                linkInput.placeholder = 'https://snapchat.com/add/username';
-            } else if (catLower.includes('يوتيوب') || catLower.includes('youtube')) {
-                linkInput.placeholder = 'https://youtube.com/@channelname';
-            } else if (catLower.includes('اكس') || catLower.includes('تويتر') || catLower.includes('twitter') || catLower.includes('x')) {
-                 linkInput.placeholder = 'https://x.com/username';
-            } else {
-                linkInput.placeholder = 'https://example.com/link';
-            }
+            if (catLower.includes('انستقرام') || catLower.includes('instagram')) { linkInput.placeholder = 'https://instagram.com/username'; }
+            else if (catLower.includes('فيس') || catLower.includes('facebook')) { linkInput.placeholder = 'https://facebook.com/username'; }
+            else if (catLower.includes('تيك توك') || catLower.includes('tiktok')) { linkInput.placeholder = 'https://tiktok.com/@username'; }
+            else if (catLower.includes('يوتيوب') || catLower.includes('youtube')) { linkInput.placeholder = 'https://youtube.com/@channelname'; }
+            else { linkInput.placeholder = 'https://example.com/link'; }
         }
 
         function onCategoryChange() {
@@ -498,24 +410,14 @@
             const orderDetailsContainer = document.getElementById('orderDetailsContainer');
 
             if (!selectedCat) {
-                serviceContainer.classList.add('hidden');
-                descBox.classList.add('hidden');
-                orderDetailsContainer.classList.add('hidden');
-                document.getElementById('charge').value = '';
-                return;
+                serviceContainer.classList.add('hidden'); descBox.classList.add('hidden'); orderDetailsContainer.classList.add('hidden'); document.getElementById('charge').value = ''; return;
             }
 
             const filteredServices = fetchedServices.filter(s => s.category === selectedCat);
             serviceSelect.innerHTML = '<option value="">-- اختر الخدمة --</option>';
-            filteredServices.forEach(serv => {
-                serviceSelect.innerHTML += `<option value="${serv.id}">${serv.name} - $${serv.price.toFixed(2)}/1K</option>`;
-            });
+            filteredServices.forEach(serv => { serviceSelect.innerHTML += `<option value="${serv.id}">${serv.name} - $${serv.price.toFixed(2)}/1K</option>`; });
 
-            serviceContainer.classList.remove('hidden');
-            descBox.classList.add('hidden');
-            orderDetailsContainer.classList.add('hidden');
-            document.getElementById('charge').value = '';
-            
+            serviceContainer.classList.remove('hidden'); descBox.classList.add('hidden'); orderDetailsContainer.classList.add('hidden'); document.getElementById('charge').value = '';
             updateLinkPlaceholder(selectedCat);
         }
 
@@ -525,23 +427,14 @@
             const descText = document.getElementById('serviceDescText');
             const orderDetailsContainer = document.getElementById('orderDetailsContainer');
 
-            if (!servId) {
-                descBox.classList.add('hidden');
-                orderDetailsContainer.classList.add('hidden');
-                document.getElementById('charge').value = '';
-                return;
-            }
+            if (!servId) { descBox.classList.add('hidden'); orderDetailsContainer.classList.add('hidden'); document.getElementById('charge').value = ''; return; }
 
             const targetServ = fetchedServices.find(s => s.id == servId);
             if (targetServ && targetServ.description && targetServ.description.trim() !== '') {
-                descText.innerText = targetServ.description;
-                descBox.classList.remove('hidden');
-            } else {
-                descBox.classList.add('hidden');
-            }
+                descText.innerText = targetServ.description; descBox.classList.remove('hidden');
+            } else { descBox.classList.add('hidden'); }
 
-            orderDetailsContainer.classList.remove('hidden');
-            calculatePrice();
+            orderDetailsContainer.classList.remove('hidden'); calculatePrice();
         }
 
         function calculatePrice() {
@@ -552,9 +445,7 @@
 
             if (targetServ && !isNaN(qty) && qty > 0) {
                 charge.value = ((qty / 1000) * targetServ.price).toFixed(4);
-            } else {
-                charge.value = '';
-            }
+            } else { charge.value = ''; }
         }
 
         async function showOrdersPage() {
@@ -575,22 +466,23 @@
                 tbody.innerHTML = '';
                 if (data.success && data.orders.length > 0) {
                     data.orders.forEach(order => {
+                        let statusColor = order.status.includes('مكتمل') ? 'text-green-700 bg-green-50' : 'text-yellow-700 bg-yellow-50';
                         tbody.innerHTML += `
                             <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
-                                <td class="p-3 font-bold text-primary">#${order.id}</td>
+                                <td class="p-3 font-bold text-primary">#${order.id.substring(0,6)}</td>
                                 <td class="p-3 text-gray-700">${order.service}</td>
                                 <td class="p-3 text-blue-600 truncate max-w-xs"><a href="${order.link}" target="_blank" class="hover:underline">${order.link}</a></td>
                                 <td class="p-3">${order.quantity}</td>
                                 <td class="p-3 font-bold">$${order.charge.toFixed(4)}</td>
-                                <td class="p-3"><span class="bg-yellow-50 text-yellow-700 px-2.5 py-1 rounded-full text-xs font-bold">${order.status}</span></td>
-                                <td class="p-3 text-gray-400 text-xs">${order.created_at}</td>
+                                <td class="p-3"><span class="${statusColor} px-2.5 py-1 rounded-full text-xs font-bold">${order.status}</span></td>
+                                <td class="p-3 text-gray-400 text-xs" dir="ltr">${order.created_at}</td>
                             </tr>
                         `;
                     });
                 } else {
                     tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-400">لا توجد طلبات سابقة.</td></tr>`;
                 }
-            } catch (err) { alert('خطأ في جلب الطلبات.'); }
+            } catch (err) {}
         }
 
         function showDepositPage() {
@@ -601,26 +493,16 @@
             document.getElementById('universalDepositForm').reset();
             updateDepositInstructions();
             refreshUserBalance();
+            document.getElementById('depositSuccessMsg').classList.add('hidden');
         }
 
         function updateDepositInstructions() {
             const gateway = document.getElementById('depositGateway').value;
             const infoBox = document.getElementById('depositInfoBox');
-            if (gateway === 'Asiacell') {
-                infoBox.innerHTML = `قم بتحويل المبلغ إلى الرقم:<br><span class="font-mono font-bold text-primary text-lg" dir="ltr">07738889080</span>`;
-            } else if (gateway === 'ZainCash') {
-                infoBox.innerHTML = `
-                    قم بالتحويل عبر مسح الباركود التالي الخاص بزين كاش:<br>
-                    <img src="/ZAINCASH.jpeg" alt="Zain Cash QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">
-                `;
-            } else if (gateway === 'Mastercard') {
-                infoBox.innerHTML = `قم بتحويل المبلغ إلى الرقم:<br><span class="font-mono font-bold text-primary text-lg" dir="ltr">7111053109</span>`;
-            } else if (gateway === 'Binance') {
-                infoBox.innerHTML = `
-                    قم بالتحويل إلى المعرف: <span class="font-mono font-bold text-primary" dir="ltr">1075470705</span> أو عبر مسح الباركود التالي:<br>
-                    <img src="/BINANCE.jpeg" alt="Binance QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">
-                `;
-            }
+            if (gateway === 'Asiacell') { infoBox.innerHTML = `قم بتحويل المبلغ إلى الرقم:<br><span class="font-mono font-bold text-primary text-lg" dir="ltr">07738889080</span>`; }
+            else if (gateway === 'ZainCash') { infoBox.innerHTML = `قم بالتحويل عبر مسح الباركود التالي الخاص بزين كاش:<br><img src="/ZAINCASH.jpeg" alt="Zain Cash QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">`; }
+            else if (gateway === 'Mastercard') { infoBox.innerHTML = `قم بتحويل المبلغ إلى الرقم:<br><span class="font-mono font-bold text-primary text-lg" dir="ltr">7111053109</span>`; }
+            else if (gateway === 'Binance') { infoBox.innerHTML = `قم بالتحويل إلى المعرف: <span class="font-mono font-bold text-primary" dir="ltr">1075470705</span> أو عبر مسح الباركود التالي:<br><img src="/BINANCE.jpeg" alt="Binance QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">`; }
         }
 
         async function handleDepositSubmit(e) {
@@ -628,27 +510,32 @@
             const sessionStr = localStorage.getItem('smm_session');
             if (!sessionStr) return alert('الرجاء تسجيل الدخول أولاً');
             const session = JSON.parse(sessionStr);
-
             const imageInput = document.getElementById('depImageInput');
             if (!imageInput.files[0]) return alert('الرجاء رفع صورة الإيصال.');
+
+            const msgBox = document.getElementById('depositSuccessMsg');
+            msgBox.className = 'hidden mt-4 max-w-xl text-xs p-3 rounded-xl font-bold text-center';
 
             const formData = new FormData();
             formData.append('email', session.email); 
             formData.append('gateway', document.getElementById('depositGateway').value);
             formData.append('amount', document.getElementById('depAmountInput').value);
-            formData.append('reference_id', 'بدون رقم عملية'); 
             formData.append('receiptImage', imageInput.files[0]);
 
             try {
                 const res = await fetch('/api/deposit/submit', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
-                    const successMsg = document.getElementById('depositSuccessMsg');
-                    successMsg.classList.remove('hidden');
+                    msgBox.classList.remove('hidden');
+                    msgBox.classList.add('bg-green-50', 'text-green-700');
+                    msgBox.innerText = 'تم إرسال طلب الشحن بنجاح! بانتظار مراجعة الإدارة عبر التليجرام.';
                     document.getElementById('universalDepositForm').reset();
                     updateDepositInstructions();
-                    setTimeout(() => successMsg.classList.add('hidden'), 5000);
-                } else { alert(data.message); }
+                } else { 
+                    msgBox.classList.remove('hidden');
+                    msgBox.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
+                    msgBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i> ${data.message}`; 
+                }
             } catch (err) { alert('خطأ في الاتصال بالخادم'); }
         }
 
@@ -660,72 +547,19 @@
             refreshUserBalance();
 
             try {
-                const res = await fetch('/api/admin/data');
-                const data = await res.json();
-                const depRes = await fetch('/api/admin/deposits');
-                const depData = await depRes.json();
+                const dataRes = await fetch('/api/admin/data');
+                const data = await dataRes.json();
                 const servRes = await fetch('/api/services');
                 const servData = await servRes.json();
 
                 if (data.success) {
                     document.getElementById('adminUsersCount').innerText = data.usersCount;
                     document.getElementById('adminTotalSales').innerText = data.totalSales.toFixed(2);
-
-                    const tbody = document.getElementById('adminOrdersTableBody');
-                    tbody.innerHTML = '';
-                    if (data.orders.length > 0) {
-                        data.orders.forEach(order => {
-                            tbody.innerHTML += `
-                                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                    <td class="p-3 font-bold text-primary">#${order.id}</td>
-                                    <td class="p-3 text-gray-800 font-bold">${order.username}</td>
-                                    <td class="p-3 text-gray-600">${order.service}</td>
-                                    <td class="p-3 text-blue-600 truncate max-w-xs"><a href="${order.link}" target="_blank" class="hover:underline">${order.link}</a></td>
-                                    <td class="p-3 font-bold">$${order.charge.toFixed(4)}</td>
-                                    <td class="p-3"><span class="bg-yellow-50 text-yellow-700 px-2.5 py-1 rounded-full text-xs font-bold">${order.status}</span></td>
-                                    <td class="p-3 space-x-2 space-x-reverse">
-                                        <button onclick="updateOrderStatus('${order.id}', 'مكتمل')" class="bg-green-600 text-white px-3 py-1 rounded-lg text-xs font-bold">إتمام</button>
-                                        <button onclick="updateOrderStatus('${order.id}', 'ملغي')" class="bg-red-500 text-white px-3 py-1 rounded-lg text-xs font-bold">إلغاء</button>
-                                    </td>
-                                </tr>
-                            `;
-                        });
-                    } else { tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-400">لا توجد طلبات.</td></tr>`; }
                 }
-
-                if (depData.success) {
-                    const depTbody = document.getElementById('adminDepositsTableBody');
-                    depTbody.innerHTML = '';
-                    if (depData.deposits.length > 0) {
-                        depData.deposits.forEach(dep => {
-                            let statusBadge = dep.status === 'معلق' ? '<span class="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">معلق</span>' : (dep.status === 'مقبول' ? '<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold">مقبول</span>' : '<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">مرفوض</span>');
-                            let imgBtn = dep.receipt_image ? `<button onclick="viewReceipt('${dep.receipt_image}')" class="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold hover:bg-blue-700">عرض الإيصال</button>` : '<span class="text-gray-400">بدون صورة</span>';
-
-                            depTbody.innerHTML += `
-                                <tr class="border-b hover:bg-gray-50">
-                                    <td class="p-3 font-bold">#${dep.id.substring(0, 6)}</td>
-                                    <td class="p-3 font-bold text-dark">${dep.username}</td>
-                                    <td class="p-3 text-indigo-600 font-mono text-xs">${dep.email}</td>
-                                    <td class="p-3 text-indigo-600 font-bold">${dep.gateway}</td>
-                                    <td class="p-3 font-bold">$${dep.amount.toFixed(2)}</td>
-                                    <td class="p-3">${imgBtn}</td>
-                                    <td class="p-3">${statusBadge}</td>
-                                    <td class="p-3 space-x-1 space-x-reverse">
-                                        ${dep.status === 'معلق' ? `
-                                            <button onclick="handleAdminDeposit('${dep.id}', 'مقبول')" class="bg-green-600 text-white px-2.5 py-1 rounded-lg font-bold hover:bg-green-700">قبول وشحن</button>
-                                            <button onclick="handleAdminDeposit('${dep.id}', 'مرفوض')" class="bg-red-500 text-white px-2.5 py-1 rounded-lg font-bold hover:bg-red-600">رفض</button>
-                                        ` : '<span class="text-gray-400 text-xs">تمت المعالجة</span>'}
-                                    </td>
-                                </tr>
-                            `;
-                        });
-                    } else { depTbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-gray-400">لا توجد طلبات شحن معلقة.</td></tr>`; }
-                }
-
                 if (servData.success) {
                     renderAdminServicesTable(servData.services);
                 }
-            } catch (err) { alert('خطأ في جلب البيانات.'); }
+            } catch (err) {}
         }
 
         function renderAdminServicesTable(services) {
@@ -746,115 +580,55 @@
                         </tr>
                     `;
                 });
-            } else {
-                servTbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-400">لا توجد خدمات مضافة بعد.</td></tr>`;
-            }
+            } else { servTbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-400">لا توجد خدمات مضافة بعد.</td></tr>`; }
         }
 
         function editService(id, category, name, price, description) {
-            document.getElementById('editServiceId').value = id;
-            document.getElementById('servCategory').value = category;
-            document.getElementById('servName').value = name;
-            document.getElementById('servPrice').value = price;
-            document.getElementById('servDescription').value = description;
-
+            document.getElementById('editServiceId').value = id; document.getElementById('servCategory').value = category; document.getElementById('servName').value = name; document.getElementById('servPrice').value = price; document.getElementById('servDescription').value = description;
             document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-500 me-2"></i> تعديل الخدمة الحالية`;
             const saveBtn = document.getElementById('saveServiceBtn');
-            saveBtn.innerText = 'حفظ التعديلات';
-            saveBtn.className = 'bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+            saveBtn.innerText = 'حفظ التعديلات'; saveBtn.className = 'bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
             document.getElementById('cancelEditBtn').classList.remove('hidden');
-
             document.getElementById('addServiceForm').scrollIntoView({ behavior: 'smooth' });
         }
 
         function resetServiceForm() {
-            document.getElementById('addServiceForm').reset();
-            document.getElementById('editServiceId').value = '';
+            document.getElementById('addServiceForm').reset(); document.getElementById('editServiceId').value = '';
             document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام`;
             const saveBtn = document.getElementById('saveServiceBtn');
-            saveBtn.innerText = 'إضافة الخدمة للنظام';
-            saveBtn.className = 'bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+            saveBtn.innerText = 'إضافة الخدمة للنظام'; saveBtn.className = 'bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
             document.getElementById('cancelEditBtn').classList.add('hidden');
         }
 
         async function deleteService(id) {
             if (!confirm('هل أنت تأكد من رغبتك في حذف هذه الخدمة؟')) return;
             try {
-                const res = await fetch('/api/admin/delete-service', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id })
-                });
+                const res = await fetch('/api/admin/delete-service', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
                 const data = await res.json();
-                if (data.success) {
-                    alert('تم حذف الخدمة بنجاح.');
-                    showAdminPanel();
-                } else { alert('فشل حذف الخدمة.'); }
-            } catch (err) { alert('خطأ في الاتصال.'); }
-        }
-
-        function viewReceipt(imgName) {
-            document.getElementById('modalReceiptImg').src = '/' + imgName;
-            openModal('receiptModal');
-        }
-
-        async function handleAdminDeposit(depositId, action) {
-            try {
-                const res = await fetch('/api/admin/deposit/action', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ depositId, action })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert(data.message);
-                    showAdminPanel();
-                    refreshUserBalance();
-                } else { alert(data.message); }
-            } catch (err) { alert('خطأ في الاتصال بالخادم'); }
+                if (data.success) showAdminPanel();
+            } catch (err) { }
         }
 
         document.getElementById('addServiceForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const editId = document.getElementById('editServiceId').value;
-            const category = document.getElementById('servCategory').value;
-            const name = document.getElementById('servName').value;
-            const price = parseFloat(document.getElementById('servPrice').value);
-            const description = document.getElementById('servDescription').value;
+            const payload = {
+                category: document.getElementById('servCategory').value, name: document.getElementById('servName').value,
+                price: parseFloat(document.getElementById('servPrice').value), description: document.getElementById('servDescription').value
+            };
+            if(editId) payload.id = editId;
 
             const endpoint = editId ? '/api/admin/update-service' : '/api/admin/add-service';
-            const payload = editId ? { id: editId, category, name, price, description } : { category, name, price, description };
-
             try {
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await res.json();
-                if (data.success) {
-                    alert(editId ? 'تم تعديل الخدمة بنجاح!' : 'تمت إضافة الخدمة بنجاح!');
-                    resetServiceForm();
-                    showAdminPanel();
-                } else { alert('حدث خطأ أثناء حفظ الخدمة.'); }
-            } catch (err) { alert('خطأ في الاتصال.'); }
+                if (data.success) { resetServiceForm(); showAdminPanel(); }
+            } catch (err) { }
         });
-
-        async function updateOrderStatus(orderId, status) {
-            await fetch('/api/admin/update-order-status', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ orderId, status })
-            });
-            showAdminPanel();
-        }
 
         window.addEventListener('DOMContentLoaded', () => {
             const session = localStorage.getItem('smm_session');
-            if (session) {
-                const user = JSON.parse(session);
-                showDashboard(user.username, user.email, user.balance);
-            }
+            if (session) { const user = JSON.parse(session); showDashboard(user.username, user.email, user.balance); }
         });
 
         document.getElementById('orderForm').addEventListener('submit', async function(e) {
@@ -862,93 +636,51 @@
             const sessionStr = localStorage.getItem('smm_session');
             if (!sessionStr) return alert('الرجاء تسجيل الدخول أولاً');
             const session = JSON.parse(sessionStr);
-
             const quantity = parseInt(document.getElementById('quantity').value);
-            if (isNaN(quantity) || quantity < 1000) return alert('عذراً، الحد الأدنى للطلب هو 1000.');
+            if (isNaN(quantity) || quantity < 1000) return alert('الحد الأدنى للطلب هو 1000.');
 
-            const servId = document.getElementById('serviceSelect').value;
-            const targetServ = fetchedServices.find(s => s.id == servId);
-            if (!targetServ) return alert('الرجاء اختيار الخدمة أولاً.');
+            const targetServ = fetchedServices.find(s => s.id == document.getElementById('serviceSelect').value);
+            if (!targetServ) return alert('اختر الخدمة.');
 
             const serviceName = `[${targetServ.category}] ${targetServ.name}`;
             const link = document.getElementById('orderLink').value;
             const charge = parseFloat(document.getElementById('charge').value);
 
-            if (session.balance < charge) return alert('رصيدك غير كافٍ لتنفيذ هذا الطلب.');
+            if (session.balance < charge) return alert('رصيدك غير كافٍ.');
 
             try {
-                const res = await fetch('/api/order', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: session.username, service: serviceName, link, quantity, charge })
-                });
+                const res = await fetch('/api/order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: session.username, service: serviceName, link, quantity, charge }) });
                 const data = await res.json();
                 if (data.success) {
-                    session.balance = data.newBalance;
-                    localStorage.setItem('smm_session', JSON.stringify(session));
+                    session.balance = data.newBalance; localStorage.setItem('smm_session', JSON.stringify(session));
                     document.getElementById('displayBalance').innerText = '$' + data.newBalance.toFixed(2);
-                    const successMsg = document.getElementById('successOrderMsg');
-                    successMsg.innerText = `تم إنشاء الطلب بنجاح! رقم الطلب: #${data.orderId}`;
-                    successMsg.classList.remove('hidden');
-                    
-                    this.reset();
-                    document.getElementById('serviceSelectContainer').classList.add('hidden');
-                    document.getElementById('serviceDescriptionBox').classList.add('hidden');
-                    document.getElementById('orderDetailsContainer').classList.add('hidden');
-                    document.getElementById('charge').value = '';
-                    
-                    setTimeout(() => successMsg.classList.add('hidden'), 5000);
+                    const msg = document.getElementById('successOrderMsg'); msg.innerText = `تم إنشاء الطلب بنجاح! #${data.orderId.substring(0,6)}`; msg.classList.remove('hidden');
+                    this.reset(); document.getElementById('serviceSelectContainer').classList.add('hidden'); document.getElementById('serviceDescriptionBox').classList.add('hidden'); document.getElementById('orderDetailsContainer').classList.add('hidden'); document.getElementById('charge').value = '';
+                    setTimeout(() => msg.classList.add('hidden'), 5000);
                 } else { alert(data.message); }
-            } catch (err) { alert('خطأ في الاتصال بالخادم.'); }
+            } catch (err) {}
         });
 
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const errorBox = document.getElementById('registerError');
-            errorBox.classList.add('hidden');
+            const errorBox = document.getElementById('registerError'); errorBox.classList.add('hidden');
             try {
-                const res = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: document.getElementById('regUsername').value,
-                        email: document.getElementById('regEmail').value,
-                        password: document.getElementById('regPassword').value
-                    })
-                });
+                const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: document.getElementById('regUsername').value, email: document.getElementById('regEmail').value, password: document.getElementById('regPassword').value }) });
                 const data = await res.json();
-                if (data.success) {
-                    localStorage.setItem('smm_session', JSON.stringify({ username: data.username, email: data.email, balance: data.balance }));
-                    showDashboard(data.username, data.email, data.balance);
-                    document.getElementById('registerForm').reset();
-                } else {
-                    errorBox.innerText = data.message; errorBox.classList.remove('hidden');
-                }
-            } catch (err) { alert('خطأ اتصال'); }
+                if (data.success) { localStorage.setItem('smm_session', JSON.stringify({ username: data.username, email: data.email, balance: data.balance })); showDashboard(data.username, data.email, data.balance); document.getElementById('registerForm').reset(); } 
+                else { errorBox.innerText = data.message; errorBox.classList.remove('hidden'); }
+            } catch (err) {}
         });
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const errorBox = document.getElementById('loginError');
-            errorBox.classList.add('hidden');
+            const errorBox = document.getElementById('loginError'); errorBox.classList.add('hidden');
             try {
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: document.getElementById('loginEmail').value,
-                        password: document.getElementById('loginPassword').value
-                    })
-                });
+                const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: document.getElementById('loginEmail').value, password: document.getElementById('loginPassword').value }) });
                 const data = await res.json();
-                if (data.success) {
-                    localStorage.setItem('smm_session', JSON.stringify({ username: data.username, email: data.email, balance: data.balance }));
-                    showDashboard(data.username, data.email, data.balance);
-                    document.getElementById('loginForm').reset();
-                } else {
-                    errorBox.innerText = data.message; errorBox.classList.remove('hidden');
-                }
-            } catch (err) { alert('خطأ اتصال'); }
+                if (data.success) { localStorage.setItem('smm_session', JSON.stringify({ username: data.username, email: data.email, balance: data.balance })); showDashboard(data.username, data.email, data.balance); document.getElementById('loginForm').reset(); } 
+                else { errorBox.innerText = data.message; errorBox.classList.remove('hidden'); }
+            } catch (err) {}
         });
     </script>
 </body>
