@@ -152,7 +152,7 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================================
-// ⚡ نظام الدفع المتكامل عبر آسياسيل (محدث بالكامل مع حفظ الكوكيز والـ PID)
+// ⚡ نظام الدفع المتكامل عبر آسياسيل (مع البحث العميق عن PID والكوكيز)
 // ==========================================================
 
 async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '') {
@@ -187,11 +187,18 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
         body: bodyData ? JSON.stringify(bodyData) : undefined
     });
 
-    // التقاط الكوكيز (Cookies) لضمان استمرارية الجلسة مع سيرفر آسياسيل
+    // التقاط كافة الكوكيز بدقة عالية في Node.js الحديث
     let newCookies = cookies;
-    const setCookieHeader = response.headers.get('set-cookie');
-    if (setCookieHeader) {
-        newCookies = setCookieHeader.split(',').map(c => c.split(';')[0].trim()).join('; ');
+    if (typeof response.headers.getSetCookie === 'function') {
+        const cookieList = response.headers.getSetCookie();
+        if (cookieList && cookieList.length > 0) {
+            newCookies = cookieList.map(c => c.split(';')[0].trim()).join('; ');
+        }
+    } else {
+        const setCookieHeader = response.headers.get('set-cookie');
+        if (setCookieHeader) {
+            newCookies = setCookieHeader.split(/,(?=\s*[a-zA-Z0-9_-]+=)/).map(c => c.split(';')[0].trim()).join('; ');
+        }
     }
 
     const text = await response.text();
@@ -207,18 +214,44 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     return { status: response.status, ok: response.ok, data: json, deviceId: currentDeviceId, cookies: newCookies };
 }
 
-// دالة استخراج الـ PID بذكاء من أي مكان في رد آسياسيل
-function extractPID(data) {
-    if (!data) return '';
-    if (data.PID) return data.PID;
-    if (data.pid) return data.pid;
-    if (data.data?.PID) return data.data.PID;
-    if (data.data?.pid) return data.data.pid;
-    // في بعض التحديثات ترسل آسياسيل الـ PID داخل رابط nextStepUrl أو smsValidationUrl
-    const urlStr = data.smsValidationUrl || data.nextStepUrl || data.data?.smsValidationUrl || data.data?.nextStepUrl || '';
-    const match = urlStr.match(/[?&](?:PID|pid)=([^&]+)/);
-    if (match) return match[1];
-    return '';
+// دالة بحث عميق لاستخراج الـ PID ورابط التحقق مهما كان مكانه أو اسمه في رد آسياسيل
+function extractSessionInfo(obj) {
+    let result = { pid: '', validationUrl: '' };
+    if (!obj || typeof obj !== 'object') return result;
+
+    const str = JSON.stringify(obj);
+
+    // 1. البحث عن أي رابط يحتوي على smsvalidation أو PID
+    const urlMatch = str.match(/https?:\/\/[^"'\s]+smsvalidation[^"'\s]*/i);
+    if (urlMatch) {
+        result.validationUrl = urlMatch[0];
+    }
+
+    // 2. البحث عن قيمة PID داخل أي نص أو رابط
+    const pidInUrl = str.match(/[?&](?:PID|pid|processId|requestId)=([a-zA-Z0-9_-]+)/);
+    if (pidInUrl) {
+        result.pid = pidInUrl[1];
+    }
+
+    // 3. البحث العميق في جميع مفاتيح الكائن (JSON Keys)
+    function searchKeys(o) {
+        for (const [k, v] of Object.entries(o)) {
+            if (v && typeof v === 'object') {
+                searchKeys(v);
+            } else if (typeof v === 'string' || typeof v === 'number') {
+                const keyLower = k.toLowerCase();
+                if (!result.pid && (keyLower === 'pid' || keyLower === 'processid' || keyLower === 'requestid' || keyLower === 'transactionid' || keyLower === 'sessionid' || keyLower === 'referenceid')) {
+                    result.pid = String(v);
+                }
+                if (!result.validationUrl && (keyLower.includes('url') || keyLower.includes('link')) && String(v).includes('smsvalidation')) {
+                    result.validationUrl = String(v);
+                }
+            }
+        }
+    }
+    searchKeys(obj);
+
+    return result;
 }
 
 function formatAsiacellErrorMessage(rawMessage) {
@@ -248,13 +281,14 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
             captchaCode: ''
         });
 
-        const pid = extractPID(result.data);
+        const info = extractSessionInfo(result.data);
         const nextStep = result.data?.nextStep || result.data?.data?.nextStep;
 
-        if (result.ok || pid || nextStep === 'OTP' || nextStep === 'SMS_VALIDATION') {
+        if (result.ok || info.pid || info.validationUrl || nextStep === 'OTP' || nextStep === 'SMS_VALIDATION') {
             await db.collection('asiacell_sessions').doc(cleanPhone).set({
                 phone: cleanPhone,
-                pid: pid,
+                pid: info.pid,
+                validationUrl: info.validationUrl,
                 deviceId: result.deviceId,
                 cookies: result.cookies || '',
                 rawLoginResponse: JSON.stringify(result.data),
@@ -296,35 +330,31 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
 
         const session = sessionDoc.data();
 
-        // المحاولة 1: الصيغة الرسمية لتطبيق آسياسيل الحديث (PID + passcode فقط)
-        let payload1 = { passcode: cleanOtp };
-        if (session.pid) payload1.PID = session.pid;
-
-        let verifyResult = await callAsiacellAPI('smsvalidation?lang=ar', 'POST', payload1, null, session.deviceId, session.cookies);
-        let accessToken = verifyResult.data?.access_token || verifyResult.data?.data?.access_token || verifyResult.data?.token || verifyResult.data?.data?.token;
-
-        // المحاولة 2: إذا لم ينجح، نجرب إرسال username مع PID و passcode
-        if (!accessToken) {
-            let payload2 = { username: cleanPhone, passcode: cleanOtp };
-            if (session.pid) payload2.PID = session.pid;
-            const retry1 = await callAsiacellAPI('smsvalidation?lang=ar', 'POST', payload2, null, session.deviceId, session.cookies);
-            accessToken = retry1.data?.access_token || retry1.data?.data?.access_token || retry1.data?.token || retry1.data?.data?.token;
-            if (accessToken) verifyResult = retry1;
+        // تحديد الرابط الدقيق للتحقق (إذا أرسلت آسياسيل رابطاً مخصصاً نستخدمه، وإلا نستخدم الرابط القياسي)
+        let targetEndpoint = 'smsvalidation?lang=ar';
+        if (session.validationUrl) {
+            targetEndpoint = session.validationUrl;
+        } else if (session.pid) {
+            targetEndpoint = `smsvalidation?lang=ar`;
         }
 
-        // المحاولة 3: في حال كانت الواجهة تستخدم حقل otpCode بدلاً من passcode
-        if (!accessToken) {
-            let payload3 = { username: cleanPhone, passcode: cleanOtp, otp: cleanOtp, otpCode: cleanOtp, PID: session.pid || undefined };
-            const retry2 = await callAsiacellAPI('smsvalidation?lang=ar', 'POST', payload3, null, session.deviceId, session.cookies);
-            accessToken = retry2.data?.access_token || retry2.data?.data?.access_token || retry2.data?.token || retry2.data?.data?.token;
-            if (accessToken) verifyResult = retry2;
+        // تجهيز البيانات في طلب واحد شامل لمنع احتراق الرمز بتكرار الطلبات
+        const verifyPayload = {
+            username: cleanPhone,
+            passcode: cleanOtp
+        };
+        if (session.pid) {
+            verifyPayload.PID = session.pid;
         }
+
+        const verifyResult = await callAsiacellAPI(targetEndpoint, 'POST', verifyPayload, null, session.deviceId, session.cookies);
+        const accessToken = verifyResult.data?.access_token || verifyResult.data?.data?.access_token || verifyResult.data?.token || verifyResult.data?.data?.token;
 
         if (!accessToken) {
             const errMsg = verifyResult.data?.message || verifyResult.data?.error_description || JSON.stringify(verifyResult.data);
             return res.status(400).json({
                 success: false,
-                message: `❌ رفض سيرفر آسياسيل الرمز. السبب من آسياسيل: (${errMsg}) | [PID: ${session.pid ? 'موجود' : 'مفقود'}]`
+                message: `❌ رد آسياسيل: (${errMsg}) | بيانات المرحلة 1: ${session.rawLoginResponse}`
             });
         }
 
@@ -373,10 +403,10 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             amount: transferAmountIQD
         }, session.accessToken, session.deviceId, session.cookies);
 
-        const transferPid = extractPID(transferResult.data) || transferResult.data?.transactionId || '';
+        const transferInfo = extractSessionInfo(transferResult.data);
         const nextStep = transferResult.data?.nextStep || transferResult.data?.data?.nextStep;
 
-        if (!transferResult.ok && !transferPid && nextStep !== 'OTP' && nextStep !== 'SMS_VALIDATION') {
+        if (!transferResult.ok && !transferInfo.pid && nextStep !== 'OTP' && nextStep !== 'SMS_VALIDATION') {
             return res.status(400).json({
                 success: false,
                 message: formatAsiacellErrorMessage(transferResult.data?.message || transferResult.data?.error_description || JSON.stringify(transferResult.data))
@@ -384,7 +414,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
-            transferPid: transferPid,
+            transferPid: transferInfo.pid,
             amountUSD: usd,
             amountIQD: transferAmountIQD,
             step: 'WAIT_TRANSFER_OTP',
