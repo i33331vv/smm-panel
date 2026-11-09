@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const fs = require('fs');
 const https = require('https');
+const crypto = require('crypto'); // 💡 تم إضافة مكتبة التشفير لقراءة بصمة الصور
 
 // إعدادات بوتات التليجرام والمعرفات الخاصة بك
 const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
@@ -26,24 +27,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const port = 3000;
 
-// إعداد التخزين للإيصالات
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, __dirname);
-    },
-    filename: (req, file, cb) => {
-        cb(null, 'receipt_' + Date.now() + path.extname(file.originalname));
-    }
+    destination: (req, file, cb) => { cb(null, __dirname); },
+    filename: (req, file, cb) => { cb(null, 'receipt_' + Date.now() + path.extname(file.originalname)); }
 });
 const upload = multer({ storage: storage });
 
 app.use(express.static(__dirname));
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 
-// دالة لتوليد التاريخ والوقت بدقة تامة
 function getFormattedDateTime() {
     const now = new Date();
     return now.toLocaleString('ar-IQ', {
@@ -54,66 +47,38 @@ function getFormattedDateTime() {
     });
 }
 
-// إرسال رسالة نصية لتليجرام
-function sendTelegramTextMessage(token, chatId, text, replyMarkup = null) {
-    const data = JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        reply_markup: replyMarkup
+// 💡 دالة جديدة: استخراج البصمة الرقمية للصورة (لمنع التكرار)
+function getFileHash(filePath) {
+    return new Promise((resolve, reject) => {
+        const hash = crypto.createHash('sha256');
+        const stream = fs.createReadStream(filePath);
+        stream.on('data', data => hash.update(data));
+        stream.on('end', () => resolve(hash.digest('hex')));
+        stream.on('error', err => reject(err));
     });
+}
 
-    const options = {
-        hostname: 'api.telegram.org', path: `/bot${token}/sendMessage`,
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
-    };
-
+function sendTelegramTextMessage(token, chatId, text, replyMarkup = null) {
+    const data = JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: replyMarkup });
+    const options = { hostname: 'api.telegram.org', path: `/bot${token}/sendMessage`, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } };
     const req = https.request(options);
     req.on('error', (e) => console.error(e));
     req.write(data); req.end();
 }
 
-// دالة لإيقاف دوران الزر في تليجرام فوراً (إجابة تليجرام)
 function answerCallbackQuery(token, callbackQueryId, text) {
-    const data = JSON.stringify({
-        callback_query_id: callbackQueryId,
-        text: text,
-        show_alert: false
-    });
-
-    const options = {
-        hostname: 'api.telegram.org', path: `/bot${token}/answerCallbackQuery`,
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
-    };
-
-    const req = https.request(options);
-    req.on('error', () => {});
-    req.write(data); req.end();
+    const data = JSON.stringify({ callback_query_id: callbackQueryId, text: text, show_alert: false });
+    const options = { hostname: 'api.telegram.org', path: `/bot${token}/answerCallbackQuery`, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } };
+    const req = https.request(options); req.on('error', () => {}); req.write(data); req.end();
 }
 
-// دالة لتعديل الرسالة النصية وإزالة الأزرار
 function editTelegramTextMessage(token, chatId, messageId, newText, replyMarkup = { inline_keyboard: [] }) {
-    const data = JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        text: newText,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        reply_markup: replyMarkup
-    });
-
-    const options = {
-        hostname: 'api.telegram.org', path: `/bot${token}/editMessageText`,
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
-    };
-
-    const req = https.request(options);
-    req.on('error', () => {});
-    req.write(data); req.end();
+    const data = JSON.stringify({ chat_id: chatId, message_id: messageId, text: newText, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: replyMarkup });
+    const options = { hostname: 'api.telegram.org', path: `/bot${token}/editMessageText`, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } };
+    const req = https.request(options); req.on('error', () => {}); req.write(data); req.end();
 }
 
-// نظام الاستعلام المستمر (Polling) - يحل مشكلة الـ Webhook الجدار الناري 100%
+// نظام الاستعلام المستمر
 function startTelegramPolling(token) {
     let offset = 0;
     setInterval(() => {
@@ -126,14 +91,12 @@ function startTelegramPolling(token) {
                     if (data.ok && data.result.length > 0) {
                         for (const update of data.result) {
                             offset = update.update_id + 1; 
-
                             if (update.callback_query) {
                                 const callbackQuery = update.callback_query;
                                 const cbData = callbackQuery.data;
                                 const chatId = callbackQuery.message.chat.id;
                                 const messageId = callbackQuery.message.message_id;
 
-                                // 🚨 إيقاف دوران الزر فوراً عند الضغط
                                 answerCallbackQuery(token, callbackQuery.id, 'جاري تنفيذ الطلب...');
 
                                 try {
@@ -149,7 +112,6 @@ function startTelegramPolling(token) {
                                             const currentBalance = parseFloat(userDoc.data().balance || 0);
                                             await userDoc.ref.update({ balance: currentBalance + amount });
                                             await db.collection('deposit_requests').doc(depId).update({ status: 'مقبول' });
-
                                             const originalText = callbackQuery.message.text || '';
                                             const updatedText = originalText + `\n\n✅ <b>تم شحن الرصيد بنجاح ($${amount}) وإضافته لحساب المستخدم!</b>`;
                                             editTelegramTextMessage(token, chatId, messageId, updatedText);
@@ -171,7 +133,7 @@ function startTelegramPolling(token) {
                                         const orderId = cbData.split('_')[2];
                                         await db.collection('orders').doc(orderId).update({ status: 'مكتمل' });
                                         const originalText = callbackQuery.message.text || '';
-                                        const updatedText = originalText.replace('🔄 الحالة: قيد التنفيذ حالياً', '✅ <b>الحالة: تم إكمال الطلب بنجاح</b>');
+                                        const updatedText = originalText.replace('🔄 <b>الحالة: قيد التنفيذ حالياً</b>', '✅ <b>الحالة: تم إكمال الطلب بنجاح</b>');
                                         editTelegramTextMessage(token, chatId, messageId, updatedText);
                                     }
                                 } catch (err) { console.error('خطأ قاعدة البيانات:', err); }
@@ -181,14 +143,12 @@ function startTelegramPolling(token) {
                 } catch (e) {}
             });
         }).on('error', () => {});
-    }, 2500); // تحديث كل ثانيتين ونصف
+    }, 2500); 
 }
 
-// تفعيل نظام الاستعلام المباشر للبوتين
 startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
-// مسارات الموقع
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
     try {
@@ -220,33 +180,54 @@ app.get('/api/user/:email', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// طلب شحن
+// طلب شحن - مع نظامي (منع التكرار المعلق) + (البصمة الرقمية للصورة) 🚨
 app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) => {
     const { email, gateway, amount } = req.body;
     const uploadedFile = req.file;
     if (!email || !gateway || !amount || !uploadedFile) return res.status(400).json({ success: false, message: 'الرجاء إكمال البيانات.' });
 
     try {
+        // 1. التحقق من الطلبات المعلقة
+        const pendingSnap = await db.collection('deposit_requests').where('email', '==', email).where('status', '==', 'معلق').get();
+        if (!pendingSnap.empty) {
+            if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
+            return res.status(400).json({ success: false, message: 'عذراً، لديك طلب شحن قيد المراجعة بالفعل. الرجاء الانتظار.' });
+        }
+
+        // 2. 💡 استخراج البصمة الرقمية والتحقق من عدم استخدام الصورة مسبقاً
+        const fileHash = await getFileHash(uploadedFile.path);
+        const hashCheckSnap = await db.collection('deposit_requests').where('image_hash', '==', fileHash).get();
+        if (!hashCheckSnap.empty) {
+            if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
+            return res.status(400).json({ success: false, message: '🚫 عذراً! لقد تم استخدام صورة هذا الإيصال مسبقاً في النظام. يرجى رفع إيصال دفع جديد.' });
+        }
+
         const userSnap = await db.collection('users').where('email', '==', email).get();
         if (userSnap.empty) { fs.unlinkSync(uploadedFile.path); return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' }); }
         
         const username = userSnap.docs[0].data().username;
         const dateTime = getFormattedDateTime();
-        const depRef = await db.collection('deposit_requests').add({ username, email, gateway, amount: parseFloat(amount), receipt_image: uploadedFile.filename, status: 'معلق', created_at: dateTime });
+        
+        // إضافة البصمة `image_hash` إلى قاعدة البيانات
+        const depRef = await db.collection('deposit_requests').add({ 
+            username, email, gateway, amount: parseFloat(amount), 
+            receipt_image: uploadedFile.filename, 
+            image_hash: fileHash, // حفظ البصمة هنا
+            status: 'معلق', created_at: dateTime 
+        });
         
         const receiptUrl = `https://mtnajm.com/${uploadedFile.filename}`;
         const text = `📥 <b>طلب شحن رصيد جديد</b>\n\n👤 <b>المستخدم:</b> ${username}\n📧 <b>البريد:</b> ${email}\n💰 <b>المبلغ:</b> $${amount}\n💳 <b>البوابة:</b> ${gateway}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}\n\n🔗 <a href="${receiptUrl}"><b>[ اضغط هنا لعرض صورة إيصال الدفع ]</b></a>`;
-        
         const replyMarkup = { inline_keyboard: [[ { text: '✅ شحن الرصيد', callback_data: `dep_accept_${depRef.id}_${email}_${amount}` }, { text: '❌ رفض', callback_data: `dep_reject_${depRef.id}` } ]] };
         sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, text, replyMarkup);
-        res.json({ success: true, message: 'تم إرسال طلب الشحن بنجاح.' });
+        
+        res.json({ success: true, message: 'تم إرسال طلب الشحن بنجاح وبانتظار المراجعة.' });
     } catch (e) {
         if (uploadedFile && fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
-        res.status(500).json({ success: false });
+        res.status(500).json({ success: false, message: 'خطأ في الخادم.' });
     }
 });
 
-// طلب خدمة
 app.post('/api/order', async (req, res) => {
     const { username, service, link, quantity, charge } = req.body;
     try {
@@ -290,6 +271,40 @@ app.get('/api/services', async (req, res) => {
         snapshot.forEach(doc => services.push({ id: doc.id, ...doc.data() }));
         res.json({ success: true, services });
     } catch (e) { res.json({ success: true, services: [] }); }
+});
+
+// مسارات الإدارة للحصول على الإحصائيات (تم إزالة استدعاء الجداول لعدم الحاجة لها)
+app.get('/api/admin/data', async (req, res) => {
+    try {
+        const usersSnap = await db.collection('users').get();
+        let totalSales = 0;
+        const ordersSnap = await db.collection('orders').get();
+        ordersSnap.forEach(doc => { totalSales += parseFloat(doc.data().charge || 0); });
+        res.json({ success: true, usersCount: usersSnap.size, totalSales });
+    } catch (e) { res.status(500).json({ success: false }); }
+});
+
+app.post('/api/admin/add-service', async (req, res) => {
+    const { category, name, price, description } = req.body;
+    try {
+        await db.collection('services').add({ category, name, price: parseFloat(price), description, created_at: getFormattedDateTime() });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false }); }
+});
+
+app.post('/api/admin/update-service', async (req, res) => {
+    const { id, category, name, price, description } = req.body;
+    try {
+        await db.collection('services').doc(id).update({ category, name, price: parseFloat(price), description });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false }); }
+});
+
+app.post('/api/admin/delete-service', async (req, res) => {
+    try {
+        await db.collection('services').doc(req.body.id).delete();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false }); }
 });
 
 app.listen(port, () => {
