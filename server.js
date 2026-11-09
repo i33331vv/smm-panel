@@ -320,4 +320,30 @@ app.get('/api/orders/:username', async (req, res) => {
     try {
         const snapshot = await db.collection('orders').where('username', '==', req.params.username).get();
         const orders = [];
-        snapshot.forEach(doc => orders.push({ id: doc.id, ...doc.data() }))
+        snapshot.forEach(doc => orders.push({ id: doc.id, ...doc.data() }));
+        res.json({ success: true, orders });
+    } catch (e) { res.json({ success: true, orders: [] }); }
+});
+
+app.get('/api/services', async (req, res) => {
+    try {
+        const snapshot = await db.collection('services').get();
+        const services = [];
+        snapshot.forEach(doc => services.push({ id: doc.id, ...doc.data() }));
+        res.json({ success: true, services });
+    } catch (e) { res.json({ success: true, services: [] }); }
+});
+
+app.get('/api/admin/data', async (req, res) => {
+    try {
+        const usersSnap = await db.collection('users').get();
+        let totalSales = 0;
+        const ordersSnap = await db.collection('orders').get();
+        ordersSnap.forEach(doc => { totalSales += parseFloat(doc.data().charge || 0); });
+        res.json({ success: true, usersCount: usersSnap.size, totalSales });
+    } catch (e) { res.status(500).json({ success: false }); }
+});
+
+app.listen(port, () => {
+    console.log(`Cloud Server running on port ${port}`);
+});
