@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MT</title>
+    <title>mtnajm - MT</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -12,14 +12,18 @@
             theme: {
                 extend: {
                     fontFamily: { sans: ['Tajawal', 'sans-serif'] },
-                    colors: { primary: '#4f46e5', secondary: '#3b82f6', dark: '#1e293b' }
+                    colors: { 
+                        primary: '#6b1d2f', /* تم تغيير اللون الأساسي إلى البرغندي الفاخر */
+                        secondary: '#8a253d', 
+                        dark: '#1e293b' 
+                    }
                 }
             }
         }
     </script>
     <style>
         body { font-family: 'Tajawal', sans-serif; background-color: #f3f4f6; }
-        .hero-bg { background-image: radial-gradient(circle at top right, #e0e7ff 0%, transparent 40%), radial-gradient(circle at bottom left, #dbeafe 0%, transparent 40%); }
+        .hero-bg { background-image: radial-gradient(circle at top right, #fce4e8 0%, transparent 40%), radial-gradient(circle at bottom left, #f7d6dd 0%, transparent 40%); }
         .modal { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
         .modal.active { opacity: 1; pointer-events: auto; }
         .modal-content { transform: scale(0.95) translateY(-20px); transition: all 0.3s ease; }
@@ -33,13 +37,16 @@
         <header class="bg-white shadow-sm sticky top-0 z-50">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center h-20">
-                    <div class="flex-shrink-0 flex items-center">
-                        <i class="fa-solid fa-rocket text-primary text-3xl me-2"></i>
-                        <span class="font-bold text-2xl text-dark">MT</span>
+                    <div class="flex-shrink-0 flex items-center space-x-2 space-x-reverse">
+                        <!-- شعار الموقع المتوافق مع الاسم mt وmtnajm -->
+                        <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-xl shadow-md">
+                            MT
+                        </div>
+                        <span class="font-extrabold text-xl text-dark tracking-wide">mtnajm</span>
                     </div>
                     <div class="flex items-center space-x-4 space-x-reverse">
                         <button onclick="openModal('loginModal')" class="text-dark font-medium hover:text-primary transition">تسجيل الدخول</button>
-                        <button onclick="openModal('registerModal')" class="bg-primary hover:bg-indigo-700 text-white px-6 py-2 rounded-full font-medium shadow-md transition transform hover:-translate-y-0.5">حساب جديد</button>
+                        <button onclick="openModal('registerModal')" class="bg-primary hover:bg-[#531423] text-white px-6 py-2 rounded-full font-medium shadow-md transition transform hover:-translate-y-0.5">حساب جديد</button>
                     </div>
                 </div>
             </div>
@@ -48,12 +55,12 @@
         <main class="flex-grow hero-bg">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 text-center">
                 <h1 class="text-4xl md:text-6xl font-extrabold text-dark tracking-tight mb-6 leading-tight">
-                    كبّر حساباتك مع أفضل لوحة دعم ميديا
+                    كبّر حساباتك مع منصة <span class="text-primary">mtnajm</span> للدعم الرقمي
                 </h1>
                 <p class="mt-4 text-xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
                     نقدم لك خدمات زيادة المتابعين، اللايكات، والمشاهدات بأسعار تنافسية وبطرق شحن مرنة ومضمونة.
                 </p>
-                <button onclick="openModal('registerModal')" class="bg-primary hover:bg-indigo-700 text-white px-8 py-4 rounded-full font-bold text-lg shadow-xl transition transform hover:-translate-y-1">
+                <button onclick="openModal('registerModal')" class="bg-primary hover:bg-[#531423] text-white px-8 py-4 rounded-full font-bold text-lg shadow-xl transition transform hover:-translate-y-1">
                     ابدأ الآن - أنشئ حسابك
                 </button>
             </div>
@@ -63,19 +70,25 @@
     <!-- لوحة التحكم الكاملة -->
     <div id="dashboard-page" class="hidden min-h-screen bg-[#f8fafc] flex flex-col md:flex-row transition-opacity duration-300">
         <aside class="w-full md:w-64 bg-white border-l border-gray-200 shadow-sm flex-shrink-0 flex flex-col">
-            <div class="h-16 flex items-center justify-center md:justify-start md:px-6 flex-shrink-0">
-                <i class="fa-solid fa-rocket text-primary text-2xl me-2"></i>
-                <span class="font-bold text-xl text-dark">MT</span>
+            <!-- الشعار المحدث في الشريط الجانبي -->
+            <div class="h-20 flex items-center justify-center md:justify-start md:px-6 flex-shrink-0 space-x-3 space-x-reverse">
+                <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-lg shadow-md">
+                    MT
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-extrabold text-lg text-dark leading-none">mtnajm</span>
+                    <span class="text-[10px] text-gray-400 mt-1">SMM Panel</span>
+                </div>
             </div>
             
             <div class="px-4 pb-4 border-b border-gray-100 text-center md:text-right flex-shrink-0">
-                <p class="text-xs font-bold text-primary bg-indigo-50 py-2 px-3 rounded-lg shadow-sm">
+                <p class="text-xs font-bold text-primary bg-[#fdf2f4] py-2 px-3 rounded-lg shadow-sm">
                     خدمات زيادة متابعين وتفاعل حقيقية فقط
                 </p>
             </div>
 
             <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
-                <a href="#" id="navNewOrder" onclick="showNewOrderPage()" class="flex items-center px-4 py-3 bg-indigo-50 text-primary rounded-xl font-medium transition cursor-pointer">
+                <a href="#" id="navNewOrder" onclick="showNewOrderPage()" class="flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer">
                     <i class="fa-solid fa-plus-circle w-6 text-center text-lg me-3"></i> طلب جديد
                 </a>
                 <a href="#" id="navOrders" onclick="showOrdersPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer">
@@ -88,22 +101,18 @@
                     <i class="fa-solid fa-shield-halved w-6 text-center text-lg me-3"></i> لوحة المدير
                 </a>
             </nav>
-            <div class="p-4 border-t border-gray-100 flex-shrink-0">
-                <button onclick="logoutUser()" class="flex w-full items-center justify-center px-4 py-2 text-red-500 hover:bg-red-50 rounded-xl font-medium transition">
-                    <i class="fa-solid fa-right-from-bracket text-lg me-2 rotate-180"></i> تسجيل الخروج
-                </button>
-            </div>
+            <!-- تم حذف زر تسجيل الخروج بناءً على رغبتك -->
         </aside>
 
         <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-10 flex-shrink-0">
+            <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-10 flex-shrink-0">
                 <h2 id="pageTitle" class="text-xl font-bold text-dark hidden sm:block">إنشاء طلب جديد</h2>
                 <div class="flex items-center space-x-4 space-x-reverse">
                     <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-1.5 rounded-full flex items-center text-sm font-bold shadow-sm">
                         <i class="fa-solid fa-coins me-2 text-yellow-500"></i> الرصيد: <span id="displayBalance" class="ms-1" dir="ltr">$0.00</span>
                     </div>
                     <div class="flex items-center bg-gray-50 p-2 rounded-lg transition">
-                        <div id="displayUsernameIcon" class="w-8 h-8 rounded-full bg-indigo-100 text-primary flex items-center justify-center font-bold text-sm">U</div>
+                        <div id="displayUsernameIcon" class="w-8 h-8 rounded-full bg-[#fdf2f4] text-primary flex items-center justify-center font-bold text-sm">U</div>
                         <span id="displayUsernameText" class="font-bold text-sm text-gray-700 ms-2">المستخدم</span>
                     </div>
                 </div>
@@ -112,19 +121,17 @@
             <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                 <div class="max-w-5xl mx-auto">
                     
-                    <!-- 1. نموذج الطلب للمستخدم (مقسم حسب القسم والخدمة) -->
+                    <!-- 1. نموذج الطلب للمستخدم -->
                     <div id="new-order-section" class="space-y-6">
                         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                             <form id="orderForm" class="space-y-5">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                    <!-- اختيار القسم -->
                                     <div>
                                         <label class="block text-sm font-bold text-gray-700 mb-2">القسم</label>
                                         <select id="categorySelect" onchange="onCategoryChange()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-medium">
                                             <option value="">-- اختر القسم --</option>
                                         </select>
                                     </div>
-                                    <!-- اختيار الخدمة (تظهر فقط بعد اختيار القسم) -->
                                     <div id="serviceSelectContainer" class="hidden">
                                         <label class="block text-sm font-bold text-gray-700 mb-2">الخدمة</label>
                                         <select id="serviceSelect" onchange="onServiceChange()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-medium">
@@ -133,13 +140,11 @@
                                     </div>
                                 </div>
 
-                                <!-- مربع وصف الخدمة -->
-                                <div id="serviceDescriptionBox" class="hidden bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-900 leading-relaxed">
+                                <div id="serviceDescriptionBox" class="hidden bg-[#fdf2f4] border border-[#f7d6dd] p-4 rounded-xl text-sm text-[#531423] leading-relaxed">
                                     <span class="font-bold block mb-1"><i class="fa-solid fa-circle-info me-1"></i> وصف الخدمة:</span>
                                     <p id="serviceDescText" class="whitespace-pre-wrap"></p>
                                 </div>
 
-                                <!-- تفاصيل الطلب المخفية (الرابط، الكمية، السعر) -->
                                 <div id="orderDetailsContainer" class="hidden space-y-5">
                                     <div>
                                         <label class="block text-sm font-bold text-gray-700 mb-2">الرابط</label>
@@ -155,7 +160,7 @@
                                             <input type="text" id="charge" readonly placeholder="0.00" class="block w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-100 text-gray-500 font-bold cursor-not-allowed">
                                         </div>
                                     </div>
-                                    <button type="submit" id="submitOrderBtn" class="w-full bg-primary hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition">تأكيد الطلب</button>
+                                    <button type="submit" id="submitOrderBtn" class="w-full bg-primary hover:bg-[#531423] text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition">تأكيد الطلب</button>
                                 </div>
                             </form>
                             <div id="successOrderMsg" class="hidden mt-4 bg-green-50 text-green-700 border border-green-200 p-4 rounded-xl text-sm text-center font-bold">تم استلام طلبك بنجاح!</div>
@@ -201,7 +206,7 @@
                                 </select>
                             </div>
                             
-                            <div id="depositInfoBox" class="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-900 font-medium text-center"></div>
+                            <div id="depositInfoBox" class="p-4 bg-[#fdf2f4] border border-[#f7d6dd] rounded-xl text-sm text-[#531423] font-medium text-center"></div>
 
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">المبلغ المراد شحنه ($ USD)</label>
@@ -209,24 +214,23 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">رفع لقطة الشاشة (صورة الإيصال)</label>
-                                <input type="file" id="depImageInput" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-indigo-700" required>
+                                <input type="file" id="depImageInput" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-[#531423]" required>
                             </div>
-                            <button type="submit" class="w-full bg-primary hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm transition">إرسال إيصال الشحن للمراجعة</button>
+                            <button type="submit" class="w-full bg-primary hover:bg-[#531423] text-white font-bold py-3 rounded-xl text-sm transition">إرسال إيصال الشحن للمراجعة</button>
                         </form>
                         <div id="depositSuccessMsg" class="hidden max-w-xl bg-green-50 text-green-700 text-xs p-3 rounded-xl font-bold text-center">تم إرسال طلب الشحن بنجاح! بانتظار مراجعة الإدارة.</div>
                     </div>
 
-                    <!-- 2 & 3. لوحة المدير وإدارة الخدمات (إضافة، تعديل، حذف) -->
+                    <!-- لوحة المدير -->
                     <div id="admin-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
                         <div class="flex flex-col sm:flex-row justify-between items-center gap-4 border-b pb-4">
                             <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-shield-halved text-red-500 me-2"></i> لوحة إدارة النظام (Admin Panel)</h3>
                             <div class="flex gap-3">
-                                <div class="bg-indigo-50 text-primary px-4 py-2 rounded-xl text-sm font-bold">إجمالي المستخدمين: <span id="adminUsersCount">0</span></div>
+                                <div class="bg-[#fdf2f4] text-primary px-4 py-2 rounded-xl text-sm font-bold">إجمالي المستخدمين: <span id="adminUsersCount">0</span></div>
                                 <div class="bg-green-50 text-green-700 px-4 py-2 rounded-xl text-sm font-bold">إجمالي المبيعات: $<span id="adminTotalSales">0.00</span></div>
                             </div>
                         </div>
                         
-                        <!-- طلبات الشحن المعلقة -->
                         <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl">
                             <h4 class="font-bold text-lg text-amber-900 mb-3"><i class="fa-solid fa-wallet me-2"></i> طلبات شحن الرصيد المعلقة من العملاء</h4>
                             <div class="overflow-x-auto">
@@ -248,7 +252,6 @@
                             </div>
                         </div>
 
-                        <!-- متابعة طلبات الخدمات -->
                         <div class="mt-6">
                             <h4 class="font-bold text-lg text-dark mb-3">متابعة طلبات الخدمات</h4>
                             <div class="overflow-x-auto">
@@ -269,7 +272,6 @@
                             </div>
                         </div>
 
-                        <!-- نموذج إضافة / تعديل خدمة جديدة -->
                         <div class="mt-8 bg-gray-50 p-6 rounded-2xl border border-gray-200">
                             <h4 id="adminFormTitle" class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام</h4>
                             <form id="addServiceForm" class="space-y-4">
@@ -293,13 +295,12 @@
                                     <textarea id="servDescription" rows="3" placeholder="وصف الخدمة..." class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required></textarea>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <button type="submit" id="saveServiceBtn" class="bg-primary hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition">إضافة الخدمة للنظام</button>
+                                    <button type="submit" id="saveServiceBtn" class="bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition">إضافة الخدمة للنظام</button>
                                     <button type="button" id="cancelEditBtn" onclick="resetServiceForm()" class="hidden bg-gray-500 hover:bg-gray-600 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition">إلغاء التعديل</button>
                                 </div>
                             </form>
                         </div>
 
-                        <!-- جدول إدارة الخدمات المتاحة (تعديل وحذف) -->
                         <div class="mt-6 bg-white p-6 rounded-2xl border border-gray-200">
                             <h4 class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-list-check text-primary me-2"></i> الخدمات المتاحة في النظام (تعديل / حذف)</h4>
                             <div class="overflow-x-auto">
@@ -361,7 +362,7 @@
         </div>
     </div>
 
-    <!-- JavaScript المحدث للعمليات -->
+    <!-- JavaScript المحدث -->
     <script>
         let fetchedServices = [];
 
@@ -436,12 +437,11 @@
             hideAllSections();
             document.getElementById('new-order-section').classList.remove('hidden');
             document.getElementById('pageTitle').innerText = 'إنشاء طلب جديد';
-            document.getElementById('navNewOrder').className = 'flex items-center px-4 py-3 bg-indigo-50 text-primary rounded-xl font-medium transition cursor-pointer';
+            document.getElementById('navNewOrder').className = 'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
             loadServicesForUser();
             refreshUserBalance();
         }
 
-        // جلب الخدمات للأقسام
         async function loadServicesForUser() {
             try {
                 const res = await fetch('/api/services');
@@ -464,7 +464,6 @@
             } catch (err) { console.error('خطأ في جلب الخدمات'); }
         }
 
-        // دالة تحديث نص الرابط التوضيحي
         function updateLinkPlaceholder(categoryName) {
             const linkInput = document.getElementById('orderLink');
             if (!categoryName) return;
@@ -488,7 +487,6 @@
             }
         }
 
-        // عند تغير القسم
         function onCategoryChange() {
             const selectedCat = document.getElementById('categorySelect').value;
             const serviceContainer = document.getElementById('serviceSelectContainer');
@@ -515,11 +513,9 @@
             orderDetailsContainer.classList.add('hidden');
             document.getElementById('charge').value = '';
             
-            // تغيير نص الرابط الافتراضي
             updateLinkPlaceholder(selectedCat);
         }
 
-        // عند تغير الخدمة
         function onServiceChange() {
             const servId = document.getElementById('serviceSelect').value;
             const descBox = document.getElementById('serviceDescriptionBox');
@@ -541,7 +537,6 @@
                 descBox.classList.add('hidden');
             }
 
-            // إظهار حقول الرابط والكمية والسعر
             orderDetailsContainer.classList.remove('hidden');
             calculatePrice();
         }
@@ -563,7 +558,7 @@
             hideAllSections();
             document.getElementById('orders-section').classList.remove('hidden');
             document.getElementById('pageTitle').innerText = 'سجل الطلبات';
-            document.getElementById('navOrders').className = 'flex items-center px-4 py-3 bg-indigo-50 text-primary rounded-xl font-medium transition cursor-pointer';
+            document.getElementById('navOrders').className = 'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
             refreshUserBalance();
 
             const sessionStr = localStorage.getItem('smm_session');
@@ -599,7 +594,7 @@
             hideAllSections();
             document.getElementById('deposit-section').classList.remove('hidden');
             document.getElementById('pageTitle').innerText = 'شحن الرصيد';
-            document.getElementById('navDeposit').className = 'flex items-center px-4 py-3 bg-indigo-50 text-primary rounded-xl font-medium transition cursor-pointer';
+            document.getElementById('navDeposit').className = 'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
             document.getElementById('universalDepositForm').reset();
             updateDepositInstructions();
             refreshUserBalance();
@@ -654,7 +649,6 @@
             } catch (err) { alert('خطأ في الاتصال بالخادم'); }
         }
 
-        // لوحة التحكم للمدير
         async function showAdminPanel() {
             hideAllSections();
             document.getElementById('admin-section').classList.remove('hidden');
@@ -725,20 +719,17 @@
                     } else { depTbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-gray-400">لا توجد طلبات شحن معلقة.</td></tr>`; }
                 }
 
-                // عرض جدول الخدمات للتحكم
                 if (servData.success) {
                     renderAdminServicesTable(servData.services);
                 }
             } catch (err) { alert('خطأ في جلب البيانات.'); }
         }
 
-        // عرض جدول الخدمات وإتاحة التعديل والحذف
         function renderAdminServicesTable(services) {
             const servTbody = document.getElementById('adminServicesTableBody');
             servTbody.innerHTML = '';
             if (services && services.length > 0) {
                 services.forEach(serv => {
-                    const servJson = JSON.stringify(serv).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
                     servTbody.innerHTML += `
                         <tr class="border-b hover:bg-gray-50">
                             <td class="p-3 font-bold text-primary">${serv.category}</td>
@@ -757,7 +748,6 @@
             }
         }
 
-        // بدء تعديل الخدمة
         function editService(id, category, name, price, description) {
             document.getElementById('editServiceId').value = id;
             document.getElementById('servCategory').value = category;
@@ -774,18 +764,16 @@
             document.getElementById('addServiceForm').scrollIntoView({ behavior: 'smooth' });
         }
 
-        // إعادة تعيين نموذج الخدمة
         function resetServiceForm() {
             document.getElementById('addServiceForm').reset();
             document.getElementById('editServiceId').value = '';
             document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام`;
             const saveBtn = document.getElementById('saveServiceBtn');
             saveBtn.innerText = 'إضافة الخدمة للنظام';
-            saveBtn.className = 'bg-primary hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+            saveBtn.className = 'bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
             document.getElementById('cancelEditBtn').classList.add('hidden');
         }
 
-        // حذف الخدمة
         async function deleteService(id) {
             if (!confirm('هل أنت تأكد من رغبتك في حذف هذه الخدمة؟')) return;
             try {
@@ -823,7 +811,6 @@
             } catch (err) { alert('خطأ في الاتصال بالخادم'); }
         }
 
-        // حفظ أو تعديل الخدمة
         document.getElementById('addServiceForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const editId = document.getElementById('editServiceId').value;
@@ -859,11 +846,6 @@
             showAdminPanel();
         }
 
-        function logoutUser() {
-            localStorage.removeItem('smm_session');
-            toggleView('landing-page');
-        }
-
         window.addEventListener('DOMContentLoaded', () => {
             const session = localStorage.getItem('smm_session');
             if (session) {
@@ -872,7 +854,6 @@
             }
         });
 
-        // تقديم طلب للمستخدم
         document.getElementById('orderForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const sessionStr = localStorage.getItem('smm_session');
@@ -907,7 +888,6 @@
                     successMsg.innerText = `تم إنشاء الطلب بنجاح! رقم الطلب: #${data.orderId}`;
                     successMsg.classList.remove('hidden');
                     
-                    // إعادة تعيين النموذج وإخفاء الحقول
                     this.reset();
                     document.getElementById('serviceSelectContainer').classList.add('hidden');
                     document.getElementById('serviceDescriptionBox').classList.add('hidden');
