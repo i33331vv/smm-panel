@@ -3,18 +3,17 @@ const path = require('path');
 const app = express();
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
-const sharp = require('sharp');
 const fs = require('fs');
 const https = require('https');
 
-// إعدادات بوتات التليجرام ومعرف الشات الخاص بك
+// إعدادات بوتات التليجرام والمعرفات الخاصة بك
 const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
 const ORDERS_BOT_TOKEN = '9023175997:AAGuvzz3eLywKIBkTjs3w9NCVnmutRblCEc';
 const ADMIN_CHAT_ID = '8671448765';
 
 // استيراد Firebase
 const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore } = require('firebase-admin/firestore');
 const serviceAccount = require('./serviceAccountKey.json');
 
 initializeApp({
@@ -59,89 +58,19 @@ function getFormattedDateTime() {
     });
 }
 
-// دالة إرسال رسالة مع صورة أو نص إلى تليجرام مع الأزرار الشفافة
-function sendTelegramMessage(token, chatId, text, replyMarkup = null, photoPath = null) {
-    const boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW';
-    let postData = '';
-
-    if (photoPath && fs.existsSync(photoPath)) {
-        const fileData = fs.readFileSync(photoPath);
-        const fileName = path.basename(photoPath);
-        
-        postData += `--${boundary}\r\n`;
-        postData += `Content-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n`;
-        postData += `--${boundary}\r\n`;
-        postData += `Content-Disposition: form-data; name="caption"\r\n\r\n${text}\r\n`;
-        postData += `--${boundary}\r\n`;
-        postData += `Content-Disposition: form-data; name="parse_mode"\r\n\r\nHTML\r\n`;
-        if (replyMarkup) {
-            postData += `--${boundary}\r\n`;
-            postData += `Content-Disposition: form-data; name="reply_markup"\r\n\r\n${JSON.stringify(replyMarkup)}\r\n`;
-        }
-        postData += `--${boundary}\r\n`;
-        postData += `Content-Disposition: form-data; name="photo"; filename="${fileName}"\r\n`;
-        postData += `Content-Type: image/jpeg\r\n\r\n`;
-
-        const bufferData = Buffer.concat([
-            Buffer.from(postData, 'utf-8'),
-            fileData,
-            Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8')
-        ]);
-
-        const options = {
-            hostname: 'api.telegram.org',
-            path: `/bot${token}/sendPhoto`,
-            method: 'POST',
-            headers: {
-                'Content-Type': `multipart/form-data; boundary=${boundary}`,
-                'Content-Length': bufferData.length
-            }
-        };
-
-        const req = https.request(options, (res) => {});
-        req.on('error', (e) => console.error(e));
-        req.write(bufferData);
-        req.end();
-    } else {
-        const data = JSON.stringify({
-            chat_id: chatId,
-            text: text,
-            parse_mode: 'HTML',
-            reply_markup: replyMarkup
-        });
-
-        const options = {
-            hostname: 'api.telegram.org',
-            path: `/bot${token}/sendMessage`,
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(data)
-            }
-        };
-
-        const req = https.request(options, (res) => {});
-        req.on('error', (e) => console.error(e));
-        req.write(data);
-        req.end();
-    }
-}
-
-// دالة عامة لتعديل نص الرسالة (سواء كانت صورة أو نص) وإزالة الأزرار نهائياً
-function editTelegramMessageText(token, chatId, messageId, newText) {
-    // نحدد ما إذا كانت الرسالة تحتوي على caption أو text بناءً على نوع الـ API المتاح، أو نستخدم editMessageCaption إذا كانت صورة
-    // لتفادي أي خطأ، سنقوم بتحديث الـ caption إذا كانت صورة، أو الـ text إذا كانت نصاً
+// دالة إرسال رسالة نصية بحتة مع الأزرار الشفافة (تمنع مشاكل معاينة الروابط وتضمن سرعة استجابة الأزرار)
+function sendTelegramTextMessage(token, chatId, text, replyMarkup = null) {
     const data = JSON.stringify({
         chat_id: chatId,
-        message_id: messageId,
-        caption: newText,
+        text: text,
         parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: [] }
+        disable_web_page_preview: true, // إلغاء معاينة الروابط لضمان عمل الأزرار 100%
+        reply_markup: replyMarkup
     });
 
     const options = {
         hostname: 'api.telegram.org',
-        path: `/bot${token}/editMessageCaption`,
+        path: `/bot${token}/sendMessage`,
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -149,29 +78,21 @@ function editTelegramMessageText(token, chatId, messageId, newText) {
         }
     };
 
-    const req = https.request(options, (res) => {
-        res.on('data', (chunk) => {
-            // إذا فشلت كـ caption (لأنها رسالة نصية وليست صورة)، نقوم بتعديلها كـ text
-            try {
-                const response = JSON.parse(chunk.toString());
-                if (!response.ok) {
-                    editAsTextOnly(token, chatId, messageId, newText);
-                }
-            } catch (err) {}
-        });
-    });
-    req.on('error', (e) => {});
+    const req = https.request(options, (res) => {});
+    req.on('error', (e) => console.error(e));
     req.write(data);
     req.end();
 }
 
-function editAsTextOnly(token, chatId, messageId, newText) {
+// دالة لتعديل الرسالة النصية وإزالة الأزرار فوراً عند الضغط
+function editTelegramTextMessage(token, chatId, messageId, newText, replyMarkup = { inline_keyboard: [] }) {
     const data = JSON.stringify({
         chat_id: chatId,
         message_id: messageId,
         text: newText,
         parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: [] }
+        disable_web_page_preview: true,
+        reply_markup: replyMarkup
     });
 
     const options = {
@@ -228,7 +149,7 @@ app.get('/api/user/:email', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// 1. استقبال طلب الشحن وإرساله لبوت التليجرام مع صورة الإيصال والأزرار (شحن / رفض)
+// 1. استقبال طلب الشحن وإرساله لبوت التليجرام كرسالة نصية مع رابط الإيصال والأزرار الفورية
 app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) => {
     const { email, gateway, amount } = req.body;
     const uploadedFile = req.file;
@@ -253,7 +174,11 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
             created_at: dateTime
         });
 
-        const text = `📥 <b>طلب شحن رصيد جديد</b>\n\n👤 <b>المستخدم:</b> ${username}\n📧 <b>البريد:</b> ${email}\n💰 <b>المبلغ:</b> $${amount}\n💳 <b>البوابة:</b> ${gateway}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}`;
+        // رابط صورة الإيصال المباشر
+        const receiptUrl = `https://mtnajm.com/${uploadedFile.filename}`;
+
+        const text = `📥 <b>طلب شحن رصيد جديد</b>\n\n👤 <b>المستخدم:</b> ${username}\n📧 <b>البريد:</b> ${email}\n💰 <b>المبلغ:</b> $${amount}\n💳 <b>البوابة:</b> ${gateway}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}\n\n🔗 <a href="${receiptUrl}"><b>[ اضغط هنا لعرض صورة إيصال الدفع ]</b></a>`;
+        
         const replyMarkup = {
             inline_keyboard: [
                 [
@@ -263,7 +188,7 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
             ]
         };
 
-        sendTelegramMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, text, replyMarkup, uploadedFile.path);
+        sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, text, replyMarkup);
 
         res.json({ success: true, message: 'تم إرسال طلب الشحن بنجاح وبانتظار المراجعة.' });
     } catch (e) {
@@ -307,7 +232,7 @@ app.post('/api/order', async (req, res) => {
             ]
         };
 
-        sendTelegramMessage(ORDERS_BOT_TOKEN, ADMIN_CHAT_ID, text, replyMarkup);
+        sendTelegramTextMessage(ORDERS_BOT_TOKEN, ADMIN_CHAT_ID, text, replyMarkup);
 
         res.json({ success: true, newBalance, orderId });
     } catch (e) { res.status(500).json({ success: false, message: 'خطأ في الخادم.' }); }
@@ -341,17 +266,17 @@ app.post('/api/telegram-webhook/:type', async (req, res) => {
                     await userRef.update({ balance: newBalance });
                     await db.collection('deposit_requests').doc(depId).update({ status: 'مقبول' });
 
-                    const originalText = callbackQuery.message.caption || callbackQuery.message.text || '';
+                    const originalText = callbackQuery.message.text || '';
                     const updatedText = originalText + `\n\n✅ <b>تم شحن الرصيد بنجاح ($${amount}) للمستخدم!</b>`;
-                    editTelegramMessageText(token, chatId, messageId, updatedText);
+                    editTelegramTextMessage(token, chatId, messageId, updatedText, { inline_keyboard: [] });
                 }
             } else if (data.startsWith('dep_reject_')) {
                 const depId = data.split('_')[2];
                 await db.collection('deposit_requests').doc(depId).update({ status: 'مرفوض' });
 
-                const originalText = callbackQuery.message.caption || callbackQuery.message.text || '';
+                const originalText = callbackQuery.message.text || '';
                 const updatedText = originalText + `\n\n❌ <b>تم رفض طلب شحن الرصيد.</b>`;
-                editTelegramMessageText(token, chatId, messageId, updatedText);
+                editTelegramTextMessage(token, chatId, messageId, updatedText, { inline_keyboard: [] });
             } else if (data.startsWith('ord_progress_')) {
                 const orderId = data.split('_')[2];
                 await db.collection('orders').doc(orderId).update({ status: 'قيد التنفيذ' });
@@ -363,14 +288,14 @@ app.post('/api/telegram-webhook/:type', async (req, res) => {
                         [{ text: '✔️ تم الاكتمال', callback_data: `ord_complete_${orderId}` }]
                     ]
                 };
-                editAsTextOnly(token, chatId, messageId, updatedText + `\n\n✔️ <b>الحالة: قيد التنفيذ حالياً</b>`, newMarkup);
+                editTelegramTextMessage(token, chatId, messageId, updatedText, newMarkup);
             } else if (data.startsWith('ord_complete_')) {
                 const orderId = data.split('_')[2];
                 await db.collection('orders').doc(orderId).update({ status: 'مكتمل' });
 
                 const originalText = callbackQuery.message.text || '';
                 const updatedText = originalText.replace('🔄 الحالة: قيد التنفيذ حالياً', '✅ الحالة: تم إكمال الطلب بنجاح');
-                editAsTextOnly(token, chatId, messageId, updatedText, { inline_keyboard: [] });
+                editTelegramTextMessage(token, chatId, messageId, updatedText, { inline_keyboard: [] });
             }
         } catch (e) {
             console.error('خطأ في معالجة تفاعل التليجرام:', e);
