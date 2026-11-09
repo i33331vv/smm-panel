@@ -173,37 +173,73 @@
                         </div>
                     </div>
 
-                    <!-- شحن الرصيد -->
+                    <!-- شحن الرصيد التلقائي واليدوي -->
                     <div id="deposit-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
                         <div class="border-b pb-4">
-                            <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-wallet text-primary me-2"></i> شحن الرصيد</h3>
-                            <p class="text-sm text-gray-500 mt-1">اختر بوابة الدفع، قم بالتحويل ثم أرفع صورة الإيصال.</p>
+                            <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-bolt text-yellow-500 me-2"></i> شحن الرصيد التلقائي / اليدوي</h3>
+                            <p class="text-sm text-gray-500 mt-1">اختر طريقة الدفع المناسبة لشحن حسابك فوراً.</p>
                         </div>
-                        <form id="universalDepositForm" onsubmit="handleDepositSubmit(event)" class="max-w-xl space-y-4">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">طريقة الدفع</label>
-                                <select id="depositGateway" onchange="updateDepositInstructions()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-medium">
-                                    <option value="Asiacell">آسيا حوالة (Asiacell)</option>
-                                    <option value="ZainCash">زين كاش (Zain Cash)</option>
-                                    <option value="Mastercard">ماستر كارد</option>
-                                    <option value="Binance">بينانس (Binance)</option>
-                                </select>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">طريقة الدفع</label>
+                            <select id="depositGateway" onchange="toggleDepositMode()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-medium">
+                                <option value="AsiacellAuto">آسيا سيل (دفع وتأكيد تلقائي بالـ OTP) ⚡</option>
+                                <option value="ZainCash">زين كاش (Zain Cash)</option>
+                                <option value="Mastercard">ماستر كارد</option>
+                                <option value="Binance">بينانس (Binance)</option>
+                            </select>
+                        </div>
+
+                        <!-- ⚡ 1. واجهة آسيا سيل التلقائية -->
+                        <div id="asiaAutoBox" class="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
+                            <div class="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs font-bold text-center">
+                                سيتم إرسال رمز تحقق (OTP) إلى هاتفك واستقطاع المبلغ المحدد وإضافته لحسابك تلقائياً
                             </div>
+                            <div id="asiaStep1" class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">رقم هاتف آسيا سيل</label>
+                                    <input type="text" id="asiaPhoneInput" placeholder="077XXXXXXXX" class="w-full px-4 py-3 border rounded-xl text-sm font-mono" dir="ltr">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">المبلغ المراد شحنه ($ USD)</label>
+                                    <input type="number" id="asiaAmountInput" placeholder="10" class="w-full px-4 py-3 border rounded-xl text-sm">
+                                </div>
+                                <button onclick="requestAsiaOTP()" id="sendOtpBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl text-sm transition">
+                                    إرسال رمز التحقق OTP
+                                </button>
+                            </div>
+                            <div id="asiaStep2" class="hidden space-y-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">رمز OTP المكون من 6 أرقام المرسل إلى هاتفك</label>
+                                    <input type="text" id="asiaOtpInput" placeholder="123456" maxlength="6" class="w-full px-4 py-3 border rounded-xl text-center font-mono text-lg font-bold tracking-widest" dir="ltr">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">رمز التحويل السري (اختياري إن وجد)</label>
+                                    <input type="password" id="asiaPinInput" placeholder="****" class="w-full px-4 py-3 border rounded-xl text-center font-mono text-sm" dir="ltr">
+                                </div>
+                                <button onclick="confirmAsiaTransfer()" id="confirmOtpBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl text-sm transition">
+                                    تأكيد واستقطاع الرصيد تلقائياً
+                                </button>
+                            </div>
+                            <div id="asiaMsg" class="hidden text-xs p-3 rounded-xl font-bold text-center"></div>
+                        </div>
+
+                        <!-- 📷 2. واجهة الدفع اليدوي بواسطة الإيصالات (للبوابات الأخرى) -->
+                        <form id="manualDepositForm" onsubmit="handleDepositSubmit(event)" class="hidden max-w-xl space-y-4">
                             <div id="depositInfoBox" class="p-4 bg-[#fdf2f4] border border-[#f7d6dd] rounded-xl text-sm text-[#531423] font-medium text-center"></div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">المبلغ المراد شحنه ($ USD)</label>
-                                <input type="number" step="0.01" id="depAmountInput" placeholder="10" class="w-full px-3 py-2 border rounded-xl bg-white text-sm" required>
+                                <input type="number" step="0.01" id="depAmountInput" placeholder="10" class="w-full px-3 py-2 border rounded-xl bg-white text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">رفع لقطة الشاشة (صورة الإيصال)</label>
-                                <input type="file" id="depImageInput" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-[#531423]" required>
+                                <input type="file" id="depImageInput" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white">
                             </div>
                             <button type="submit" class="w-full bg-primary hover:bg-[#531423] text-white font-bold py-3 rounded-xl text-sm transition">إرسال إيصال الشحن للمراجعة</button>
                         </form>
                         <div id="depositSuccessMsg" class="hidden max-w-xl text-xs p-3 rounded-xl font-bold text-center"></div>
                     </div>
 
-                    <!-- لوحة المدير (تم تنظيفها لتشمل الإحصائيات وإدارة الخدمات فقط) -->
+                    <!-- لوحة المدير (الإحصائيات وإدارة الخدمات) -->
                     <div id="admin-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
                         <div class="flex flex-col sm:flex-row justify-between items-center gap-4 border-b pb-4">
                             <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-shield-halved text-red-500 me-2"></i> لوحة إدارة النظام (Admin Panel)</h3>
@@ -212,8 +248,6 @@
                                 <div class="bg-green-50 text-green-700 px-4 py-2 rounded-xl text-sm font-bold">إجمالي المبيعات: $<span id="adminTotalSales">0.00</span></div>
                             </div>
                         </div>
-
-                        <!-- تم إزالة الجداول الخاصة بالطلبات وشحن الرصيد لأنها تدار من تليجرام -->
 
                         <div class="mt-4 bg-gray-50 p-6 rounded-2xl border border-gray-200">
                             <h4 id="adminFormTitle" class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام</h4>
@@ -245,7 +279,7 @@
                         </div>
 
                         <div class="mt-6 bg-white p-6 rounded-2xl border border-gray-200">
-                            <h4 class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-list-check text-primary me-2"></i> الخدمات المتاحة في النظام (تعديل / حذف)</h4>
+                            <h4 class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-list-check text-primary me-2"></i> الخدمات المتاحة في النظام</h4>
                             <div class="overflow-x-auto">
                                 <table class="w-full text-right border-collapse">
                                     <thead>
@@ -261,7 +295,6 @@
                                 </table>
                             </div>
                         </div>
-
                     </div>
                 </div>
             </div>
@@ -296,7 +329,7 @@
         </div>
     </div>
 
-    <!-- JavaScript المحدث لتنظيف السكربتات الخاصة بالإدارة -->
+    <!-- JavaScript الأساسي للوحة -->
     <script>
         let fetchedServices = [];
 
@@ -317,11 +350,9 @@
             const ADMIN_EMAIL = 'qhtymhmd@gmail.com';
             const adminLink = document.getElementById('adminNavLink');
             if (username === ADMIN_USER && email === ADMIN_EMAIL) {
-                adminLink.classList.remove('hidden');
-                adminLink.classList.add('flex');
+                adminLink.classList.remove('hidden'); adminLink.classList.add('flex');
             } else {
-                adminLink.classList.add('hidden');
-                adminLink.classList.remove('flex');
+                adminLink.classList.add('hidden'); adminLink.classList.remove('flex');
             }
 
             closeModal('loginModal'); closeModal('registerModal');
@@ -340,23 +371,17 @@
                 if (data.success) {
                     document.getElementById('displayBalance').innerText = '$' + parseFloat(data.user.balance).toFixed(2);
                     session.balance = data.user.balance;
-                    session.username = data.user.username;
                     localStorage.setItem('smm_session', JSON.stringify(session));
                 }
             } catch (err) {}
         }
-
-        setInterval(() => {
-            const session = localStorage.getItem('smm_session');
-            if (session) refreshUserBalance();
-        }, 3000);
+        setInterval(() => { if (localStorage.getItem('smm_session')) refreshUserBalance(); }, 3000);
 
         function hideAllSections() {
             document.getElementById('new-order-section').classList.add('hidden');
             document.getElementById('orders-section').classList.add('hidden');
             document.getElementById('deposit-section').classList.add('hidden');
             document.getElementById('admin-section').classList.add('hidden');
-            
             document.getElementById('navNewOrder').className = 'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
             document.getElementById('navOrders').className = 'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
             document.getElementById('navDeposit').className = 'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
@@ -367,8 +392,7 @@
             document.getElementById('new-order-section').classList.remove('hidden');
             document.getElementById('pageTitle').innerText = 'إنشاء طلب جديد';
             document.getElementById('navNewOrder').className = 'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
-            loadServicesForUser();
-            refreshUserBalance();
+            loadServicesForUser(); refreshUserBalance();
         }
 
         async function loadServicesForUser() {
@@ -382,9 +406,7 @@
                     fetchedServices = data.services;
                     const categories = [...new Set(data.services.map(s => s.category))];
                     categories.forEach(cat => { categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`; });
-                } else {
-                    fetchedServices = [];
-                }
+                } else { fetchedServices = []; }
                 document.getElementById('serviceSelectContainer').classList.add('hidden');
                 document.getElementById('serviceDescriptionBox').classList.add('hidden');
                 document.getElementById('orderDetailsContainer').classList.add('hidden');
@@ -396,9 +418,7 @@
             if (!categoryName) return;
             const catLower = categoryName.toLowerCase();
             if (catLower.includes('انستقرام') || catLower.includes('instagram')) { linkInput.placeholder = 'https://instagram.com/username'; }
-            else if (catLower.includes('فيس') || catLower.includes('facebook')) { linkInput.placeholder = 'https://facebook.com/username'; }
-            else if (catLower.includes('تيك توك') || catLower.includes('tiktok')) { linkInput.placeholder = 'https://tiktok.com/@username'; }
-            else if (catLower.includes('يوتيوب') || catLower.includes('youtube')) { linkInput.placeholder = 'https://youtube.com/@channelname'; }
+            else if (catLower.includes('تيك') || catLower.includes('tiktok')) { linkInput.placeholder = 'https://tiktok.com/@username'; }
             else { linkInput.placeholder = 'https://example.com/link'; }
         }
 
@@ -412,11 +432,9 @@
             if (!selectedCat) {
                 serviceContainer.classList.add('hidden'); descBox.classList.add('hidden'); orderDetailsContainer.classList.add('hidden'); document.getElementById('charge').value = ''; return;
             }
-
             const filteredServices = fetchedServices.filter(s => s.category === selectedCat);
             serviceSelect.innerHTML = '<option value="">-- اختر الخدمة --</option>';
             filteredServices.forEach(serv => { serviceSelect.innerHTML += `<option value="${serv.id}">${serv.name} - $${serv.price.toFixed(2)}/1K</option>`; });
-
             serviceContainer.classList.remove('hidden'); descBox.classList.add('hidden'); orderDetailsContainer.classList.add('hidden'); document.getElementById('charge').value = '';
             updateLinkPlaceholder(selectedCat);
         }
@@ -428,12 +446,10 @@
             const orderDetailsContainer = document.getElementById('orderDetailsContainer');
 
             if (!servId) { descBox.classList.add('hidden'); orderDetailsContainer.classList.add('hidden'); document.getElementById('charge').value = ''; return; }
-
             const targetServ = fetchedServices.find(s => s.id == servId);
             if (targetServ && targetServ.description && targetServ.description.trim() !== '') {
                 descText.innerText = targetServ.description; descBox.classList.remove('hidden');
             } else { descBox.classList.add('hidden'); }
-
             orderDetailsContainer.classList.remove('hidden'); calculatePrice();
         }
 
@@ -443,9 +459,7 @@
             const qty = parseInt(document.getElementById('quantity').value);
             const charge = document.getElementById('charge');
 
-            if (targetServ && !isNaN(qty) && qty > 0) {
-                charge.value = ((qty / 1000) * targetServ.price).toFixed(4);
-            } else { charge.value = ''; }
+            if (targetServ && !isNaN(qty) && qty > 0) { charge.value = ((qty / 1000) * targetServ.price).toFixed(4); } else { charge.value = ''; }
         }
 
         async function showOrdersPage() {
@@ -479,9 +493,7 @@
                             </tr>
                         `;
                     });
-                } else {
-                    tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-400">لا توجد طلبات سابقة.</td></tr>`;
-                }
+                } else { tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-400">لا توجد طلبات سابقة.</td></tr>`; }
             } catch (err) {}
         }
 
@@ -490,19 +502,86 @@
             document.getElementById('deposit-section').classList.remove('hidden');
             document.getElementById('pageTitle').innerText = 'شحن الرصيد';
             document.getElementById('navDeposit').className = 'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
-            document.getElementById('universalDepositForm').reset();
-            updateDepositInstructions();
-            refreshUserBalance();
+            
+            // تصفير الواجهات عند الدخول
+            if (document.getElementById('manualDepositForm')) document.getElementById('manualDepositForm').reset();
+            document.getElementById('asiaPhoneInput').value = '';
+            document.getElementById('asiaAmountInput').value = '';
+            document.getElementById('asiaOtpInput').value = '';
+            document.getElementById('asiaPinInput').value = '';
+            document.getElementById('asiaStep1').classList.remove('hidden');
+            document.getElementById('asiaStep2').classList.add('hidden');
+            document.getElementById('asiaMsg').classList.add('hidden');
             document.getElementById('depositSuccessMsg').classList.add('hidden');
+            
+            toggleDepositMode();
+            refreshUserBalance();
+        }
+
+        function toggleDepositMode() {
+            const gateway = document.getElementById('depositGateway').value;
+            const asiaAutoBox = document.getElementById('asiaAutoBox');
+            const manualForm = document.getElementById('manualDepositForm');
+
+            if (gateway === 'AsiacellAuto') {
+                asiaAutoBox.classList.remove('hidden'); manualForm.classList.add('hidden');
+            } else {
+                asiaAutoBox.classList.add('hidden'); manualForm.classList.remove('hidden'); updateDepositInstructions();
+            }
         }
 
         function updateDepositInstructions() {
             const gateway = document.getElementById('depositGateway').value;
             const infoBox = document.getElementById('depositInfoBox');
-            if (gateway === 'Asiacell') { infoBox.innerHTML = `قم بتحويل المبلغ إلى الرقم:<br><span class="font-mono font-bold text-primary text-lg" dir="ltr">07738889080</span>`; }
-            else if (gateway === 'ZainCash') { infoBox.innerHTML = `قم بالتحويل عبر مسح الباركود التالي الخاص بزين كاش:<br><img src="/ZAINCASH.jpeg" alt="Zain Cash QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">`; }
+            if (gateway === 'ZainCash') { infoBox.innerHTML = `قم بالتحويل عبر مسح الباركود التالي الخاص بزين كاش:<br><img src="/ZAINCASH.jpeg" alt="Zain Cash QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">`; }
             else if (gateway === 'Mastercard') { infoBox.innerHTML = `قم بتحويل المبلغ إلى الرقم:<br><span class="font-mono font-bold text-primary text-lg" dir="ltr">7111053109</span>`; }
             else if (gateway === 'Binance') { infoBox.innerHTML = `قم بالتحويل إلى المعرف: <span class="font-mono font-bold text-primary" dir="ltr">1075470705</span> أو عبر مسح الباركود التالي:<br><img src="/BINANCE.jpeg" alt="Binance QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">`; }
+        }
+
+        // ==========================================
+        // 🚀 وظائف آسيا سيل التلقائية
+        // ==========================================
+        async function requestAsiaOTP() {
+            const phone = document.getElementById('asiaPhoneInput').value;
+            const amount = document.getElementById('asiaAmountInput').value;
+            const msg = document.getElementById('asiaMsg');
+
+            if (!phone || !phone.startsWith('077') || !amount) { alert('يرجى كتابة رقم آسيا سيل يبدأ بـ 077 والمبلغ.'); return; }
+            document.getElementById('sendOtpBtn').innerText = 'جاري إرسال الرمز...';
+
+            try {
+                const res = await fetch('/api/asiacell/send-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
+                const data = await res.json();
+                msg.classList.remove('hidden'); msg.className = 'text-xs p-3 rounded-xl font-bold text-center bg-blue-50 text-blue-700 border border-blue-200'; msg.innerText = data.message;
+                document.getElementById('asiaStep1').classList.add('hidden'); document.getElementById('asiaStep2').classList.remove('hidden');
+            } catch(e) { alert('خطأ في إرسال الطلب.'); } finally { document.getElementById('sendOtpBtn').innerText = 'إرسال رمز التحقق OTP'; }
+        }
+
+        async function confirmAsiaTransfer() {
+            const sessionStr = localStorage.getItem('smm_session');
+            if (!sessionStr) return alert('الرجاء تسجيل الدخول أولاً');
+            const session = JSON.parse(sessionStr);
+
+            const phone = document.getElementById('asiaPhoneInput').value;
+            const amount = document.getElementById('asiaAmountInput').value;
+            const otp = document.getElementById('asiaOtpInput').value;
+            const pin = document.getElementById('asiaPinInput').value;
+            const msg = document.getElementById('asiaMsg');
+
+            if (!otp || otp.length < 4) { alert('يرجى إدخال كود الـ OTP الصحيح.'); return; }
+            document.getElementById('confirmOtpBtn').innerText = 'جاري معالجة الاستقطاع والرصيد...';
+
+            try {
+                const res = await fetch('/api/asiacell/confirm-transfer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: session.email, phone, otp, amount, pin }) });
+                const data = await res.json();
+                if (data.success) {
+                    msg.className = 'text-xs p-3 rounded-xl font-bold text-center bg-green-50 text-green-700 border border-green-200'; msg.innerText = data.message;
+                    session.balance = data.newBalance; localStorage.setItem('smm_session', JSON.stringify(session)); document.getElementById('displayBalance').innerText = '$' + data.newBalance.toFixed(2);
+                    setTimeout(() => { document.getElementById('asiaStep2').classList.add('hidden'); document.getElementById('asiaStep1').classList.remove('hidden'); document.getElementById('asiaOtpInput').value = ''; }, 3000);
+                } else {
+                    msg.className = 'text-xs p-3 rounded-xl font-bold text-center bg-red-50 text-red-700 border border-red-200'; msg.innerText = data.message;
+                }
+            } catch(e) { alert('حدث خطأ أثناء التنفيذ.'); } finally { document.getElementById('confirmOtpBtn').innerText = 'تأكيد واستقطاع الرصيد تلقائياً'; }
         }
 
         async function handleDepositSubmit(e) {
@@ -526,15 +605,10 @@
                 const res = await fetch('/api/deposit/submit', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
-                    msgBox.classList.remove('hidden');
-                    msgBox.classList.add('bg-green-50', 'text-green-700');
-                    msgBox.innerText = 'تم إرسال طلب الشحن بنجاح! بانتظار مراجعة الإدارة عبر التليجرام.';
-                    document.getElementById('universalDepositForm').reset();
-                    updateDepositInstructions();
+                    msgBox.classList.remove('hidden'); msgBox.classList.add('bg-green-50', 'text-green-700'); msgBox.innerText = 'تم إرسال طلب الشحن بنجاح! بانتظار مراجعة الإدارة عبر التليجرام.';
+                    document.getElementById('manualDepositForm').reset(); updateDepositInstructions();
                 } else { 
-                    msgBox.classList.remove('hidden');
-                    msgBox.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
-                    msgBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i> ${data.message}`; 
+                    msgBox.classList.remove('hidden'); msgBox.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200'); msgBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i> ${data.message}`; 
                 }
             } catch (err) { alert('خطأ في الاتصال بالخادم'); }
         }
@@ -551,14 +625,8 @@
                 const data = await dataRes.json();
                 const servRes = await fetch('/api/services');
                 const servData = await servRes.json();
-
-                if (data.success) {
-                    document.getElementById('adminUsersCount').innerText = data.usersCount;
-                    document.getElementById('adminTotalSales').innerText = data.totalSales.toFixed(2);
-                }
-                if (servData.success) {
-                    renderAdminServicesTable(servData.services);
-                }
+                if (data.success) { document.getElementById('adminUsersCount').innerText = data.usersCount; document.getElementById('adminTotalSales').innerText = data.totalSales.toFixed(2); }
+                if (servData.success) { renderAdminServicesTable(servData.services); }
             } catch (err) {}
         }
 
@@ -586,17 +654,14 @@
         function editService(id, category, name, price, description) {
             document.getElementById('editServiceId').value = id; document.getElementById('servCategory').value = category; document.getElementById('servName').value = name; document.getElementById('servPrice').value = price; document.getElementById('servDescription').value = description;
             document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-500 me-2"></i> تعديل الخدمة الحالية`;
-            const saveBtn = document.getElementById('saveServiceBtn');
-            saveBtn.innerText = 'حفظ التعديلات'; saveBtn.className = 'bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
-            document.getElementById('cancelEditBtn').classList.remove('hidden');
-            document.getElementById('addServiceForm').scrollIntoView({ behavior: 'smooth' });
+            const saveBtn = document.getElementById('saveServiceBtn'); saveBtn.innerText = 'حفظ التعديلات'; saveBtn.className = 'bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+            document.getElementById('cancelEditBtn').classList.remove('hidden'); document.getElementById('addServiceForm').scrollIntoView({ behavior: 'smooth' });
         }
 
         function resetServiceForm() {
             document.getElementById('addServiceForm').reset(); document.getElementById('editServiceId').value = '';
             document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام`;
-            const saveBtn = document.getElementById('saveServiceBtn');
-            saveBtn.innerText = 'إضافة الخدمة للنظام'; saveBtn.className = 'bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+            const saveBtn = document.getElementById('saveServiceBtn'); saveBtn.innerText = 'إضافة الخدمة للنظام'; saveBtn.className = 'bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
             document.getElementById('cancelEditBtn').classList.add('hidden');
         }
 
@@ -612,12 +677,8 @@
         document.getElementById('addServiceForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const editId = document.getElementById('editServiceId').value;
-            const payload = {
-                category: document.getElementById('servCategory').value, name: document.getElementById('servName').value,
-                price: parseFloat(document.getElementById('servPrice').value), description: document.getElementById('servDescription').value
-            };
+            const payload = { category: document.getElementById('servCategory').value, name: document.getElementById('servName').value, price: parseFloat(document.getElementById('servPrice').value), description: document.getElementById('servDescription').value };
             if(editId) payload.id = editId;
-
             const endpoint = editId ? '/api/admin/update-service' : '/api/admin/add-service';
             try {
                 const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
