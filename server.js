@@ -13,6 +13,9 @@ const ORDERS_BOT_TOKEN = '9023175997:AAGuvzz3eLywKIBkTjs3w9NCVnmutRblCEc';
 const ADMIN_CHAT_ID = '8671448765';
 const TARGET_ASIACELL_NUMBER = '07738889080'; // رقمك الأساسي لاستلام الرصيد
 
+// إعدادات سعر الصرف (عدّل هذا الرقم حسب تسعيرتك: مثلاً كل 1 دولار = 1500 دينار رصيد آسيا)
+const IQD_PER_USD_RATE = 1500; 
+
 // استيراد Firebase
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
@@ -148,97 +151,193 @@ function startTelegramPolling(token) {
 startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
-// ==========================================
-// 🌉 نظام الجسر الوسيط (Android Phone Bridge API)
-// ==========================================
-let pendingBridgeRequests = {};
+// ==========================================================
+// ⚡ نظام الدفع المباشر عبر آسياسيل (مثل نظام كيدي - Kidi)
+// ==========================================================
 
-// 1. الزبون يطلب رمز التحقق من الموقع
+// مخزن مؤقت لجلسات التحقق الخاصة بالزبائن
+const activeOtpSessions = {};
+
+// دالة مساعدة للاتصال المباشر بسيرفرات تطبيق آسياسيل (Asiacell Mobile API)
+async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null) {
+    const currentDeviceId = deviceId || crypto.randomUUID();
+    const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/plain, */*',
+        'X-ODP-API-KEY': '1ccbc4c913bc4ce785a0a2de444aa0d6', // مفتاح تطبيق آسياسيل الأساسي
+        'DeviceID': currentDeviceId,
+        'X-OS-Version': '14',
+        'X-Device-Type': 'Android',
+        'X-App-Version': '4.1.0',
+        'Accept-Language': 'ar',
+        'User-Agent': 'okhttp/4.11.0'
+    };
+
+    if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(`https://odpapp.asiacell.com/api/v1/${endpoint}`, {
+        method: method,
+        headers: headers,
+        body: bodyData ? JSON.stringify(bodyData) : undefined
+    });
+
+    const text = await response.text();
+    let json = {};
+    try {
+        json = JSON.parse(text);
+    } catch (err) {
+        throw new Error(`استجابة غير متوقعة من سيرفر آسياسيل (الحالة: ${response.status})`);
+    }
+
+    return { status: response.status, ok: response.ok, data: json, deviceId: currentDeviceId };
+}
+
+// 1. الزبون يكتب رقمه ويطلب رمز التحقق (يُرسل الرمز لهاتف الزبون مباشرة)
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const { phone } = req.body;
-    if (!phone || !phone.startsWith('077')) {
-        return res.status(400).json({ success: false, message: 'يرجى إدخال رقم آسيا سيل صحيح يبدأ بـ 077' });
+    if (!phone || !/^077\d{8}$/.test(phone.trim())) {
+        return res.status(400).json({ success: false, message: 'يرجى إدخال رقم آسياسيل صحيح مكون من 11 رقماً ويبدأ بـ 077' });
     }
 
-    pendingBridgeRequests[phone] = {
-        status: 'pending',
-        timestamp: Date.now()
-    };
+    const cleanPhone = phone.trim();
 
-    console.log(`[Bridge System] Order queued for phone: ${phone}`);
+    try {
+        // إرسال طلب تسجيل دخول لسيرفر آسياسيل لإرسال SMS للزبون
+        const result = await callAsiacellAPI('login?lang=ar', 'POST', {
+            username: cleanPhone,
+            captchaCode: ''
+        });
 
-    // إرسال تنبيه لبوت التليجرام الخاص بك ليقوم هاتفك بطلب الرمز
-    sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, `🔔 <b>طلب رمز جديد لـ:</b> ${phone}\n\nيرجى من تطبيق هاتفك سحب الرمز عبر AsiacellApp وإرساله للنظام.`);
+        // التحقق مما إذا كان سيرفر آسياسيل قد أرسل الرمز بنجاح
+        if (result.ok || result.data?.nextStep === 'OTP' || result.data?.PID || result.data?.success) {
+            activeOtpSessions[cleanPhone] = {
+                pid: result.data?.PID || result.data?.data?.PID || '',
+                deviceId: result.deviceId,
+                timestamp: Date.now()
+            };
 
-    res.json({ 
-        success: true, 
-        message: 'جاري طلب رمز التحقق من تطبيق آسيا سيل عبر هاتفك الحقيقي...' 
-    });
-});
-
-// 2. هاتفك الحقيقي يرسل الرمز المستلم للسيرفر تلقائياً
-app.post('/api/bridge/push-otp', async (req, res) => {
-    const { phone, otp } = req.body;
-    if (!phone || !otp) {
-        return res.status(400).json({ success: false, message: 'بيانات غير مكتملة.' });
+            console.log(`[Asiacell Direct] OTP sent directly to customer: ${cleanPhone}`);
+            return res.json({
+                success: true,
+                message: `تم إرسال رمز التحقق (OTP) في رسالة نصية إلى الرقم ${cleanPhone} بنجاح!`
+            });
+        } else {
+            console.error('[Asiacell API Response]:', result.data);
+            return res.status(400).json({
+                success: false,
+                message: result.data?.message || 'تعذر إرسال الرمز من شركة آسياسيل حالياً، تأكد من الرقم أو حاول بعد قليل.'
+            });
+        }
+    } catch (error) {
+        console.error('[Asiacell Send OTP Error]:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الاتصال بسيرفر آسياسيل المباشر.'
+        });
     }
-
-    pendingBridgeRequests[phone] = {
-        status: 'received',
-        otp: otp.trim(),
-        timestamp: Date.now()
-    };
-
-    console.log(`[Bridge System] OTP received from phone for ${phone}: ${otp}`);
-    res.json({ success: true, message: 'تم استلام الرمز من الهاتف بنجاح.' });
 });
 
-// 3. الزبون يدخل الرمز في الموقع ويتم إتمام التحويل
+// 2. الزبون يدخل الرمز المستلم في هاتفه -> السيرفر يتحقق ويحول الرصيد لرقمك فوراً
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const { email, phone, otp, amount } = req.body;
     if (!email || !phone || !otp || !amount) {
         return res.status(400).json({ success: false, message: 'يرجى إكمال جميع الحقول المطلوبة.' });
     }
 
-    const bridgeData = pendingBridgeRequests[phone];
-    if (!bridgeData || bridgeData.status !== 'received' || bridgeData.otp !== otp.trim()) {
-        return res.status(400).json({ success: false, message: '❌ رمز التحقق غير صحيح أو لم يتم إرساله من الهاتف بعد.' });
+    const cleanPhone = phone.trim();
+    const cleanOtp = otp.trim();
+    const session = activeOtpSessions[cleanPhone];
+
+    if (!session || (Date.now() - session.timestamp > 5 * 60 * 1000)) {
+        return res.status(400).json({ success: false, message: 'انتهت صلاحية الجلسة، يرجى طلب رمز تحقق جديد.' });
     }
 
-    delete pendingBridgeRequests[phone];
-
     try {
+        // الخطوة أ: تأكيد رمز الـ OTP مع سيرفر آسياسيل للحصول على صلاحية الدخول (Access Token)
+        const verifyPayload = {
+            username: cleanPhone,
+            passcode: cleanOtp
+        };
+        if (session.pid) verifyPayload.PID = session.pid;
+
+        const verifyResult = await callAsiacellAPI('smsvalidation?lang=ar', 'POST', verifyPayload, null, session.deviceId);
+        const accessToken = verifyResult.data?.access_token || verifyResult.data?.data?.access_token || verifyResult.data?.token;
+
+        if (!verifyResult.ok || !accessToken) {
+            return res.status(400).json({
+                success: false,
+                message: verifyResult.data?.message || '❌ رمز التحقق (OTP) غير صحيح أو منتهي الصلاحية.'
+            });
+        }
+
+        // حساب المبلغ المطلوب استقطاعه بالدينار العراقي (إذا كان الزبون يدخل المبلغ بالدولار، نحوله للدينار، وإذا كان يدخله بالدينار مباشرة يترك كما هو)
+        const rawAmount = parseFloat(amount);
+        const transferAmountIQD = rawAmount < 250 ? Math.round(rawAmount * IQD_PER_USD_RATE) : Math.round(rawAmount);
+        const creditAmountUSD = rawAmount < 250 ? rawAmount : parseFloat((rawAmount / IQD_PER_USD_RATE).toFixed(2));
+
+        // الخطوة ب: إرسال أمر تحويل الرصيد من حساب الزبون إلى رقمك الأساسي (07738889080)
+        const transferResult = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', {
+            receiverMsisdn: TARGET_ASIACELL_NUMBER,
+            amount: transferAmountIQD
+        }, accessToken, session.deviceId);
+
+        // إذا تطلب التحويل تأكيداً إضافياً أو فشل بسبب نقص رصيد الزبون
+        if (!transferResult.ok && transferResult.data?.success !== true) {
+            return res.status(400).json({
+                success: false,
+                message: transferResult.data?.message || 'فشل استقطاع الرصيد: تأكد من وجود رصيد كافٍ في شريحة آسياسيل الخاصة بك.'
+            });
+        }
+
+        // مسح الجلسة بعد نجاح العملية لمنع التكرار
+        delete activeOtpSessions[cleanPhone];
+
+        // الخطوة ج: إضافة الرصيد لحساب الزبون في Firebase وإرسال إشعار التليجرام لك
         const userSnap = await db.collection('users').where('email', '==', email).get();
-        if (userSnap.empty) return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' });
-        
+        if (userSnap.empty) return res.status(400).json({ success: false, message: 'المستخدم غير موجود في الموقع.' });
+
         const userDoc = userSnap.docs[0];
         const currentBalance = parseFloat(userDoc.data().balance || 0);
-        const amountNum = parseFloat(amount);
+        const newBalance = parseFloat((currentBalance + creditAmountUSD).toFixed(2));
 
-        const newBalance = currentBalance + amountNum;
         await userDoc.ref.update({ balance: newBalance });
 
+        const dateTime = getFormattedDateTime();
         await db.collection('deposit_requests').add({
             username: userDoc.data().username,
             email: email,
-            gateway: 'Asiacell Bridge Real-App',
-            amount: amountNum,
+            gateway: 'Asiacell Auto (Kidi Style)',
+            sender_phone: cleanPhone,
+            amount: creditAmountUSD,
+            amount_iqd: transferAmountIQD,
             recipient: TARGET_ASIACELL_NUMBER,
             status: 'مقبول تلقائياً',
-            created_at: getFormattedDateTime()
+            created_at: dateTime
         });
 
-        res.json({ 
-            success: true, 
-            message: `تم التحقق عبر التطبيق واستقطاع الرصيد بنجاح! تم إضافة $${amountNum} إلى حسابك.`, 
-            newBalance 
+        const telegramMsg = `⚡ <b>شحن آسياسيل تلقائي ناجح (نظام كيدي)</b>\n\n👤 <b>المستخدم:</b> ${userDoc.data().username}\n📱 <b>رقم الزبون:</b> ${cleanPhone}\n📲 <b>تم التحويل لرقمك:</b> ${TARGET_ASIACELL_NUMBER}\n💴 <b>المبلغ المستقطع:</b> ${transferAmountIQD} د.ع\n💵 <b>الرصيد المضاف للموقع:</b> $${creditAmountUSD}\n🕒 <b>الوقت:</b> ${dateTime}`;
+        sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, telegramMsg);
+
+        return res.json({
+            success: true,
+            message: `تم التحقق واستقطاع الرصيد بنجاح! تمت إضافة $${creditAmountUSD} إلى حسابك فوراً.`,
+            newBalance
         });
-    } catch (e) {
-        res.status(500).json({ success: false, message: 'حدث خطأ أثناء معالجة التحويل.' });
+
+    } catch (error) {
+        console.error('[Asiacell Confirm Transfer Error]:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء معالجة التحويل مع سيرفر آسياسيل.'
+        });
     }
 });
 
-// المسارات الأساسية الأخرى
+// ==========================================================
+// المسارات الأساسية الأخرى للموقع
+// ==========================================================
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
     try {
@@ -369,5 +468,5 @@ app.get('/api/admin/data', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Bridge Server running on port ${port}`);
+    console.log(`Server running on port ${port}`);
 });
