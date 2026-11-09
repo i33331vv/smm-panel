@@ -384,42 +384,38 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 
         const session = sessionDoc.data();
 
-        // تجربة المسارات المعتمدة لتحويل الرصيد في تطبيق آسياسيل وتمرير كافة الحقول المطلوبة
+        // تجربة مسارات التحويل البديلة في تطبيق آسياسيل (مثل micro-transfer أو transfer أو p2p)
         const transferPayload = {
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
             recipientMsisdn: TARGET_ASIACELL_NUMBER,
-            targetMsisdn: TARGET_ASIACELL_NUMBER,
-            msisdn: TARGET_ASIACELL_NUMBER,
             amount: transferAmountIQD
         };
 
-        let transferResult = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
+        let transferResult = await callAsiacellAPI('transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
         let transferInfo = extractSessionInfo(transferResult.data);
 
-        // إذا أرجع المسار الأول خطأ أو لم يولد PID، نجرب المسار البديل لخدمة تحويل الرصيد في تطبيق آسياسيل
-        if (transferResult.data?.success !== true && !transferInfo.pid) {
-            const altResult = await callAsiacellAPI('balance-transfer/initiate?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
-            const altInfo = extractSessionInfo(altResult.data);
-            if (altResult.data?.success === true || altInfo.pid) {
-                transferResult = altResult;
-                transferInfo = altInfo;
-            }
+        if (!transferResult.ok || (transferResult.data?.success === false && !transferInfo.pid)) {
+            // تجربة مسار آخر مستخدم في واجهات آسياسيل الحديثة
+            transferResult = await callAsiacellAPI('services/transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
+            transferInfo = extractSessionInfo(transferResult.data);
         }
 
-        // التحقق الصارم: لا ننتقل للمرحلة 4 إلا إذا أكدت آسياسيل إرسال رمز التحويل أو أرجعت PID حقيقي للعملية!
+        if (!transferResult.ok || (transferResult.data?.success === false && !transferInfo.pid)) {
+            // تجربة مسار ثالث عبر محفظة أو رصيد الخط
+            transferResult = await callAsiacellAPI('balance/transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
+            transferInfo = extractSessionInfo(transferResult.data);
+        }
+
         const isTransferOtpSent = (
-            transferResult.data?.success === true ||
-            Boolean(transferInfo.pid) ||
-            transferResult.data?.nextStep === 'OTP' ||
-            transferResult.data?.nextStep === 'SMS_VALIDATION' ||
-            transferResult.data?.data?.nextStep === 'OTP'
+            transferResult.ok &&
+            (transferResult.data?.success === true || Boolean(transferInfo.pid) || transferResult.data?.nextStep === 'OTP')
         );
 
         if (!isTransferOtpSent) {
             const rawErr = transferResult.data?.message || transferResult.data?.error_description || JSON.stringify(transferResult.data);
             return res.status(400).json({
                 success: false,
-                message: `${formatAsiacellErrorMessage(rawErr)} | (رد السيرفر: ${JSON.stringify(transferResult.data)})`
+                message: `❌ رد آسياسيل عند طلب التحويل: ${rawErr}`
             });
         }
 
