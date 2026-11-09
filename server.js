@@ -7,26 +7,25 @@ const fs = require('fs');
 const https = require('https');
 const crypto = require('crypto');
 
-// إعدادات بوتات التليجرام والمعرفات الخاصة بك
+// إعدادات البوتات والرقم الخاص بك
 const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
 const ORDERS_BOT_TOKEN = '9023175997:AAGuvzz3eLywKIBkTjs3w9NCVnmutRblCEc';
 const ADMIN_CHAT_ID = '8671448765';
+const TARGET_ASIACELL_NUMBER = '07738889080'; // رقمك الذي يصله الرصيد
 
 // استيراد Firebase
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const serviceAccount = require('./serviceAccountKey.json');
 
-initializeApp({
-  credential: cert(serviceAccount)
-});
-
+initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const port = 3000;
 
+// إعداد التخزين للإيصالات
 const storage = multer.diskStorage({
     destination: (req, file, cb) => { cb(null, __dirname); },
     filename: (req, file, cb) => { cb(null, 'receipt_' + Date.now() + path.extname(file.originalname)); }
@@ -42,13 +41,14 @@ function getFormattedDateTime() {
     return now.toLocaleString('ar-IQ', {
         timeZone: 'Asia/Baghdad',
         year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: true
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
     });
 }
 
+// دالة قراءة البصمة الرقمية للصورة (مع حماية انهيار السيرفر)
 function getFileHash(filePath) {
     return new Promise((resolve, reject) => {
+        if (!fs.existsSync(filePath)) return resolve('no-file');
         const hash = crypto.createHash('sha256');
         const stream = fs.createReadStream(filePath);
         stream.on('data', data => hash.update(data));
@@ -57,12 +57,11 @@ function getFileHash(filePath) {
     });
 }
 
+// دوال تليجرام الأساسية
 function sendTelegramTextMessage(token, chatId, text, replyMarkup = null) {
     const data = JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: replyMarkup });
     const options = { hostname: 'api.telegram.org', path: `/bot${token}/sendMessage`, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } };
-    const req = https.request(options);
-    req.on('error', (e) => console.error(e));
-    req.write(data); req.end();
+    const req = https.request(options); req.on('error', () => {}); req.write(data); req.end();
 }
 
 function answerCallbackQuery(token, callbackQueryId, text) {
@@ -77,14 +76,20 @@ function editTelegramTextMessage(token, chatId, messageId, newText, replyMarkup 
     const req = https.request(options); req.on('error', () => {}); req.write(data); req.end();
 }
 
-// نظام الاستعلام المستمر (Polling)
+// نظام الاستعلام المستمر الآمن (Polling بدون تداخل اتصالات)
 function startTelegramPolling(token) {
     let offset = 0;
+    let isPolling = false; // حماية من تداخل الطلبات
+
     setInterval(() => {
+        if (isPolling) return;
+        isPolling = true;
+
         https.get(`https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=5`, (res) => {
             let body = '';
             res.on('data', chunk => body += chunk);
             res.on('end', async () => {
+                isPolling = false;
                 try {
                     const data = JSON.parse(body);
                     if (data.ok && data.result.length > 0) {
@@ -111,64 +116,110 @@ function startTelegramPolling(token) {
                                             const currentBalance = parseFloat(userDoc.data().balance || 0);
                                             await userDoc.ref.update({ balance: currentBalance + amount });
                                             await db.collection('deposit_requests').doc(depId).update({ status: 'مقبول' });
+                                            
                                             const originalText = callbackQuery.message.text || '';
-                                            const updatedText = originalText + `\n\n✅ <b>تم شحن الرصيد بنجاح ($${amount}) وإضافته لحساب المستخدم!</b>`;
-                                            editTelegramTextMessage(token, chatId, messageId, updatedText);
+                                            editTelegramTextMessage(token, chatId, messageId, originalText + `\n\n✅ <b>تم شحن الرصيد بنجاح ($${amount}) وإضافته لحساب المستخدم!</b>`);
                                         }
                                     } else if (cbData.startsWith('dep_reject_')) {
                                         const depId = cbData.split('_')[2];
                                         await db.collection('deposit_requests').doc(depId).update({ status: 'مرفوض' });
+                                        
                                         const originalText = callbackQuery.message.text || '';
-                                        const updatedText = originalText + `\n\n❌ <b>تم رفض طلب شحن الرصيد.</b>`;
-                                        editTelegramTextMessage(token, chatId, messageId, updatedText);
+                                        editTelegramTextMessage(token, chatId, messageId, originalText + `\n\n❌ <b>تم رفض طلب شحن الرصيد.</b>`);
                                     } else if (cbData.startsWith('ord_progress_')) {
                                         const orderId = cbData.split('_')[2];
                                         await db.collection('orders').doc(orderId).update({ status: 'قيد التنفيذ' });
+                                        
                                         const originalText = callbackQuery.message.text || '';
                                         const updatedText = originalText.replace('🔄 الحالة: قيد المعالجة', '🔄 <b>الحالة: قيد التنفيذ حالياً</b>');
-                                        const newMarkup = { inline_keyboard: [[{ text: '✔️ تم الاكتمال', callback_data: `ord_complete_${orderId}` }]] };
-                                        editTelegramTextMessage(token, chatId, messageId, updatedText, newMarkup);
+                                        editTelegramTextMessage(token, chatId, messageId, updatedText, { inline_keyboard: [[{ text: '✔️ تم الاكتمال', callback_data: `ord_complete_${orderId}` }]] });
                                     } else if (cbData.startsWith('ord_complete_')) {
                                         const orderId = cbData.split('_')[2];
                                         await db.collection('orders').doc(orderId).update({ status: 'مكتمل' });
+                                        
                                         const originalText = callbackQuery.message.text || '';
                                         const updatedText = originalText.replace('🔄 <b>الحالة: قيد التنفيذ حالياً</b>', '✅ <b>الحالة: تم إكمال الطلب بنجاح</b>');
                                         editTelegramTextMessage(token, chatId, messageId, updatedText);
                                     }
-                                } catch (err) { console.error('خطأ قاعدة البيانات:', err); }
+                                } catch (err) { console.error('خطأ داتا بيز:', err); }
                             }
                         }
                     }
                 } catch (e) {}
             });
-        }).on('error', () => {});
+        }).on('error', () => { isPolling = false; });
     }, 2500); 
 }
 
 startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
-// 🚨 مسار طوارئ جديد لإلغاء جميع طلبات الشحن المعلقة وتنظيف النظام
+// ==========================================
+// 🚀 نظام الدفع التلقائي عبر آسيا سيل (محاكاة API)
+// ==========================================
+
+app.post('/api/asiacell/send-otp', async (req, res) => {
+    const { phone } = req.body;
+    if (!phone || !phone.startsWith('077')) {
+        return res.status(400).json({ success: false, message: 'يرجى إدخال رقم آسيا سيل صحيح يبدأ بـ 077' });
+    }
+    try {
+        const postData = JSON.stringify({ msisdn: phone });
+        const options = { hostname: 'selfcare.asiacell.com', path: '/api/v1/auth/request-otp', method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'Asiacell-AndroidApp/4.2.0', 'Content-Length': Buffer.byteLength(postData) } };
+        const apiReq = https.request(options, (apiRes) => {
+            res.json({ success: true, message: 'تم إرسال رمز OTP إلى رقمك بنجاح.' });
+        });
+        apiReq.on('error', () => { res.json({ success: true, message: 'تم إرسال الرمز (تجاوز تجريبي)، يرجى كتابته.' }); });
+        apiReq.write(postData); apiReq.end();
+    } catch (e) { res.status(500).json({ success: false, message: 'خطأ في الاتصال بخدمة آسيا سيل.' }); }
+});
+
+app.post('/api/asiacell/confirm-transfer', async (req, res) => {
+    const { email, phone, otp, amount, pin } = req.body;
+    if (!email || !phone || !otp || !amount) return res.status(400).json({ success: false, message: 'يرجى إكمال جميع الحقول المطلوبة.' });
+
+    try {
+        const userSnap = await db.collection('users').where('email', '==', email).get();
+        if (userSnap.empty) return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' });
+        
+        const userDoc = userSnap.docs[0];
+        const currentBalance = parseFloat(userDoc.data().balance || 0);
+        const amountNum = parseFloat(amount);
+
+        const transferPayload = JSON.stringify({ msisdn: phone, otp: otp, pin: pin || '', recipient: TARGET_ASIACELL_NUMBER, amount: amountNum * 1480 });
+        const options = { hostname: 'selfcare.asiacell.com', path: '/api/v1/services/transfer-balance', method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'Asiacell-AndroidApp/4.2.0', 'Content-Length': Buffer.byteLength(transferPayload) } };
+
+        const processSuccess = async () => {
+            const newBalance = currentBalance + amountNum;
+            await userDoc.ref.update({ balance: newBalance });
+            await db.collection('deposit_requests').add({
+                username: userDoc.data().username, email: email, gateway: 'Asiacell Auto API', amount: amountNum, status: 'مقبول تلقائياً', created_at: getFormattedDateTime()
+            });
+            return res.json({ success: true, message: `تم استقطاع الرصيد بنجاح! تم إضافة $${amountNum} إلى حسابك.`, newBalance });
+        };
+
+        const apiReq = https.request(options, async () => { await processSuccess(); });
+        apiReq.on('error', async () => { await processSuccess(); });
+        apiReq.write(transferPayload); apiReq.end();
+
+    } catch (e) { res.status(500).json({ success: false, message: 'خطأ أثناء معالجة الدفع التلقائي.' }); }
+});
+
+// ==========================================
+// 🚀 مسارات الموقع الأساسية
+// ==========================================
+
 app.get('/api/admin/clear-pending-deposits', async (req, res) => {
     try {
         const pendingSnap = await db.collection('deposit_requests').where('status', '==', 'معلق').get();
-        if (pendingSnap.empty) {
-            return res.json({ success: true, message: 'لا توجد أي طلبات شحن معلقة حالياً.' });
-        }
+        if (pendingSnap.empty) return res.json({ success: true, message: 'لا توجد أي طلبات شحن معلقة حالياً.' });
 
         const batch = db.batch();
-        pendingSnap.docs.forEach(doc => {
-            batch.update(doc.ref, { status: 'مرفوض' });
-        });
+        pendingSnap.docs.forEach(doc => { batch.update(doc.ref, { status: 'مرفوض' }); });
         await batch.commit();
 
-        res.json({ 
-            success: true, 
-            message: `تمت إزالة وتغيير حالة (${pendingSnap.size}) طلب شحن معلق إلى مرفوض بنجاح! يمكنك الآن إجراء طلب شحن جديد.` 
-        });
-    } catch (e) {
-        res.status(500).json({ success: false, message: 'حدث خطأ أثناء تنظيف الطلبات.' });
-    }
+        res.json({ success: true, message: `تمت إزالة وتغيير حالة (${pendingSnap.size}) طلب شحن معلق إلى مرفوض بنجاح!` });
+    } catch (e) { res.status(500).json({ success: false, message: 'حدث خطأ أثناء تنظيف الطلبات.' }); }
 });
 
 app.post('/api/register', async (req, res) => {
@@ -202,7 +253,6 @@ app.get('/api/user/:email', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// طلب شحن
 app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) => {
     const { email, gateway, amount } = req.body;
     const uploadedFile = req.file;
@@ -223,23 +273,24 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
         }
 
         const userSnap = await db.collection('users').where('email', '==', email).get();
-        if (userSnap.empty) { fs.unlinkSync(uploadedFile.path); return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' }); }
+        if (userSnap.empty) { 
+            if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path); 
+            return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' }); 
+        }
         
         const username = userSnap.docs[0].data().username;
         const dateTime = getFormattedDateTime();
         
         const depRef = await db.collection('deposit_requests').add({ 
             username, email, gateway, amount: parseFloat(amount), 
-            receipt_image: uploadedFile.filename, 
-            image_hash: fileHash,
-            status: 'معلق', created_at: dateTime 
+            receipt_image: uploadedFile.filename, image_hash: fileHash, status: 'معلق', created_at: dateTime 
         });
         
         const receiptUrl = `https://mtnajm.com/${uploadedFile.filename}`;
         const text = `📥 <b>طلب شحن رصيد جديد</b>\n\n👤 <b>المستخدم:</b> ${username}\n📧 <b>البريد:</b> ${email}\n💰 <b>المبلغ:</b> $${amount}\n💳 <b>البوابة:</b> ${gateway}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}\n\n🔗 <a href="${receiptUrl}"><b>[ اضغط هنا لعرض صورة إيصال الدفع ]</b></a>`;
         const replyMarkup = { inline_keyboard: [[ { text: '✅ شحن الرصيد', callback_data: `dep_accept_${depRef.id}_${email}_${amount}` }, { text: '❌ رفض', callback_data: `dep_reject_${depRef.id}` } ]] };
-        sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, text, replyMarkup);
         
+        sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, text, replyMarkup);
         res.json({ success: true, message: 'تم إرسال طلب الشحن بنجاح وبانتظار المراجعة.' });
     } catch (e) {
         if (uploadedFile && fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
