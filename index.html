@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Tajawal', 'sans-serif'] },
+                    colors: { primary: '#4f46e5', secondary: '#3b82f6', dark: '#1e293b' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Tajawal', sans-serif; background-color: #f3f4f6; }
+        .hero-bg { background-image: radial-gradient(circle at top right, #e0e7ff 0%, transparent 40%), radial-gradient(circle at bottom left, #dbeafe 0%, transparent 40%); }
+        .modal { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .modal.active { opacity: 1; pointer-events: auto; }
+        .modal-content { transform: scale(0.95) translateY(-20px); transition: all 0.3s ease; }
+        .modal.active .modal-content { transform: scale(1) translateY(0); }
+    </style>
+</head>
+<body class="text-gray-800 antialiased selection:bg-primary selection:text-white">
+
+    <!-- الصفحة الرئيسية -->
+    <div id="landing-page" class="min-h-screen flex flex-col transition-opacity duration-300">
+        <header class="bg-white shadow-sm sticky top-0 z-50">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-20">
+                    <div class="flex-shrink-0 flex items-center">
+                        <i class="fa-solid fa-rocket text-primary text-3xl me-2"></i>
+                        <span class="font-bold text-2xl text-dark">MT</span>
+                    </div>
+                    <div class="flex items-center space-x-4 space-x-reverse">
+                        <button onclick="openModal('loginModal')" class="text-dark font-medium hover:text-primary transition">تسجيل الدخول</button>
+                        <button onclick="openModal('registerModal')" class="bg-primary hover:bg-indigo-700 text-white px-6 py-2 rounded-full font-medium shadow-md transition transform hover:-translate-y-0.5">حساب جديد</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-grow hero-bg">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 text-center">
+                <h1 class="text-4xl md:text-6xl font-extrabold text-dark tracking-tight mb-6 leading-tight">
+                    كبّر حساباتك مع أفضل لوحة دعم ميديا
+                </h1>
+                <p class="mt-4 text-xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
+                    نقدم لك خدمات زيادة المتابعين، اللايكات، والمشاهدات بأسعار تنافسية وبطرق شحن مرنة ومضمونة.
+                </p>
+                <button onclick="openModal('registerModal')" class="bg-primary hover:bg-indigo-700 text-white px-8 py-4 rounded-full font-bold text-lg shadow-xl transition transform hover:-translate-y-1">
+                    ابدأ الآن - أنشئ حسابك
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- لوحة التحكم الكاملة -->
+    <div id="dashboard-page" class="hidden min-h-screen bg-[#f8fafc] flex flex-col md:flex-row transition-opacity duration-300">
+        <aside class="w-full md:w-64 bg-white border-l border-gray-200 shadow-sm flex-shrink-0 flex flex-col">
+            <div class="h-16 flex items-center justify-center md:justify-start md:px-6 flex-shrink-0">
+                <i class="fa-solid fa-rocket text-primary text-2xl me-2"></i>
+                <span class="font-bold text-xl text-dark">MT</span>
+            </div>
+            
+            <!-- النص المطلوب أسفل الشعار -->
+            <div class="px-4 pb-4 border-b border-gray-100 text-center md:text-right flex-shrink-0">
+                <p class="text-xs font-bold text-primary bg-indigo-50 py-2 px-3 rounded-lg shadow-sm">
+                    خدمات زيادة متابعين وتفاعل حقيقية فقط
+                </p>
+            </div>
+
+            <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+                <a href="#" id="navNewOrder" onclick="showNewOrderPage()" class="flex items-center px-4 py-3 bg-indigo-50 text-primary rounded-xl font-medium transition cursor-pointer">
+                    <i class="fa-solid fa-plus-circle w-6 text-center text-lg me-3"></i> طلب جديد
+                </a>
+                <a href="#" id="navOrders" onclick="showOrdersPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer">
+                    <i class="fa-solid fa-list w-6 text-center text-lg me-3"></i> الطلبات
+                </a>
+                <a href="#" id="navDeposit" onclick="showDepositPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer">
+                    <i class="fa-solid fa-wallet w-6 text-center text-lg me-3"></i> شحن الرصيد
+                </a>
+                <a href="#" id="adminNavLink" onclick="showAdminPanel()" class="hidden items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-medium transition cursor-pointer">
+                    <i class="fa-solid fa-shield-halved w-6 text-center text-lg me-3"></i> لوحة المدير
+                </a>
+            </nav>
+            <div class="p-4 border-t border-gray-100 flex-shrink-0">
+                <button onclick="logoutUser()" class="flex w-full items-center justify-center px-4 py-2 text-red-500 hover:bg-red-50 rounded-xl font-medium transition">
+                    <i class="fa-solid fa-right-from-bracket text-lg me-2 rotate-180"></i> تسجيل الخروج
+                </button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-10 flex-shrink-0">
+                <h2 id="pageTitle" class="text-xl font-bold text-dark hidden sm:block">إنشاء طلب جديد</h2>
+                <div class="flex items-center space-x-4 space-x-reverse">
+                    <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-1.5 rounded-full flex items-center text-sm font-bold shadow-sm">
+                        <i class="fa-solid fa-coins me-2 text-yellow-500"></i> الرصيد: <span id="displayBalance" class="ms-1" dir="ltr">$0.00</span>
+                    </div>
+                    <div class="flex items-center bg-gray-50 p-2 rounded-lg transition">
+                        <div id="displayUsernameIcon" class="w-8 h-8 rounded-full bg-indigo-100 text-primary flex items-center justify-center font-bold text-sm">U</div>
+                        <span id="displayUsernameText" class="font-bold text-sm text-gray-700 ms-2">المستخدم</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                <div class="max-w-5xl mx-auto">
+                    
+                    <!-- نموذج الطلب -->
+                    <div id="new-order-section" class="space-y-6">
+                        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                            <form id="orderForm" class="space-y-5">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">الخدمة</label>
+                                    <select id="service" onchange="onServiceChange()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50"></select>
+                                </div>
+                                <div id="serviceDescriptionBox" class="hidden bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-900 leading-relaxed">
+                                    <span class="font-bold block mb-1"><i class="fa-solid fa-circle-info me-1"></i> وصف الخدمة:</span>
+                                    <p id="serviceDescText" class="whitespace-pre-wrap"></p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">الرابط</label>
+                                    <input type="url" id="orderLink" placeholder="https://instagram.com/username" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50" required>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">الكمية (الحد الأدنى: 1000)</label>
+                                        <input type="number" id="quantity" oninput="calculatePrice()" min="1000" placeholder="1000" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">السعر الإجمالي ($)</label>
+                                        <input type="text" id="charge" readonly placeholder="0.00" class="block w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-100 text-gray-500 font-bold cursor-not-allowed">
+                                    </div>
+                                </div>
+                                <button type="submit" id="submitOrderBtn" class="w-full bg-primary hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition">تأكيد الطلب</button>
+                            </form>
+                            <div id="successOrderMsg" class="hidden mt-4 bg-green-50 text-green-700 border border-green-200 p-4 rounded-xl text-sm text-center font-bold">تم استلام طلبك بنجاح!</div>
+                        </div>
+                    </div>
+
+                    <!-- سجل الطلبات -->
+                    <div id="orders-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                        <h3 class="text-xl font-bold text-dark mb-4">سجل الطلبات السابقة</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 border-b border-gray-200 text-sm text-gray-600">
+                                        <th class="p-3">رقم الطلب</th>
+                                        <th class="p-3">الخدمة</th>
+                                        <th class="p-3">الرابط</th>
+                                        <th class="p-3">الكمية</th>
+                                        <th class="p-3">السعر ($)</th>
+                                        <th class="p-3">الحالة</th>
+                                        <th class="p-3">التاريخ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ordersTableBody" class="text-sm divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- شحن الرصيد -->
+                    <div id="deposit-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
+                        <div class="border-b pb-4">
+                            <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-wallet text-primary me-2"></i> شحن الرصيد</h3>
+                            <p class="text-sm text-gray-500 mt-1">اختر بوابة الدفع، قم بالتحويل ثم أرفع صورة الإيصال.</p>
+                        </div>
+
+                        <form id="universalDepositForm" onsubmit="handleDepositSubmit(event)" class="max-w-xl space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">طريقة الدفع</label>
+                                <select id="depositGateway" onchange="updateDepositInstructions()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-medium">
+                                    <option value="Asiacell">آسيا حوالة (Asiacell)</option>
+                                    <option value="ZainCash">زين كاش (Zain Cash)</option>
+                                    <option value="Mastercard">ماستر كارد</option>
+                                    <option value="Binance">بينانس (Binance)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- مربع عرض الباركود ومعلومات التحويل -->
+                            <div id="depositInfoBox" class="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-900 font-medium text-center">
+                                <!-- سيتم تحديث هذا القسم عبر جافاسكريبت -->
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">المبلغ المراد شحنه ($ USD)</label>
+                                <input type="number" step="0.01" id="depAmountInput" placeholder="10" class="w-full px-3 py-2 border rounded-xl bg-white text-sm" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">رفع لقطة الشاشة (صورة الإيصال)</label>
+                                <input type="file" id="depImageInput" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-indigo-700" required>
+                            </div>
+                            <button type="submit" class="w-full bg-primary hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm transition">إرسال إيصال الشحن للمراجعة</button>
+                        </form>
+                        <div id="depositSuccessMsg" class="hidden max-w-xl bg-green-50 text-green-700 text-xs p-3 rounded-xl font-bold text-center">تم إرسال طلب الشحن بنجاح! بانتظار مراجعة الإدارة.</div>
+                    </div>
+
+                    <!-- لوحة المدير -->
+                    <div id="admin-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
+                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 border-b pb-4">
+                            <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-shield-halved text-red-500 me-2"></i> لوحة إدارة النظام (Admin Panel)</h3>
+                            <div class="flex gap-3">
+                                <div class="bg-indigo-50 text-primary px-4 py-2 rounded-xl text-sm font-bold">إجمالي المستخدمين: <span id="adminUsersCount">0</span></div>
+                                <div class="bg-green-50 text-green-700 px-4 py-2 rounded-xl text-sm font-bold">إجمالي المبيعات: $<span id="adminTotalSales">0.00</span></div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl">
+                            <h4 class="font-bold text-lg text-amber-900 mb-3"><i class="fa-solid fa-wallet me-2"></i> طلبات شحن الرصيد المعلقة من العملاء</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-right border-collapse bg-white rounded-xl overflow-hidden shadow-sm">
+                                    <thead>
+                                        <tr class="bg-gray-100 border-b text-xs text-gray-600">
+                                            <th class="p-3">ID</th>
+                                            <th class="p-3">المستخدم</th>
+                                            <th class="p-3">البريد الإلكتروني</th>
+                                            <th class="p-3">البوابة</th>
+                                            <th class="p-3">المبلغ ($)</th>
+                                            <th class="p-3">الإيصال</th>
+                                            <th class="p-3">الحالة</th>
+                                            <th class="p-3">الإجراء</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminDepositsTableBody" class="text-xs divide-y"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="mt-6">
+                            <h4 class="font-bold text-lg text-dark mb-3">متابعة طلبات الخدمات</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-right border-collapse">
+                                    <thead>
+                                        <tr class="bg-gray-50 border-b border-gray-200 text-sm text-gray-600">
+                                            <th class="p-3">رقم الطلب</th>
+                                            <th class="p-3">المستخدم</th>
+                                            <th class="p-3">الخدمة</th>
+                                            <th class="p-3">الرابط</th>
+                                            <th class="p-3">السعر ($)</th>
+                                            <th class="p-3">الحالة</th>
+                                            <th class="p-3">إجراءات التحكم</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminOrdersTableBody" class="text-sm divide-y divide-gray-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="mt-8 bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                            <h4 class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام</h4>
+                            <form id="addServiceForm" class="space-y-4">
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <input type="text" id="servCategory" placeholder="القسم (مثلاً: انستقرام)" class="px-4 py-2 border rounded-xl bg-white text-sm" required>
+                                    <input type="text" id="servName" placeholder="اسم الخدمة" class="px-4 py-2 border rounded-xl bg-white text-sm" required>
+                                    <input type="number" step="0.01" id="servPrice" placeholder="السعر لكل 1K ($)" class="px-4 py-2 border rounded-xl bg-white text-sm" required>
+                                </div>
+                                <div>
+                                    <textarea id="servDescription" rows="3" placeholder="وصف الخدمة..." class="w-full px-4 py-2 border rounded-xl bg-white text-sm"></textarea>
+                                </div>
+                                <button type="submit" class="bg-primary hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition">إضافة الخدمة للنظام</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- نافذة معاينة صورة الإيصال -->
+    <div id="receiptModal" class="modal fixed inset-0 z-[150] flex items-center justify-center bg-dark/70 backdrop-blur-sm">
+        <div class="bg-white p-4 rounded-2xl max-w-lg w-full relative text-center">
+            <button onclick="closeModal('receiptModal')" class="absolute top-2 left-2 text-gray-500 hover:text-red-500 text-xl font-bold"><i class="fa-solid fa-xmark"></i></button>
+            <h4 class="font-bold text-lg mb-3">معاينة إيصال الدفع</h4>
+            <img id="modalReceiptImg" src="" alt="الإيصال" class="max-h-[70vh] mx-auto rounded-xl border">
+        </div>
+    </div>
+
+    <!-- نوافذ الدخول والتسجيل -->
+    <div id="registerModal" class="modal fixed inset-0 z-[100] flex items-center justify-center bg-dark/60 backdrop-blur-sm">
+        <div class="modal-content bg-white w-full max-w-md rounded-2xl p-8 relative mx-4">
+            <button onclick="closeModal('registerModal')" class="absolute top-4 left-4 text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <div class="text-center mb-6"><h2 class="text-2xl font-bold text-dark">إنشاء حساب جديد</h2></div>
+            <form id="registerForm" class="space-y-4">
+                <div id="registerError" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-lg text-center font-bold"></div>
+                <div><label class="block text-sm font-bold text-gray-700 mb-1">اسم المستخدم</label><input type="text" id="regUsername" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required></div>
+                <div><label class="block text-sm font-bold text-gray-700 mb-1">البريد الإلكتروني</label><input type="email" id="regEmail" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required></div>
+                <div><label class="block text-sm font-bold text-gray-700 mb-1">كلمة المرور</label><input type="password" id="regPassword" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required></div>
+                <button type="submit" id="regSubmitBtn" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl">إنشاء الحساب ودخول اللوحة</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="loginModal" class="modal fixed inset-0 z-[100] flex items-center justify-center bg-dark/60 backdrop-blur-sm">
+        <div class="modal-content bg-white w-full max-w-md rounded-2xl p-8 relative mx-4">
+            <button onclick="closeModal('loginModal')" class="absolute top-4 left-4 text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <div class="text-center mb-6"><h2 class="text-2xl font-bold text-dark">تسجيل الدخول</h2></div>
+            <form id="loginForm" class="space-y-4">
+                <div id="loginError" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-lg text-center font-bold"></div>
+                <div><label class="block text-sm font-bold text-gray-700 mb-1">البريد الإلكتروني</label><input type="email" id="loginEmail" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required></div>
+                <div><label class="block text-sm font-bold text-gray-700 mb-1">كلمة المرور</label><input type="password" id="loginPassword" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required></div>
+                <button type="submit" id="loginSubmitBtn" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl">دخول لوحة التحكم</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- سكربت العمليات -->
+    <script>
+        let fetchedServices = [];
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        function toggleView(id) {
+            document.getElementById('landing-page').classList.add('hidden');
+            document.getElementById('dashboard-page').classList.add('hidden');
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function showDashboard(username, email, balance) {
+            document.getElementById('displayUsernameText').innerText = username;
+            document.getElementById('displayUsernameIcon').innerText = username.charAt(0).toUpperCase();
+            document.getElementById('displayBalance').innerText = '$' + parseFloat(balance).toFixed(2);
+            
+            const ADMIN_USER = 'mohamed';
+            const ADMIN_EMAIL = 'qhtymhmd@gmail.com';
+            const adminLink = document.getElementById('adminNavLink');
+            if (username === ADMIN_USER && email === ADMIN_EMAIL) {
+                adminLink.classList.remove('hidden');
+                adminLink.classList.add('flex');
+            } else {
+                adminLink.classList.add('hidden');
+                adminLink.classList.remove('flex');
+            }
+
+            closeModal('loginModal'); closeModal('registerModal');
+            toggleView('dashboard-page');
+            loadServicesForUser();
+            refreshUserBalance();
+        }
+
+        async function refreshUserBalance() {
+            const sessionStr = localStorage.getItem('smm_session');
+            if (!sessionStr) return;
+            const session = JSON.parse(sessionStr);
+
+            try {
+                const res = await fetch(`/api/user/${session.email}`);
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('displayBalance').innerText = '$' + parseFloat(data.user.balance).toFixed(2);
+                    session.balance = data.user.balance;
+                    session.username = data.user.username;
+                    localStorage.setItem('smm_session', JSON.stringify(session));
+                }
+            } catch (err) {
+                console.error('خطأ في تحديث الرصيد');
+            }
+        }
+
+        setInterval(() => {
+            const session = localStorage.getItem('smm_session');
+            if (session) {
+                refreshUserBalance();
+            }
+        }, 3000);
+
+        function hideAllSections() {
+            document.getElementById('new-order-section').classList.add('hidden');
+            document.getElementById('orders-section').classList.add('hidden');
+            document.getElementById('deposit-section').classList.add('hidden');
+            document.getElementById('admin-section').classList.add('hidden');
+            
+            document.getElementById('navNewOrder').className = 'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
+            document.getElementById('navOrders').className = 'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
+            document.getElementById('navDeposit').className = 'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
+        }
+
+        function showNewOrderPage() {
+            hideAllSections();
+            document.getElementById('new-order-section').classList.remove('hidden');
+            document.getElementById('pageTitle').innerText = 'إنشاء طلب جديد';
+            document.getElementById('navNewOrder').className = 'flex items-center px-4 py-3 bg-indigo-50 text-primary rounded-xl font-medium transition cursor-pointer';
+            loadServicesForUser();
+            refreshUserBalance();
+        }
+
+        async function loadServicesForUser() {
+            try {
+                const res = await fetch('/api/services');
+                const data = await res.json();
+                const serviceSelect = document.getElementById('service');
+                serviceSelect.innerHTML = '';
+                if (data.success && data.services.length > 0) {
+                    fetchedServices = data.services;
+                    data.services.forEach(serv => {
+                        serviceSelect.innerHTML += `<option value="${serv.price}" data-id="${serv.id}">[${serv.category}] ${serv.name} - السعر: $${serv.price.toFixed(2)} لكل 1K</option>`;
+                    });
+                    onServiceChange();
+                } else {
+                    fetchedServices = [];
+                    serviceSelect.innerHTML = `<option value="0">لا توجد خدمات متوفرة حالياً</option>`;
+                }
+            } catch (err) { console.error('خطأ'); }
+        }
+
+        function onServiceChange() {
+            calculatePrice();
+            const serviceSelect = document.getElementById('service');
+            const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+            if (!selectedOption) return;
+            const servId = selectedOption.getAttribute('data-id');
+            const targetServ = fetchedServices.find(s => s.id == servId);
+            const descBox = document.getElementById('serviceDescriptionBox');
+            const descText = document.getElementById('serviceDescText');
+            if (targetServ && targetServ.description && targetServ.description.trim() !== '') {
+                descText.innerText = targetServ.description;
+                descBox.classList.remove('hidden');
+            } else {
+                descBox.classList.add('hidden');
+            }
+        }
+
+        async function showOrdersPage() {
+            hideAllSections();
+            document.getElementById('orders-section').classList.remove('hidden');
+            document.getElementById('pageTitle').innerText = 'سجل الطلبات';
+            document.getElementById('navOrders').className = 'flex items-center px-4 py-3 bg-indigo-50 text-primary rounded-xl font-medium transition cursor-pointer';
+            refreshUserBalance();
+
+            const sessionStr = localStorage.getItem('smm_session');
+            if (!sessionStr) return;
+            const session = JSON.parse(sessionStr);
+
+            try {
+                const res = await fetch(`/api/orders/${session.username}`);
+                const data = await res.json();
+                const tbody = document.getElementById('ordersTableBody');
+                tbody.innerHTML = '';
+                if (data.success && data.orders.length > 0) {
+                    data.orders.forEach(order => {
+                        tbody.innerHTML += `
+                            <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+                                <td class="p-3 font-bold text-primary">#${order.id}</td>
+                                <td class="p-3 text-gray-700">${order.service}</td>
+                                <td class="p-3 text-blue-600 truncate max-w-xs"><a href="${order.link}" target="_blank" class="hover:underline">${order.link}</a></td>
+                                <td class="p-3">${order.quantity}</td>
+                                <td class="p-3 font-bold">$${order.charge.toFixed(4)}</td>
+                                <td class="p-3"><span class="bg-yellow-50 text-yellow-700 px-2.5 py-1 rounded-full text-xs font-bold">${order.status}</span></td>
+                                <td class="p-3 text-gray-400 text-xs">${order.created_at}</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-400">لا توجد طلبات سابقة.</td></tr>`;
+                }
+            } catch (err) { alert('خطأ في جلب الطلبات.'); }
+        }
+
+        function showDepositPage() {
+            hideAllSections();
+            document.getElementById('deposit-section').classList.remove('hidden');
+            document.getElementById('pageTitle').innerText = 'شحن الرصيد';
+            document.getElementById('navDeposit').className = 'flex items-center px-4 py-3 bg-indigo-50 text-primary rounded-xl font-medium transition cursor-pointer';
+            document.getElementById('universalDepositForm').reset();
+            updateDepositInstructions();
+            refreshUserBalance();
+        }
+
+        function updateDepositInstructions() {
+            const gateway = document.getElementById('depositGateway').value;
+            const infoBox = document.getElementById('depositInfoBox');
+            if (gateway === 'Asiacell') {
+                infoBox.innerHTML = `قم بتحويل المبلغ إلى الرقم:<br><span class="font-mono font-bold text-primary text-lg" dir="ltr">07738889080</span>`;
+            } else if (gateway === 'ZainCash') {
+                infoBox.innerHTML = `
+                    قم بالتحويل عبر مسح الباركود التالي الخاص بزين كاش:<br>
+                    <img src="/zaincash-qr.jpg" alt="Zain Cash QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">
+                `;
+            } else if (gateway === 'Mastercard') {
+                infoBox.innerHTML = `قم بتحويل المبلغ إلى الرقم:<br><span class="font-mono font-bold text-primary text-lg" dir="ltr">7111053109</span>`;
+            } else if (gateway === 'Binance') {
+                infoBox.innerHTML = `
+                    قم بالتحويل إلى المعرف: <span class="font-mono font-bold text-primary" dir="ltr">1075470705</span> أو عبر مسح الباركود التالي:<br>
+                    <img src="/binance-qr.jpg" alt="Binance QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">
+                `;
+            }
+        }
+
+        async function handleDepositSubmit(e) {
+            e.preventDefault();
+            const sessionStr = localStorage.getItem('smm_session');
+            if (!sessionStr) return alert('الرجاء تسجيل الدخول أولاً');
+            const session = JSON.parse(sessionStr);
+
+            const imageInput = document.getElementById('depImageInput');
+            if (!imageInput.files[0]) return alert('الرجاء رفع صورة الإيصال.');
+
+            const formData = new FormData();
+            formData.append('email', session.email); 
+            formData.append('gateway', document.getElementById('depositGateway').value);
+            formData.append('amount', document.getElementById('depAmountInput').value);
+            
+            // إرسال قيمة افتراضية لرقم العملية لتفادي أخطاء السيرفر
+            formData.append('reference_id', 'بدون رقم عملية'); 
+            formData.append('receiptImage', imageInput.files[0]);
+
+            try {
+                const res = await fetch('/api/deposit/submit', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    const successMsg = document.getElementById('depositSuccessMsg');
+                    successMsg.classList.remove('hidden');
+                    document.getElementById('universalDepositForm').reset();
+                    updateDepositInstructions();
+                    setTimeout(() => successMsg.classList.add('hidden'), 5000);
+                } else { alert(data.message); }
+            } catch (err) { alert('خطأ في الاتصال بالخادم'); }
+        }
+
+        async function showAdminPanel() {
+            hideAllSections();
+            document.getElementById('admin-section').classList.remove('hidden');
+            document.getElementById('pageTitle').innerText = 'لوحة تحكم المدير';
+            document.getElementById('adminNavLink').className = 'flex items-center px-4 py-3 bg-red-50 text-red-600 rounded-xl font-medium transition cursor-pointer';
+            refreshUserBalance();
+
+            try {
+                const res = await fetch('/api/admin/data');
+                const data = await res.json();
+                const depRes = await fetch('/api/admin/deposits');
+                const depData = await depRes.json();
+
+                if (data.success) {
+                    document.getElementById('adminUsersCount').innerText = data.usersCount;
+                    document.getElementById('adminTotalSales').innerText = data.totalSales.toFixed(2);
+
+                    const tbody = document.getElementById('adminOrdersTableBody');
+                    tbody.innerHTML = '';
+                    if (data.orders.length > 0) {
+                        data.orders.forEach(order => {
+                            tbody.innerHTML += `
+                                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                    <td class="p-3 font-bold text-primary">#${order.id}</td>
+                                    <td class="p-3 text-gray-800 font-bold">${order.username}</td>
+                                    <td class="p-3 text-gray-600">${order.service}</td>
+                                    <td class="p-3 text-blue-600 truncate max-w-xs"><a href="${order.link}" target="_blank" class="hover:underline">${order.link}</a></td>
+                                    <td class="p-3 font-bold">$${order.charge.toFixed(4)}</td>
+                                    <td class="p-3"><span class="bg-yellow-50 text-yellow-700 px-2.5 py-1 rounded-full text-xs font-bold">${order.status}</span></td>
+                                    <td class="p-3 space-x-2 space-x-reverse">
+                                        <button onclick="updateOrderStatus(${order.id}, 'مكتمل')" class="bg-green-600 text-white px-3 py-1 rounded-lg text-xs font-bold">إتمام</button>
+                                        <button onclick="updateOrderStatus(${order.id}, 'ملغي')" class="bg-red-500 text-white px-3 py-1 rounded-lg text-xs font-bold">إلغاء</button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    } else { tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-400">لا توجد طلبات.</td></tr>`; }
+                }
+
+                if (depData.success) {
+                    const depTbody = document.getElementById('adminDepositsTableBody');
+                    depTbody.innerHTML = '';
+                    if (depData.deposits.length > 0) {
+                        depData.deposits.forEach(dep => {
+                            let statusBadge = dep.status === 'معلق' ? '<span class="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">معلق</span>' : (dep.status === 'مقبول' ? '<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold">مقبول</span>' : '<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">مرفوض</span>');
+                            let imgBtn = dep.receipt_image ? `<button onclick="viewReceipt('${dep.receipt_image}')" class="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold hover:bg-blue-700">عرض الإيصال</button>` : '<span class="text-gray-400">بدون صورة</span>';
+
+                            depTbody.innerHTML += `
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="p-3 font-bold">#${dep.id}</td>
+                                    <td class="p-3 font-bold text-dark">${dep.username}</td>
+                                    <td class="p-3 text-indigo-600 font-mono text-xs">${dep.email}</td>
+                                    <td class="p-3 text-indigo-600 font-bold">${dep.gateway}</td>
+                                    <td class="p-3 font-bold">$${dep.amount.toFixed(2)}</td>
+                                    <td class="p-3">${imgBtn}</td>
+                                    <td class="p-3">${statusBadge}</td>
+                                    <td class="p-3 space-x-1 space-x-reverse">
+                                        ${dep.status === 'معلق' ? `
+                                            <button onclick="handleAdminDeposit(${dep.id}, 'مقبول')" class="bg-green-600 text-white px-2.5 py-1 rounded-lg font-bold hover:bg-green-700">قبول وشحن</button>
+                                            <button onclick="handleAdminDeposit(${dep.id}, 'مرفوض')" class="bg-red-500 text-white px-2.5 py-1 rounded-lg font-bold hover:bg-red-600">رفض</button>
+                                        ` : '<span class="text-gray-400 text-xs">تمت المعالجة</span>'}
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    } else { depTbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-gray-400">لا توجد طلبات شحن معلقة.</td></tr>`; }
+                }
+            } catch (err) { alert('خطأ في جلب البيانات.'); }
+        }
+
+        function viewReceipt(imgName) {
+            document.getElementById('modalReceiptImg').src = '/' + imgName;
+            openModal('receiptModal');
+        }
+
+        async function handleAdminDeposit(depositId, action) {
+            try {
+                const res = await fetch('/api/admin/deposit/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ depositId, action })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message);
+                    showAdminPanel();
+                    refreshUserBalance();
+                } else { alert(data.message); }
+            } catch (err) { alert('خطأ في الاتصال بالخادم'); }
+        }
+
+        document.getElementById('addServiceForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const category = document.getElementById('servCategory').value;
+            const name = document.getElementById('servName').value;
+            const price = parseFloat(document.getElementById('servPrice').value);
+            const description = document.getElementById('servDescription').value;
+
+            try {
+                const res = await fetch('/api/admin/add-service', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category, name, price, description })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('تمت إضافة الخدمة بنجاح!');
+                    this.reset();
+                    showAdminPanel();
+                } else { alert('فشل إضافة الخدمة'); }
+            } catch (err) { alert('خطأ في الاتصال'); }
+        });
+
+        async function updateOrderStatus(orderId, status) {
+            await fetch('/api/admin/update-order-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId, status })
+            });
+            showAdminPanel();
+        }
+
+        function logoutUser() {
+            localStorage.removeItem('smm_session');
+            toggleView('landing-page');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const session = localStorage.getItem('smm_session');
+            if (session) {
+                const user = JSON.parse(session);
+                showDashboard(user.username, user.email, user.balance);
+            }
+        });
+
+        function calculatePrice() {
+            const serviceSelect = document.getElementById('service');
+            const rate = parseFloat(serviceSelect.value);
+            const qty = parseInt(document.getElementById('quantity').value);
+            const charge = document.getElementById('charge');
+            if (!isNaN(rate) && !isNaN(qty) && qty > 0) {
+                charge.value = ((qty / 1000) * rate).toFixed(4);
+            } else { charge.value = ''; }
+        }
+
+        document.getElementById('orderForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const sessionStr = localStorage.getItem('smm_session');
+            if (!sessionStr) return alert('الرجاء تسجيل الدخول أولاً');
+            const session = JSON.parse(sessionStr);
+
+            const quantity = parseInt(document.getElementById('quantity').value);
+            if (isNaN(quantity) || quantity < 1000) return alert('عذراً، الحد الأدنى للطلب هو 1000.');
+
+            const serviceSelect = document.getElementById('service');
+            const serviceName = serviceSelect.options[serviceSelect.selectedIndex].text;
+            const link = document.getElementById('orderLink').value;
+            const charge = parseFloat(document.getElementById('charge').value);
+
+            if (session.balance < charge) return alert('رصيدك غير كافٍ لتنفيذ هذا الطلب.');
+
+            try {
+                const res = await fetch('/api/order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: session.username, service: serviceName, link, quantity, charge })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    session.balance = data.newBalance;
+                    localStorage.setItem('smm_session', JSON.stringify(session));
+                    document.getElementById('displayBalance').innerText = '$' + data.newBalance.toFixed(2);
+                    const successMsg = document.getElementById('successOrderMsg');
+                    successMsg.innerText = `تم إنشاء الطلب بنجاح! رقم الطلب: #${data.orderId}`;
+                    successMsg.classList.remove('hidden');
+                    this.reset();
+                    document.getElementById('charge').value = '';
+                    setTimeout(() => successMsg.classList.add('hidden'), 5000);
+                } else { alert(data.message); }
+            } catch (err) { alert('خطأ في الاتصال بالخادم.'); }
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errorBox = document.getElementById('registerError');
+            errorBox.classList.add('hidden');
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('regUsername').value,
+                        email: document.getElementById('regEmail').value,
+                        password: document.getElementById('regPassword').value
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('smm_session', JSON.stringify({ username: data.username, email: data.email, balance: data.balance }));
+                    showDashboard(data.username, data.email, data.balance);
+                    document.getElementById('registerForm').reset();
+                } else {
+                    errorBox.innerText = data.message; errorBox.classList.remove('hidden');
+                }
+            } catch (err) { alert('خطأ اتصال'); }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errorBox = document.getElementById('loginError');
+            errorBox.classList.add('hidden');
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: document.getElementById('loginEmail').value,
+                        password: document.getElementById('loginPassword').value
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('smm_session', JSON.stringify({ username: data.username, email: data.email, balance: data.balance }));
+                    showDashboard(data.username, data.email, data.balance);
+                    document.getElementById('loginForm').reset();
+                } else {
+                    errorBox.innerText = data.message; errorBox.classList.remove('hidden');
+                }
+            } catch (err) { alert('خطأ اتصال'); }
+        });
+    </script>
+</body>
+</html>
