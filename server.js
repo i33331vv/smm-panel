@@ -13,7 +13,7 @@ const ORDERS_BOT_TOKEN = '9023175997:AAGuvzz3eLywKIBkTjs3w9NCVnmutRblCEc';
 const ADMIN_CHAT_ID = '8671448765';
 const TARGET_ASIACELL_NUMBER = '07738889080'; // رقمك الأساسي لاستلام الرصيد
 
-// التسعيرة: 1 دولار = 1000 دينار رصيد آسياسيل (حسب طلبك)
+// التسعيرة: 1 دولار = 1000 دينار رصيد آسياسيل
 const IQD_PER_USD_RATE = 1000; 
 
 // استيراد Firebase
@@ -195,15 +195,14 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     return { status: response.status, ok: response.ok, data: json, deviceId: currentDeviceId };
 }
 
-// دالة ترجمة رسائل شركة آسياسيل لتكون واضحة للمستخدم (الرصيد لا يكفي / كلفة التحويل)
 function formatAsiacellErrorMessage(rawMessage) {
     if (!rawMessage) return 'تعذر إتمام العملية لدى شركة آسياسيل، يرجى المحاولة لاحقاً.';
     const msg = rawMessage.toLowerCase();
     if (msg.includes('insufficient') || msg.includes('balance') || msg.includes('رصيد') || msg.includes('كافي') || msg.includes('لا يكفي')) {
-        return '❌ عذراً، رصيدك في شريحة آسياسيل لا يكفي لإتمام هذا التحويل، أو ليس لديك رصيد كافٍ لتغطية كلفة رسوم التحويل.';
+        return '❌ عذراً، رصيدك في شريحة آسياسيل لا يكفي لإتمام هذا التحويل، أو ليس لديك رصيد كافٍ لتغطية كلفة التحويل.';
     }
     if (msg.includes('fee') || msg.includes('charge') || msg.includes('كلفة') || msg.includes('رسوم')) {
-        return '❌ عذراً، ليس لديك رصيد إضافي كافٍ لتغطية كلفة (رسوم) خدمة تحويل الرصيد من آسياسيل.';
+        return '❌ عذراً، ليس لديك رصيد كافٍ لتغطية كلفة (رسوم) خدمة تحويل الرصيد من آسياسيل.';
     }
     if (msg.includes('otp') || msg.includes('passcode') || msg.includes('code') || msg.includes('رمز')) {
         return '❌ الرمز الذي أدخلته غير صحيح أو انتهت صلاحيته.';
@@ -230,7 +229,6 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
         const nextStep = result.data?.nextStep || result.data?.data?.nextStep;
 
         if (result.ok || pid || nextStep === 'OTP' || nextStep === 'SMS_VALIDATION') {
-            // حفظ الجلسة في قاعدة البيانات Firestore لكي لا تضيع أبداً
             await db.collection('asiacell_sessions').doc(cleanPhone).set({
                 phone: cleanPhone,
                 pid: pid,
@@ -242,7 +240,7 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
             return res.json({
                 success: true,
                 step: 'VERIFY_LOGIN_OTP',
-                message: `✅ تم إرسال رمز تسجيل الدخول إلى الرقم ${cleanPhone}. يرجى إدخال الرمز للمتابعة.`
+                message: `✅ تم إرسال رمز تسجيل الدخول إلى الرقم ${cleanPhone}. ضع الرمز للمتابعة.`
             });
         } else {
             return res.status(400).json({
@@ -266,8 +264,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     const cleanOtp = otp.trim();
 
     try {
-        // جلب الجلسة من Firestore (أو جلب آخر جلسة إذا لم يرسل الموقع الرقم)
-        let sessionDoc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
+        const sessionDoc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
         if (!sessionDoc.exists) {
             return res.status(400).json({ success: false, message: 'لم يتم العثور على جلسة لهذا الرقم، اطلب الرمز من جديد.' });
         }
@@ -286,7 +283,6 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
             });
         }
 
-        // تحديث الجلسة بالتوكن الجديد لنقله لمرحلة اختيار المبلغ
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
             accessToken: accessToken,
             step: 'SELECT_AMOUNT',
@@ -296,14 +292,14 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
         return res.json({
             success: true,
             step: 'SELECT_AMOUNT',
-            message: '✅ تم تسجيل الدخول بنجاح! اختر الآن المبلغ الذي تريد شحنه (من 1$ إلى 10$).'
+            message: '✅ تم تسجيل الدخول بنجاح! اختر الآن كم تريد أن تشحن حسابك (من 1$ إلى 10$).'
         });
     } catch (error) {
         return res.status(500).json({ success: false, message: 'حدث خطأ أثناء التحقق من رمز الدخول.' });
     }
 });
 
-// المرحلة 3: اختيار المبلغ (1$ - 10$) وطلب التحويل (فحص الرصيد + كلفة التحويل + إرسال رمز تأكيد التحويل)
+// المرحلة 3: اختيار المبلغ (1$ - 10$) وطلب التحويل (فحص الرصيد + كلفة التحويل + إرسال رمز التأكيد)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const { phone, amountUSD } = req.body;
     const usd = parseInt(amountUSD);
@@ -313,17 +309,16 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     }
 
     const cleanPhone = phone.trim();
-    const transferAmountIQD = usd * IQD_PER_USD_RATE; // مثلاً 1$ = 1000 دينار، 5$ = 5000 دينار
+    const transferAmountIQD = usd * IQD_PER_USD_RATE;
 
     try {
         const sessionDoc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
         if (!sessionDoc.exists || !sessionDoc.data().accessToken) {
-            return res.status(400).json({ success: false, message: 'يرجى تسجيل الدخول برقمك أولاً.' });
+            return res.status(400).json({ success: false, message: 'انتهت جلسة الدخول، يرجى كتابة رقمك من جديد.' });
         }
 
         const session = sessionDoc.data();
 
-        // إرسال طلب التحويل المبدئي لآسياسيل لفحص الرصيد وكلفة التحويل وإرسال رمز التأكيد للزبون
         const transferResult = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', {
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
             amount: transferAmountIQD
@@ -332,7 +327,6 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         const transferPid = transferResult.data?.PID || transferResult.data?.data?.PID || transferResult.data?.transactionId || '';
         const nextStep = transferResult.data?.nextStep || transferResult.data?.data?.nextStep;
 
-        // إذا كان الرصيد لا يكفي أو لا توجد كلفة تحويل، ترفض آسياسيل الطلب هنا ونعرض الرسالة فوراً للمستخدم
         if (!transferResult.ok && !transferPid && nextStep !== 'OTP' && nextStep !== 'SMS_VALIDATION') {
             return res.status(400).json({
                 success: false,
@@ -340,7 +334,6 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             });
         }
 
-        // إذا نجح الطلب وأرسلت آسياسيل رمز تأكيد التحويل للمستخدم
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
             transferPid: transferPid,
             amountUSD: usd,
@@ -352,7 +345,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         return res.json({
             success: true,
             step: 'CONFIRM_TRANSFER_OTP',
-            message: `📲 تم إرسال رمز تأكيد تحويل (${transferAmountIQD} دينار = ${usd}$) إلى هاتفك. أدخل رمز التأكيد لإتمام الشحن.`
+            message: `📲 تم إرسال رمز تأكيد تحويل (${transferAmountIQD} دينار = ${usd}$) إلى هاتفك. ضع رمز التأكيد لإتمام الشحن.`
         });
     } catch (error) {
         return res.status(500).json({ success: false, message: 'حدث خطأ أثناء طلب تحويل الرصيد من آسياسيل.' });
@@ -365,11 +358,10 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const finalOtp = (transferOtp || otp || '').trim();
 
     if (!email || !finalOtp) {
-        return res.status(400).json({ success: false, message: 'يرجى إدخال رمز التأكيد.' });
+        return res.status(400).json({ success: false, message: 'يرجى إدخال رمز تأكيد التحويل.' });
     }
 
     try {
-        // البحث عن جلسة الرقم أو أحدث جلسة نشطة في Firestore
         let cleanPhone = phone ? phone.trim() : '';
         let sessionDoc;
 
@@ -389,7 +381,6 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
 
         const session = sessionDoc.data();
 
-        // إرسال رمز تأكيد التحويل النهائي إلى آسياسيل
         const confirmPayload = {
             username: cleanPhone,
             passcode: finalOtp,
@@ -404,17 +395,15 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         if (!confirmResult.ok && confirmResult.data?.success !== true && confirmResult.data?.status !== 'SUCCESS') {
             return res.status(400).json({
                 success: false,
-                message: formatAsiacellErrorMessage(confirmResult.data?.message || 'رمز تأكيد التحويل غير صحيح أو أن الرصيد وكلفة التحويل غير كافيين.')
+                message: formatAsiacellErrorMessage(confirmResult.data?.message || 'رمز تأكيد التحويل غير صحيح أو الرصيد غير كافٍ.')
             });
         }
 
         const creditAmountUSD = session.amountUSD || parseInt(amount || 1);
         const transferAmountIQD = session.amountIQD || (creditAmountUSD * IQD_PER_USD_RATE);
 
-        // مسح الجلسة بعد نجاح التحويل
         await db.collection('asiacell_sessions').doc(cleanPhone).delete();
 
-        // إضافة الرصيد لحساب الزبون في الموقع
         const userSnap = await db.collection('users').where('email', '==', email).get();
         if (userSnap.empty) return res.status(400).json({ success: false, message: 'المستخدم غير موجود في الموقع.' });
 
@@ -448,6 +437,70 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     } catch (error) {
         return res.status(500).json({ success: false, message: 'حدث خطأ أثناء تأكيد التحويل النهائي.' });
     }
+});
+
+// ==========================================================
+// 🛡️ مسارات لوحة المدير (إضافة / تعديل / حذف الخدمات + الإحصائيات)
+// ==========================================================
+app.post('/api/admin/add-service', async (req, res) => {
+    const { category, name, price, description } = req.body;
+    if (!category || !name || isNaN(parseFloat(price))) {
+        return res.status(400).json({ success: false, message: 'يرجى إكمال بيانات الخدمة بشكل صحيح.' });
+    }
+    try {
+        const docRef = await db.collection('services').add({
+            category: category.trim(),
+            name: name.trim(),
+            price: parseFloat(price),
+            description: (description || '').trim(),
+            created_at: getFormattedDateTime()
+        });
+        res.json({ success: true, id: docRef.id, message: '✅ تم إضافة الخدمة للنظام بنجاح!' });
+    } catch (e) {
+        console.error('Add Service Error:', e);
+        res.status(500).json({ success: false, message: 'حدث خطأ في قاعدة البيانات أثناء إضافة الخدمة.' });
+    }
+});
+
+app.post('/api/admin/update-service', async (req, res) => {
+    const { id, category, name, price, description } = req.body;
+    if (!id || !category || !name || isNaN(parseFloat(price))) {
+        return res.status(400).json({ success: false, message: 'بيانات التعديل غير مكتملة.' });
+    }
+    try {
+        await db.collection('services').doc(id).update({
+            category: category.trim(),
+            name: name.trim(),
+            price: parseFloat(price),
+            description: (description || '').trim()
+        });
+        res.json({ success: true, message: '✅ تم تحديث الخدمة بنجاح!' });
+    } catch (e) {
+        console.error('Update Service Error:', e);
+        res.status(500).json({ success: false, message: 'حدث خطأ أثناء تحديث الخدمة.' });
+    }
+});
+
+app.post('/api/admin/delete-service', async (req, res) => {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ success: false, message: 'معرف الخدمة مفقود.' });
+    try {
+        await db.collection('services').doc(id).delete();
+        res.json({ success: true, message: 'تم حذف الخدمة بنجاح.' });
+    } catch (e) {
+        console.error('Delete Service Error:', e);
+        res.status(500).json({ success: false, message: 'حدث خطأ أثناء حذف الخدمة.' });
+    }
+});
+
+app.get('/api/admin/data', async (req, res) => {
+    try {
+        const usersSnap = await db.collection('users').get();
+        let totalSales = 0;
+        const ordersSnap = await db.collection('orders').get();
+        ordersSnap.forEach(doc => { totalSales += parseFloat(doc.data().charge || 0); });
+        res.json({ success: true, usersCount: usersSnap.size, totalSales });
+    } catch (e) { res.status(500).json({ success: false }); }
 });
 
 // ==========================================================
@@ -570,16 +623,6 @@ app.get('/api/services', async (req, res) => {
         snapshot.forEach(doc => services.push({ id: doc.id, ...doc.data() }));
         res.json({ success: true, services });
     } catch (e) { res.json({ success: true, services: [] }); }
-});
-
-app.get('/api/admin/data', async (req, res) => {
-    try {
-        const usersSnap = await db.collection('users').get();
-        let totalSales = 0;
-        const ordersSnap = await db.collection('orders').get();
-        ordersSnap.forEach(doc => { totalSales += parseFloat(doc.data().charge || 0); });
-        res.json({ success: true, usersCount: usersSnap.size, totalSales });
-    } catch (e) { res.status(500).json({ success: false }); }
 });
 
 app.listen(port, () => {
