@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const fs = require('fs');
 const https = require('https');
-const crypto = require('crypto'); // 💡 تم إضافة مكتبة التشفير لقراءة بصمة الصور
+const crypto = require('crypto');
 
 // إعدادات بوتات التليجرام والمعرفات الخاصة بك
 const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
@@ -47,7 +47,6 @@ function getFormattedDateTime() {
     });
 }
 
-// 💡 دالة جديدة: استخراج البصمة الرقمية للصورة (لمنع التكرار)
 function getFileHash(filePath) {
     return new Promise((resolve, reject) => {
         const hash = crypto.createHash('sha256');
@@ -78,7 +77,7 @@ function editTelegramTextMessage(token, chatId, messageId, newText, replyMarkup 
     const req = https.request(options); req.on('error', () => {}); req.write(data); req.end();
 }
 
-// نظام الاستعلام المستمر
+// نظام الاستعلام المستمر (Polling)
 function startTelegramPolling(token) {
     let offset = 0;
     setInterval(() => {
@@ -149,6 +148,29 @@ function startTelegramPolling(token) {
 startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
+// 🚨 مسار طوارئ جديد لإلغاء جميع طلبات الشحن المعلقة وتنظيف النظام
+app.get('/api/admin/clear-pending-deposits', async (req, res) => {
+    try {
+        const pendingSnap = await db.collection('deposit_requests').where('status', '==', 'معلق').get();
+        if (pendingSnap.empty) {
+            return res.json({ success: true, message: 'لا توجد أي طلبات شحن معلقة حالياً.' });
+        }
+
+        const batch = db.batch();
+        pendingSnap.docs.forEach(doc => {
+            batch.update(doc.ref, { status: 'مرفوض' });
+        });
+        await batch.commit();
+
+        res.json({ 
+            success: true, 
+            message: `تمت إزالة وتغيير حالة (${pendingSnap.size}) طلب شحن معلق إلى مرفوض بنجاح! يمكنك الآن إجراء طلب شحن جديد.` 
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'حدث خطأ أثناء تنظيف الطلبات.' });
+    }
+});
+
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
     try {
@@ -180,21 +202,19 @@ app.get('/api/user/:email', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// طلب شحن - مع نظامي (منع التكرار المعلق) + (البصمة الرقمية للصورة) 🚨
+// طلب شحن
 app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) => {
     const { email, gateway, amount } = req.body;
     const uploadedFile = req.file;
     if (!email || !gateway || !amount || !uploadedFile) return res.status(400).json({ success: false, message: 'الرجاء إكمال البيانات.' });
 
     try {
-        // 1. التحقق من الطلبات المعلقة
         const pendingSnap = await db.collection('deposit_requests').where('email', '==', email).where('status', '==', 'معلق').get();
         if (!pendingSnap.empty) {
             if (fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
             return res.status(400).json({ success: false, message: 'عذراً، لديك طلب شحن قيد المراجعة بالفعل. الرجاء الانتظار.' });
         }
 
-        // 2. 💡 استخراج البصمة الرقمية والتحقق من عدم استخدام الصورة مسبقاً
         const fileHash = await getFileHash(uploadedFile.path);
         const hashCheckSnap = await db.collection('deposit_requests').where('image_hash', '==', fileHash).get();
         if (!hashCheckSnap.empty) {
@@ -208,11 +228,10 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
         const username = userSnap.docs[0].data().username;
         const dateTime = getFormattedDateTime();
         
-        // إضافة البصمة `image_hash` إلى قاعدة البيانات
         const depRef = await db.collection('deposit_requests').add({ 
             username, email, gateway, amount: parseFloat(amount), 
             receipt_image: uploadedFile.filename, 
-            image_hash: fileHash, // حفظ البصمة هنا
+            image_hash: fileHash,
             status: 'معلق', created_at: dateTime 
         });
         
@@ -273,7 +292,6 @@ app.get('/api/services', async (req, res) => {
     } catch (e) { res.json({ success: true, services: [] }); }
 });
 
-// مسارات الإدارة للحصول على الإحصائيات (تم إزالة استدعاء الجداول لعدم الحاجة لها)
 app.get('/api/admin/data', async (req, res) => {
     try {
         const usersSnap = await db.collection('users').get();
