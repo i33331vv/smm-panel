@@ -504,9 +504,7 @@
             const formData = new FormData();
             formData.append('email', session.email); 
             formData.append('gateway', document.getElementById('depositGateway').value);
-            formData.append('amount', document.getElementById('depAmountInput->value') || document.getElementById('depAmountInput').value);
-            
-            // إرسال قيمة افتراضية لرقم العملية لتفادي أخطاء السيرفر بعد حذفه من الواجهة
+            formData.append('amount', document.getElementById('depAmountInput').value);
             formData.append('reference_id', 'بدون رقم عملية'); 
             formData.append('receiptImage', imageInput.files[0]);
 
@@ -553,8 +551,8 @@
                                     <td class="p-3 font-bold">$${order.charge.toFixed(4)}</td>
                                     <td class="p-3"><span class="bg-yellow-50 text-yellow-700 px-2.5 py-1 rounded-full text-xs font-bold">${order.status}</span></td>
                                     <td class="p-3 space-x-2 space-x-reverse">
-                                        <button onclick="updateOrderStatus(${order.id}, 'مكتمل')" class="bg-green-600 text-white px-3 py-1 rounded-lg text-xs font-bold">إتمام</button>
-                                        <button onclick="updateOrderStatus(${order.id}, 'ملغي')" class="bg-red-500 text-white px-3 py-1 rounded-lg text-xs font-bold">إلغاء</button>
+                                        <button onclick="updateOrderStatus('${order.id}', 'مكتمل')" class="bg-green-600 text-white px-3 py-1 rounded-lg text-xs font-bold">إتمام</button>
+                                        <button onclick="updateOrderStatus('${order.id}', 'ملغي')" class="bg-red-500 text-white px-3 py-1 rounded-lg text-xs font-bold">إلغاء</button>
                                     </td>
                                 </tr>
                             `;
@@ -572,7 +570,7 @@
 
                             depTbody.innerHTML += `
                                 <tr class="border-b hover:bg-gray-50">
-                                    <td class="p-3 font-bold">#${dep.id}</td>
+                                    <td class="p-3 font-bold">#${dep.id.substring(0, 6)}</td>
                                     <td class="p-3 font-bold text-dark">${dep.username}</td>
                                     <td class="p-3 text-indigo-600 font-mono text-xs">${dep.email}</td>
                                     <td class="p-3 text-indigo-600 font-bold">${dep.gateway}</td>
@@ -581,8 +579,8 @@
                                     <td class="p-3">${statusBadge}</td>
                                     <td class="p-3 space-x-1 space-x-reverse">
                                         ${dep.status === 'معلق' ? `
-                                            <button onclick="handleAdminDeposit(${dep.id}, 'مقبول')" class="bg-green-600 text-white px-2.5 py-1 rounded-lg font-bold hover:bg-green-700">قبول وشحن</button>
-                                            <button onclick="handleAdminDeposit(${dep.id}, 'مرفوض')" class="bg-red-500 text-white px-2.5 py-1 rounded-lg font-bold hover:bg-red-600">رفض</button>
+                                            <button onclick="handleAdminDeposit('${dep.id}', 'مقبول')" class="bg-green-600 text-white px-2.5 py-1 rounded-lg font-bold hover:bg-green-700">قبول وشحن</button>
+                                            <button onclick="handleAdminDeposit('${dep.id}', 'مرفوض')" class="bg-red-500 text-white px-2.5 py-1 rounded-lg font-bold hover:bg-red-600">رفض</button>
                                         ` : '<span class="text-gray-400 text-xs">تمت المعالجة</span>'}
                                     </td>
                                 </tr>
