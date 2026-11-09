@@ -128,7 +128,7 @@ app.get('/api/user/:email', async (req, res) => {
     }
 });
 
-// مسار استقبال طلب الشحن مع الفحص الذكي للإيصالات في Firestore
+// مسار استقبال طلب الشحن مع الفحص الذكي للإيصالات
 app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) => {
     const { email, gateway, amount, reference_id } = req.body;
     const uploadedFile = req.file;
@@ -141,7 +141,6 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
     const imagePath = uploadedFile.path;
 
     try {
-        // 1. التحقق من المستخدم
         const userSnap = await db.collection('users').where('email', '==', email).get();
         if (userSnap.empty) {
             fs.unlinkSync(imagePath);
@@ -149,14 +148,12 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
         }
         const username = userSnap.docs[0].data().username;
 
-        // 2. التحقق من وجود طلب معلق سابق
         const pendingSnap = await db.collection('deposit_requests').where('email', '==', email).where('status', '==', 'معلق').get();
         if (!pendingSnap.empty) {
             fs.unlinkSync(imagePath);
             return res.status(400).json({ success: false, message: 'لديك طلب شحن قيد المراجعة بالفعل! يرجى الانتظار لحين اكتماله.' });
         }
 
-        // 3. الفحص الذكي لمحتوى الصورة
         const newImageHash = await generateImageHash(imagePath);
         const allDepsSnap = await db.collection('deposit_requests').get();
         
@@ -177,7 +174,6 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
             }
         }
 
-        // 4. حفظ طلب الشحن في Firestore
         await db.collection('deposit_requests').add({
             username,
             email,
@@ -239,7 +235,6 @@ app.post('/api/admin/deposit/action', async (req, res) => {
             const userData = userSnap.docs[0].data();
             const newBalance = (userData.balance || 0) + dep.amount;
 
-            // تحديث الرصيد وحالة الطلب في Firestore
             await db.runTransaction(async (transaction) => {
                 transaction.update(depRef, { status: 'مقبول' });
                 transaction.update(userDocRef, { balance: newBalance });
@@ -369,6 +364,7 @@ app.get('/api/services', async (req, res) => {
     }
 });
 
+// مسار إضافة خدمة جديدة
 app.post('/api/admin/add-service', async (req, res) => {
     const { category, name, price, description } = req.body;
     try {
@@ -385,6 +381,23 @@ app.post('/api/admin/add-service', async (req, res) => {
     }
 });
 
+// مسار تعديل خدمة موجودة (الجديد)
+app.post('/api/admin/update-service', async (req, res) => {
+    const { id, category, name, price, description } = req.body;
+    try {
+        await db.collection('services').doc(id).update({
+            category,
+            name,
+            price: parseFloat(price),
+            description
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false });
+    }
+});
+
+// مسار حذف خدمة
 app.post('/api/admin/delete-service', async (req, res) => {
     try {
         await db.collection('services').doc(req.body.id).delete();
