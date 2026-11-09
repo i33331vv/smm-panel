@@ -139,21 +139,24 @@
                                     <p id="serviceDescText" class="whitespace-pre-wrap"></p>
                                 </div>
 
-                                <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">الرابط</label>
-                                    <input type="url" id="orderLink" placeholder="https://instagram.com/username" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50" required>
-                                </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <!-- تفاصيل الطلب المخفية (الرابط، الكمية، السعر) -->
+                                <div id="orderDetailsContainer" class="hidden space-y-5">
                                     <div>
-                                        <label class="block text-sm font-bold text-gray-700 mb-2">الكمية (الحد الأدنى: 1000)</label>
-                                        <input type="number" id="quantity" oninput="calculatePrice()" min="1000" placeholder="1000" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50" required>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">الرابط</label>
+                                        <input type="url" id="orderLink" placeholder="https://instagram.com/username" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50" required>
                                     </div>
-                                    <div>
-                                        <label class="block text-sm font-bold text-gray-700 mb-2">السعر الإجمالي ($)</label>
-                                        <input type="text" id="charge" readonly placeholder="0.00" class="block w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-100 text-gray-500 font-bold cursor-not-allowed">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                        <div>
+                                            <label class="block text-sm font-bold text-gray-700 mb-2">الكمية (الحد الأدنى: 1000)</label>
+                                            <input type="number" id="quantity" oninput="calculatePrice()" min="1000" placeholder="1000" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50" required>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-bold text-gray-700 mb-2">السعر الإجمالي ($)</label>
+                                            <input type="text" id="charge" readonly placeholder="0.00" class="block w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-100 text-gray-500 font-bold cursor-not-allowed">
+                                        </div>
                                     </div>
+                                    <button type="submit" id="submitOrderBtn" class="w-full bg-primary hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition">تأكيد الطلب</button>
                                 </div>
-                                <button type="submit" id="submitOrderBtn" class="w-full bg-primary hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition">تأكيد الطلب</button>
                             </form>
                             <div id="successOrderMsg" class="hidden mt-4 bg-green-50 text-green-700 border border-green-200 p-4 rounded-xl text-sm text-center font-bold">تم استلام طلبك بنجاح!</div>
                         </div>
@@ -457,7 +460,32 @@
                 }
                 document.getElementById('serviceSelectContainer').classList.add('hidden');
                 document.getElementById('serviceDescriptionBox').classList.add('hidden');
+                document.getElementById('orderDetailsContainer').classList.add('hidden');
             } catch (err) { console.error('خطأ في جلب الخدمات'); }
+        }
+
+        // دالة تحديث نص الرابط التوضيحي
+        function updateLinkPlaceholder(categoryName) {
+            const linkInput = document.getElementById('orderLink');
+            if (!categoryName) return;
+
+            const catLower = categoryName.toLowerCase();
+            
+            if (catLower.includes('انستقرام') || catLower.includes('instagram')) {
+                linkInput.placeholder = 'https://instagram.com/username';
+            } else if (catLower.includes('فيس بوك') || catLower.includes('فيسبوك') || catLower.includes('facebook')) {
+                linkInput.placeholder = 'https://facebook.com/username';
+            } else if (catLower.includes('تيك توك') || catLower.includes('tiktok')) {
+                linkInput.placeholder = 'https://tiktok.com/@username';
+            } else if (catLower.includes('سناب') || catLower.includes('سناب شات') || catLower.includes('snapchat')) {
+                linkInput.placeholder = 'https://snapchat.com/add/username';
+            } else if (catLower.includes('يوتيوب') || catLower.includes('youtube')) {
+                linkInput.placeholder = 'https://youtube.com/@channelname';
+            } else if (catLower.includes('اكس') || catLower.includes('تويتر') || catLower.includes('twitter') || catLower.includes('x')) {
+                 linkInput.placeholder = 'https://x.com/username';
+            } else {
+                linkInput.placeholder = 'https://example.com/link';
+            }
         }
 
         // عند تغير القسم
@@ -466,10 +494,12 @@
             const serviceContainer = document.getElementById('serviceSelectContainer');
             const serviceSelect = document.getElementById('serviceSelect');
             const descBox = document.getElementById('serviceDescriptionBox');
+            const orderDetailsContainer = document.getElementById('orderDetailsContainer');
 
             if (!selectedCat) {
                 serviceContainer.classList.add('hidden');
                 descBox.classList.add('hidden');
+                orderDetailsContainer.classList.add('hidden');
                 document.getElementById('charge').value = '';
                 return;
             }
@@ -482,7 +512,11 @@
 
             serviceContainer.classList.remove('hidden');
             descBox.classList.add('hidden');
+            orderDetailsContainer.classList.add('hidden');
             document.getElementById('charge').value = '';
+            
+            // تغيير نص الرابط الافتراضي
+            updateLinkPlaceholder(selectedCat);
         }
 
         // عند تغير الخدمة
@@ -490,9 +524,11 @@
             const servId = document.getElementById('serviceSelect').value;
             const descBox = document.getElementById('serviceDescriptionBox');
             const descText = document.getElementById('serviceDescText');
+            const orderDetailsContainer = document.getElementById('orderDetailsContainer');
 
             if (!servId) {
                 descBox.classList.add('hidden');
+                orderDetailsContainer.classList.add('hidden');
                 document.getElementById('charge').value = '';
                 return;
             }
@@ -504,6 +540,9 @@
             } else {
                 descBox.classList.add('hidden');
             }
+
+            // إظهار حقول الرابط والكمية والسعر
+            orderDetailsContainer.classList.remove('hidden');
             calculatePrice();
         }
 
@@ -867,10 +906,14 @@
                     const successMsg = document.getElementById('successOrderMsg');
                     successMsg.innerText = `تم إنشاء الطلب بنجاح! رقم الطلب: #${data.orderId}`;
                     successMsg.classList.remove('hidden');
+                    
+                    // إعادة تعيين النموذج وإخفاء الحقول
                     this.reset();
                     document.getElementById('serviceSelectContainer').classList.add('hidden');
                     document.getElementById('serviceDescriptionBox').classList.add('hidden');
+                    document.getElementById('orderDetailsContainer').classList.add('hidden');
                     document.getElementById('charge').value = '';
+                    
                     setTimeout(() => successMsg.classList.add('hidden'), 5000);
                 } else { alert(data.message); }
             } catch (err) { alert('خطأ في الاتصال بالخادم.'); }
