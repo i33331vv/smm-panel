@@ -13,7 +13,7 @@
                 extend: {
                     fontFamily: { sans: ['Tajawal', 'sans-serif'] },
                     colors: { 
-                        primary: '#6b1d2f', /* تم تغيير اللون الأساسي إلى البرغندي الفاخر */
+                        primary: '#6b1d2f', 
                         secondary: '#8a253d', 
                         dark: '#1e293b' 
                     }
@@ -38,7 +38,6 @@
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center h-20">
                     <div class="flex-shrink-0 flex items-center space-x-2 space-x-reverse">
-                        <!-- شعار الموقع المتوافق مع الاسم mt وmtnajm -->
                         <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-xl shadow-md">
                             MT
                         </div>
@@ -70,7 +69,6 @@
     <!-- لوحة التحكم الكاملة -->
     <div id="dashboard-page" class="hidden min-h-screen bg-[#f8fafc] flex flex-col md:flex-row transition-opacity duration-300">
         <aside class="w-full md:w-64 bg-white border-l border-gray-200 shadow-sm flex-shrink-0 flex flex-col">
-            <!-- الشعار المحدث في الشريط الجانبي -->
             <div class="h-20 flex items-center justify-center md:justify-start md:px-6 flex-shrink-0 space-x-3 space-x-reverse">
                 <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-lg shadow-md">
                     MT
@@ -101,7 +99,6 @@
                     <i class="fa-solid fa-shield-halved w-6 text-center text-lg me-3"></i> لوحة المدير
                 </a>
             </nav>
-            <!-- تم حذف زر تسجيل الخروج بناءً على رغبتك -->
         </aside>
 
         <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -119,8 +116,14 @@
             </header>
 
             <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-                <div class="max-w-5xl mx-auto">
+                <div class="max-w-5xl mx-auto space-y-4">
                     
+                    <!-- شريط الموثوقية والهوية العراقية الجديد -->
+                    <div class="bg-gradient-to-r from-[#6b1d2f] to-[#8a253d] text-white p-3.5 rounded-2xl shadow-md flex items-center justify-center space-x-3 space-x-reverse text-center">
+                        <i class="fa-solid fa-shield-halved text-yellow-300 text-lg"></i>
+                        <span class="text-xs sm:text-sm font-bold tracking-wide">منصة عراقية موثوقة 100% — صُنعت بِسواعد وعقول عراقية لخدمتكم بثقة وأمان</span>
+                    </div>
+
                     <!-- 1. نموذج الطلب للمستخدم -->
                     <div id="new-order-section" class="space-y-6">
                         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
