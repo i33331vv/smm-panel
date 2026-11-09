@@ -384,36 +384,43 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 
         const session = sessionDoc.data();
 
-        // إرسال طلب التحويل بالمسار الصحيح والمجرب لخدمات آسياسيل
+        // تجربة المسارات المعتمدة لتحويل الرصيد في تطبيق آسياسيل وتمرير كافة الحقول المطلوبة
         const transferPayload = {
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
+            recipientMsisdn: TARGET_ASIACELL_NUMBER,
+            targetMsisdn: TARGET_ASIACELL_NUMBER,
+            msisdn: TARGET_ASIACELL_NUMBER,
             amount: transferAmountIQD
         };
 
-        const transferResult = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
-        const transferInfo = extractSessionInfo(transferResult.data);
+        let transferResult = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
+        let transferInfo = extractSessionInfo(transferResult.data);
 
-        // التحقق من قبول الطلب وإرسال رمز التحويل
+        // إذا أرجع المسار الأول خطأ أو لم يولد PID، نجرب المسار البديل لخدمة تحويل الرصيد في تطبيق آسياسيل
+        if (transferResult.data?.success !== true && !transferInfo.pid) {
+            const altResult = await callAsiacellAPI('balance-transfer/initiate?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
+            const altInfo = extractSessionInfo(altResult.data);
+            if (altResult.data?.success === true || altInfo.pid) {
+                transferResult = altResult;
+                transferInfo = altInfo;
+            }
+        }
+
+        // التحقق الصارم: لا ننتقل للمرحلة 4 إلا إذا أكدت آسياسيل إرسال رمز التحويل أو أرجعت PID حقيقي للعملية!
         const isTransferOtpSent = (
-            transferResult.ok &&
-            (transferResult.data?.success === true || Boolean(transferInfo.pid) || transferResult.data?.nextStep === 'OTP' || transferResult.data?.status === 'SUCCESS')
+            transferResult.data?.success === true ||
+            Boolean(transferInfo.pid) ||
+            transferResult.data?.nextStep === 'OTP' ||
+            transferResult.data?.nextStep === 'SMS_VALIDATION' ||
+            transferResult.data?.data?.nextStep === 'OTP'
         );
 
-        if (!isTransferOtpSent && !transferInfo.pid) {
-            // تجربة إرسال الطلب بمسار بديل إذا لم ينجح الأول
-            const altResult = await callAsiacellAPI('services/credit-transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
-            const altInfo = extractSessionInfo(altResult.data);
-            
-            if (altResult.ok && (altResult.data?.success === true || Boolean(altInfo.pid))) {
-                transferInfo.pid = altInfo.pid;
-                transferInfo.validationUrl = altInfo.validationUrl;
-            } else {
-                const rawErr = transferResult.data?.message || altResult.data?.message || 'فشل الاتصال بخدمة تحويل الرصيد';
-                return res.status(400).json({
-                    success: false,
-                    message: `❌ رد آسياسيل: ${rawErr}`
-                });
-            }
+        if (!isTransferOtpSent) {
+            const rawErr = transferResult.data?.message || transferResult.data?.error_description || JSON.stringify(transferResult.data);
+            return res.status(400).json({
+                success: false,
+                message: `${formatAsiacellErrorMessage(rawErr)} | (رد السيرفر: ${JSON.stringify(transferResult.data)})`
+            });
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
@@ -434,6 +441,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         return res.status(500).json({ success: false, message: `حدث خطأ أثناء طلب تحويل الرصيد: ${error.message}` });
     }
 });
+
 // المرحلة 4: التأكد الصارم من رمز التحويل النهائي قبل إضافة أي رصيد للموقع
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const { email, phone, transferOtp, otp, amount } = req.body;
