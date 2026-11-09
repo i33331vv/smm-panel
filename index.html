@@ -24,6 +24,7 @@
         .modal.active { opacity: 1; pointer-events: auto; }
         .modal-content { transform: scale(0.95) translateY(-20px); transition: all 0.3s ease; }
         .modal.active .modal-content { transform: scale(1) translateY(0); }
+        .amount-btn.selected { background-color: #dc2626; color: white; border-color: #dc2626; transform: scale(1.03); }
     </style>
 </head>
 <body class="text-gray-800 antialiased selection:bg-primary selection:text-white">
@@ -189,38 +190,105 @@
                             </select>
                         </div>
 
-                        <!-- ⚡ 1. واجهة آسيا سيل التلقائية -->
+                        <!-- ⚡ 1. واجهة آسيا سيل التلقائية (4 مراحل متسلسلة) -->
                         <div id="asiaAutoBox" class="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
                             <div class="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs font-bold text-center">
-                                سيتم إرسال رمز تحقق (OTP) إلى هاتفك واستقطاع المبلغ المحدد وإضافته لحسابك تلقائياً
+                                شحن تلقائي فوري عبر آسياسيل (كل 1$ يعادل 1,000 دينار رصيد)
                             </div>
+
+                            <!-- المرحلة 1: إدخال رقم الهاتف -->
                             <div id="asiaStep1" class="space-y-4">
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-700 mb-1">رقم هاتف آسيا سيل</label>
-                                    <input type="text" id="asiaPhoneInput" placeholder="077XXXXXXXX" class="w-full px-4 py-3 border rounded-xl text-sm font-mono" dir="ltr">
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">ضع رقم هاتفك (آسيا سيل)</label>
+                                    <input type="text" id="asiaPhoneInput" placeholder="077XXXXXXXX" maxlength="11" class="w-full px-4 py-3 border rounded-xl text-center text-base font-mono font-bold" dir="ltr">
                                 </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-700 mb-1">المبلغ المراد شحنه ($ USD)</label>
-                                    <input type="number" id="asiaAmountInput" placeholder="10" class="w-full px-4 py-3 border rounded-xl text-sm">
-                                </div>
-                                <button onclick="requestAsiaOTP()" id="sendOtpBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl text-sm transition">
-                                    إرسال رمز التحقق OTP
+                                <button type="button" onclick="requestAsiaLoginOTP()" id="sendLoginOtpBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-sm">
+                                    إرسال رمز تسجيل الدخول
                                 </button>
                             </div>
+
+                            <!-- المرحلة 2: إدخال رمز تسجيل الدخول -->
                             <div id="asiaStep2" class="hidden space-y-4">
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-700 mb-1">رمز OTP المكون من 6 أرقام المرسل إلى هاتفك</label>
-                                    <input type="text" id="asiaOtpInput" placeholder="123456" maxlength="6" class="w-full px-4 py-3 border rounded-xl text-center font-mono text-lg font-bold tracking-widest" dir="ltr">
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">ضع رمز تسجيل الدخول المرسل إلى هاتفك</label>
+                                    <input type="text" id="asiaLoginOtpInput" placeholder="123456" maxlength="6" class="w-full px-4 py-3 border rounded-xl text-center font-mono text-lg font-bold tracking-widest" dir="ltr">
                                 </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-700 mb-1">رمز التحويل السري (اختياري إن وجد)</label>
-                                    <input type="password" id="asiaPinInput" placeholder="****" class="w-full px-4 py-3 border rounded-xl text-center font-mono text-sm" dir="ltr">
-                                </div>
-                                <button onclick="confirmAsiaTransfer()" id="confirmOtpBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl text-sm transition">
-                                    تأكيد واستقطاع الرصيد تلقائياً
+                                <button type="button" onclick="verifyAsiaLoginOTP()" id="verifyLoginOtpBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-sm">
+                                    تأكيد رمز الدخول والمتابعة
+                                </button>
+                                <button type="button" onclick="resetAsiaFlow()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 rounded-xl text-xs transition">
+                                    تغيير رقم الهاتف
                                 </button>
                             </div>
-                            <div id="asiaMsg" class="hidden text-xs p-3 rounded-xl font-bold text-center"></div>
+
+                            <!-- المرحلة 3: اختيار المبلغ من 1$ إلى 10$ -->
+                            <div id="asiaStep3" class="hidden space-y-4">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-800 mb-2 text-center">اختر كم تريد أن تشحن حسابك:</label>
+                                    <input type="hidden" id="selectedAsiaAmountUSD" value="">
+                                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5" id="amountButtonsGrid">
+                                        <button type="button" onclick="selectAsiaAmount(1)" id="amtBtn_1" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">1$</span>
+                                            <span class="text-[11px] opacity-80">1,000 د.ع</span>
+                                        </button>
+                                        <button type="button" onclick="selectAsiaAmount(2)" id="amtBtn_2" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">2$</span>
+                                            <span class="text-[11px] opacity-80">2,000 د.ع</span>
+                                        </button>
+                                        <button type="button" onclick="selectAsiaAmount(3)" id="amtBtn_3" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">3$</span>
+                                            <span class="text-[11px] opacity-80">3,000 د.ع</span>
+                                        </button>
+                                        <button type="button" onclick="selectAsiaAmount(4)" id="amtBtn_4" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">4$</span>
+                                            <span class="text-[11px] opacity-80">4,000 د.ع</span>
+                                        </button>
+                                        <button type="button" onclick="selectAsiaAmount(5)" id="amtBtn_5" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">5$</span>
+                                            <span class="text-[11px] opacity-80">5,000 د.ع</span>
+                                        </button>
+                                        <button type="button" onclick="selectAsiaAmount(6)" id="amtBtn_6" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">6$</span>
+                                            <span class="text-[11px] opacity-80">6,000 د.ع</span>
+                                        </button>
+                                        <button type="button" onclick="selectAsiaAmount(7)" id="amtBtn_7" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">7$</span>
+                                            <span class="text-[11px] opacity-80">7,000 د.ع</span>
+                                        </button>
+                                        <button type="button" onclick="selectAsiaAmount(8)" id="amtBtn_8" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">8$</span>
+                                            <span class="text-[11px] opacity-80">8,000 د.ع</span>
+                                        </button>
+                                        <button type="button" onclick="selectAsiaAmount(9)" id="amtBtn_9" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">9$</span>
+                                            <span class="text-[11px] opacity-80">9,000 د.ع</span>
+                                        </button>
+                                        <button type="button" onclick="selectAsiaAmount(10)" id="amtBtn_10" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">10$</span>
+                                            <span class="text-[11px] opacity-80">10,000 د.ع</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="initiateAsiaTransfer()" id="initiateTransferBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-sm">
+                                    شحن الرصيد الآن
+                                </button>
+                            </div>
+
+                            <!-- المرحلة 4: إدخال رمز تأكيد التحويل النهائي -->
+                            <div id="asiaStep4" class="hidden space-y-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">ضع رمز تأكيد التحويل الذي أرسلته الشركة إليك</label>
+                                    <input type="text" id="asiaTransferOtpInput" placeholder="123456" maxlength="6" class="w-full px-4 py-3 border rounded-xl text-center font-mono text-lg font-bold tracking-widest" dir="ltr">
+                                </div>
+                                <button type="button" onclick="confirmAsiaFinalTransfer()" id="confirmFinalOtpBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-sm">
+                                    تأكيد التحويل وإضافة الرصيد لحسابي
+                                </button>
+                                <button type="button" onclick="backToStep3()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 rounded-xl text-xs transition">
+                                    تغيير المبلغ المختار
+                                </button>
+                            </div>
+
+                            <div id="asiaMsg" class="hidden text-xs p-3.5 rounded-xl font-bold text-center leading-relaxed"></div>
                         </div>
 
                         <!-- 📷 2. واجهة الدفع اليدوي بواسطة الإيصالات (للبوابات الأخرى) -->
@@ -275,6 +343,7 @@
                                     <button type="submit" id="saveServiceBtn" class="bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition">إضافة الخدمة للنظام</button>
                                     <button type="button" id="cancelEditBtn" onclick="resetServiceForm()" class="hidden bg-gray-500 hover:bg-gray-600 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition">إلغاء التعديل</button>
                                 </div>
+                                <div id="adminServiceMsg" class="hidden text-xs p-3 rounded-xl font-bold text-center"></div>
                             </form>
                         </div>
 
@@ -434,7 +503,7 @@
             }
             const filteredServices = fetchedServices.filter(s => s.category === selectedCat);
             serviceSelect.innerHTML = '<option value="">-- اختر الخدمة --</option>';
-            filteredServices.forEach(serv => { serviceSelect.innerHTML += `<option value="${serv.id}">${serv.name} - $${serv.price.toFixed(2)}/1K</option>`; });
+            filteredServices.forEach(serv => { serviceSelect.innerHTML += `<option value="${serv.id}">${serv.name} - $${parseFloat(serv.price).toFixed(2)}/1K</option>`; });
             serviceContainer.classList.remove('hidden'); descBox.classList.add('hidden'); orderDetailsContainer.classList.add('hidden'); document.getElementById('charge').value = '';
             updateLinkPlaceholder(selectedCat);
         }
@@ -459,7 +528,7 @@
             const qty = parseInt(document.getElementById('quantity').value);
             const charge = document.getElementById('charge');
 
-            if (targetServ && !isNaN(qty) && qty > 0) { charge.value = ((qty / 1000) * targetServ.price).toFixed(4); } else { charge.value = ''; }
+            if (targetServ && !isNaN(qty) && qty > 0) { charge.value = ((qty / 1000) * parseFloat(targetServ.price)).toFixed(4); } else { charge.value = ''; }
         }
 
         async function showOrdersPage() {
@@ -487,7 +556,7 @@
                                 <td class="p-3 text-gray-700">${order.service}</td>
                                 <td class="p-3 text-blue-600 truncate max-w-xs"><a href="${order.link}" target="_blank" class="hover:underline">${order.link}</a></td>
                                 <td class="p-3">${order.quantity}</td>
-                                <td class="p-3 font-bold">$${order.charge.toFixed(4)}</td>
+                                <td class="p-3 font-bold">$${parseFloat(order.charge).toFixed(4)}</td>
                                 <td class="p-3"><span class="${statusColor} px-2.5 py-1 rounded-full text-xs font-bold">${order.status}</span></td>
                                 <td class="p-3 text-gray-400 text-xs" dir="ltr">${order.created_at}</td>
                             </tr>
@@ -503,15 +572,8 @@
             document.getElementById('pageTitle').innerText = 'شحن الرصيد';
             document.getElementById('navDeposit').className = 'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
             
-            // تصفير الواجهات عند الدخول
             if (document.getElementById('manualDepositForm')) document.getElementById('manualDepositForm').reset();
-            document.getElementById('asiaPhoneInput').value = '';
-            document.getElementById('asiaAmountInput').value = '';
-            document.getElementById('asiaOtpInput').value = '';
-            document.getElementById('asiaPinInput').value = '';
-            document.getElementById('asiaStep1').classList.remove('hidden');
-            document.getElementById('asiaStep2').classList.add('hidden');
-            document.getElementById('asiaMsg').classList.add('hidden');
+            resetAsiaFlow();
             document.getElementById('depositSuccessMsg').classList.add('hidden');
             
             toggleDepositMode();
@@ -538,50 +600,194 @@
             else if (gateway === 'Binance') { infoBox.innerHTML = `قم بالتحويل إلى المعرف: <span class="font-mono font-bold text-primary" dir="ltr">1075470705</span> أو عبر مسح الباركود التالي:<br><img src="/BINANCE.jpeg" alt="Binance QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">`; }
         }
 
-        // ==========================================
-        // 🚀 وظائف آسيا سيل التلقائية
-        // ==========================================
-        async function requestAsiaOTP() {
-            const phone = document.getElementById('asiaPhoneInput').value;
-            const amount = document.getElementById('asiaAmountInput').value;
+        // ============================================================
+        // 🚀 وظائف شحن آسياسيل التلقائي (4 مراحل متسلسلة حسب الطلب)
+        // ============================================================
+        function showAsiaMessage(text, type = 'info') {
             const msg = document.getElementById('asiaMsg');
-
-            if (!phone || !phone.startsWith('077') || !amount) { alert('يرجى كتابة رقم آسيا سيل يبدأ بـ 077 والمبلغ.'); return; }
-            document.getElementById('sendOtpBtn').innerText = 'جاري إرسال الرمز...';
-
-            try {
-                const res = await fetch('/api/asiacell/send-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
-                const data = await res.json();
-                msg.classList.remove('hidden'); msg.className = 'text-xs p-3 rounded-xl font-bold text-center bg-blue-50 text-blue-700 border border-blue-200'; msg.innerText = data.message;
-                document.getElementById('asiaStep1').classList.add('hidden'); document.getElementById('asiaStep2').classList.remove('hidden');
-            } catch(e) { alert('خطأ في إرسال الطلب.'); } finally { document.getElementById('sendOtpBtn').innerText = 'إرسال رمز التحقق OTP'; }
+            msg.classList.remove('hidden');
+            if (type === 'success') {
+                msg.className = 'text-xs p-3.5 rounded-xl font-bold text-center bg-green-50 text-green-700 border border-green-200 leading-relaxed';
+            } else if (type === 'error') {
+                msg.className = 'text-xs p-3.5 rounded-xl font-bold text-center bg-red-50 text-red-700 border border-red-200 leading-relaxed';
+            } else {
+                msg.className = 'text-xs p-3.5 rounded-xl font-bold text-center bg-blue-50 text-blue-700 border border-blue-200 leading-relaxed';
+            }
+            msg.innerText = text;
         }
 
-        async function confirmAsiaTransfer() {
+        function resetAsiaFlow() {
+            document.getElementById('asiaPhoneInput').value = '';
+            document.getElementById('asiaLoginOtpInput').value = '';
+            document.getElementById('selectedAsiaAmountUSD').value = '';
+            document.getElementById('asiaTransferOtpInput').value = '';
+            document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('selected'));
+
+            document.getElementById('asiaStep1').classList.remove('hidden');
+            document.getElementById('asiaStep2').classList.add('hidden');
+            document.getElementById('asiaStep3').classList.add('hidden');
+            document.getElementById('asiaStep4').classList.add('hidden');
+            document.getElementById('asiaMsg').classList.add('hidden');
+        }
+
+        function backToStep3() {
+            document.getElementById('asiaTransferOtpInput').value = '';
+            document.getElementById('asiaStep4').classList.add('hidden');
+            document.getElementById('asiaStep3').classList.remove('hidden');
+            document.getElementById('asiaMsg').classList.add('hidden');
+        }
+
+        function selectAsiaAmount(usd) {
+            document.getElementById('selectedAsiaAmountUSD').value = usd;
+            document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('selected'));
+            const targetBtn = document.getElementById('amtBtn_' + usd);
+            if (targetBtn) targetBtn.classList.add('selected');
+            showAsiaMessage(`تم اختيار شحن ${usd}$ (سيتم تحويل ${usd * 1000} دينار من رصيدك). اضغط "شحن الرصيد الآن" للمتابعة.`, 'info');
+        }
+
+        // المرحلة 1: إرسال رقم الهاتف لطلب رمز تسجيل الدخول
+        async function requestAsiaLoginOTP() {
+            const phone = document.getElementById('asiaPhoneInput').value.trim();
+            if (!/^077\d{8}$/.test(phone)) {
+                return showAsiaMessage('⚠️ يرجى إدخال رقم هاتف آسياسيل صحيح مكون من 11 رقماً ويبدأ بـ 077', 'error');
+            }
+
+            const btn = document.getElementById('sendLoginOtpBtn');
+            btn.disabled = true;
+            btn.innerText = 'جاري إرسال رمز تسجيل الدخول...';
+
+            try {
+                const res = await fetch('/api/asiacell/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showAsiaMessage(data.message, 'info');
+                    document.getElementById('asiaStep1').classList.add('hidden');
+                    document.getElementById('asiaStep2').classList.remove('hidden');
+                } else {
+                    showAsiaMessage(data.message || 'تعذر إرسال رمز الدخول.', 'error');
+                }
+            } catch (e) {
+                showAsiaMessage('حدث خطأ في الاتصال بالخادم.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'إرسال رمز تسجيل الدخول';
+            }
+        }
+
+        // المرحلة 2: تأكيد رمز تسجيل الدخول والانتقال لاختيار المبلغ (1$ - 10$)
+        async function verifyAsiaLoginOTP() {
+            const phone = document.getElementById('asiaPhoneInput').value.trim();
+            const otp = document.getElementById('asiaLoginOtpInput').value.trim();
+
+            if (!otp || otp.length < 4) {
+                return showAsiaMessage('⚠️ يرجى إدخال رمز تسجيل الدخول المرسل إلى هاتفك.', 'error');
+            }
+
+            const btn = document.getElementById('verifyLoginOtpBtn');
+            btn.disabled = true;
+            btn.innerText = 'جاري التحقق من رمز الدخول...';
+
+            try {
+                const res = await fetch('/api/asiacell/verify-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, otp })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showAsiaMessage(data.message, 'success');
+                    document.getElementById('asiaStep2').classList.add('hidden');
+                    document.getElementById('asiaStep3').classList.remove('hidden');
+                } else {
+                    showAsiaMessage(data.message || 'رمز تسجيل الدخول غير صحيح.', 'error');
+                }
+            } catch (e) {
+                showAsiaMessage('حدث خطأ أثناء التحقق من الرمز.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'تأكيد رمز الدخول والمتابعة';
+            }
+        }
+
+        // المرحلة 3: اختيار المبلغ (1$ - 10$) وإرسال طلب التحويل لآسياسيل
+        async function initiateAsiaTransfer() {
+            const phone = document.getElementById('asiaPhoneInput').value.trim();
+            const amountUSD = parseInt(document.getElementById('selectedAsiaAmountUSD').value);
+
+            if (!amountUSD || amountUSD < 1 || amountUSD > 10) {
+                return showAsiaMessage('⚠️ يرجى اختيار المبلغ الذي تريد شحنه أولاً (من 1$ إلى 10$).', 'error');
+            }
+
+            const btn = document.getElementById('initiateTransferBtn');
+            btn.disabled = true;
+            btn.innerText = 'جاري فحص الرصيد وطلب رمز تأكيد التحويل...';
+
+            try {
+                const res = await fetch('/api/asiacell/initiate-transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, amountUSD })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showAsiaMessage(data.message, 'info');
+                    document.getElementById('asiaStep3').classList.add('hidden');
+                    document.getElementById('asiaStep4').classList.remove('hidden');
+                } else {
+                    showAsiaMessage(data.message, 'error');
+                }
+            } catch (e) {
+                showAsiaMessage('حدث خطأ في الاتصال أثناء طلب التحويل.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'شحن الرصيد الآن';
+            }
+        }
+
+        // المرحلة 4: إدخال رمز تأكيد التحويل النهائي وإضافة الرصيد للموقع
+        async function confirmAsiaFinalTransfer() {
             const sessionStr = localStorage.getItem('smm_session');
             if (!sessionStr) return alert('الرجاء تسجيل الدخول أولاً');
             const session = JSON.parse(sessionStr);
 
-            const phone = document.getElementById('asiaPhoneInput').value;
-            const amount = document.getElementById('asiaAmountInput').value;
-            const otp = document.getElementById('asiaOtpInput').value;
-            const pin = document.getElementById('asiaPinInput').value;
-            const msg = document.getElementById('asiaMsg');
+            const phone = document.getElementById('asiaPhoneInput').value.trim();
+            const amount = document.getElementById('selectedAsiaAmountUSD').value;
+            const transferOtp = document.getElementById('asiaTransferOtpInput').value.trim();
 
-            if (!otp || otp.length < 4) { alert('يرجى إدخال كود الـ OTP الصحيح.'); return; }
-            document.getElementById('confirmOtpBtn').innerText = 'جاري معالجة الاستقطاع والرصيد...';
+            if (!transferOtp || transferOtp.length < 4) {
+                return showAsiaMessage('⚠️ يرجى إدخال رمز تأكيد التحويل المرسل من آسياسيل.', 'error');
+            }
+
+            const btn = document.getElementById('confirmFinalOtpBtn');
+            btn.disabled = true;
+            btn.innerText = 'جاري تأكيد التحويل وإضافة الرصيد...';
 
             try {
-                const res = await fetch('/api/asiacell/confirm-transfer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: session.email, phone, otp, amount, pin }) });
+                const res = await fetch('/api/asiacell/confirm-transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: session.email, phone, transferOtp, amount })
+                });
                 const data = await res.json();
                 if (data.success) {
-                    msg.className = 'text-xs p-3 rounded-xl font-bold text-center bg-green-50 text-green-700 border border-green-200'; msg.innerText = data.message;
-                    session.balance = data.newBalance; localStorage.setItem('smm_session', JSON.stringify(session)); document.getElementById('displayBalance').innerText = '$' + data.newBalance.toFixed(2);
-                    setTimeout(() => { document.getElementById('asiaStep2').classList.add('hidden'); document.getElementById('asiaStep1').classList.remove('hidden'); document.getElementById('asiaOtpInput').value = ''; }, 3000);
+                    showAsiaMessage(data.message, 'success');
+                    session.balance = data.newBalance;
+                    localStorage.setItem('smm_session', JSON.stringify(session));
+                    document.getElementById('displayBalance').innerText = '$' + parseFloat(data.newBalance).toFixed(2);
+                    setTimeout(() => { resetAsiaFlow(); }, 4000);
                 } else {
-                    msg.className = 'text-xs p-3 rounded-xl font-bold text-center bg-red-50 text-red-700 border border-red-200'; msg.innerText = data.message;
+                    showAsiaMessage(data.message, 'error');
                 }
-            } catch(e) { alert('حدث خطأ أثناء التنفيذ.'); } finally { document.getElementById('confirmOtpBtn').innerText = 'تأكيد واستقطاع الرصيد تلقائياً'; }
+            } catch (e) {
+                showAsiaMessage('حدث خطأ أثناء تأكيد التحويل النهائي.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'تأكيد التحويل وإضافة الرصيد لحسابي';
+            }
         }
 
         async function handleDepositSubmit(e) {
@@ -613,6 +819,9 @@
             } catch (err) { alert('خطأ في الاتصال بالخادم'); }
         }
 
+        // ============================================================
+        // 🛡️ وظائف لوحة المدير (إضافة وتعديل وحذف الخدمات)
+        // ============================================================
         async function showAdminPanel() {
             hideAllSections();
             document.getElementById('admin-section').classList.remove('hidden');
@@ -625,8 +834,13 @@
                 const data = await dataRes.json();
                 const servRes = await fetch('/api/services');
                 const servData = await servRes.json();
-                if (data.success) { document.getElementById('adminUsersCount').innerText = data.usersCount; document.getElementById('adminTotalSales').innerText = data.totalSales.toFixed(2); }
-                if (servData.success) { renderAdminServicesTable(servData.services); }
+                if (data.success) {
+                    document.getElementById('adminUsersCount').innerText = data.usersCount;
+                    document.getElementById('adminTotalSales').innerText = parseFloat(data.totalSales).toFixed(2);
+                }
+                if (servData.success) {
+                    renderAdminServicesTable(servData.services);
+                }
             } catch (err) {}
         }
 
@@ -635,56 +849,118 @@
             servTbody.innerHTML = '';
             if (services && services.length > 0) {
                 services.forEach(serv => {
+                    const safeCategory = (serv.category || '').replace(/'/g, "\\'");
+                    const safeName = (serv.name || '').replace(/'/g, "\\'");
+                    const safeDesc = (serv.description || '').replace(/'/g, "\\'").replace(/\n/g, " ");
                     servTbody.innerHTML += `
                         <tr class="border-b hover:bg-gray-50">
                             <td class="p-3 font-bold text-primary">${serv.category}</td>
                             <td class="p-3 font-bold text-dark">${serv.name}</td>
-                            <td class="p-3 font-bold">$${serv.price.toFixed(2)}</td>
+                            <td class="p-3 font-bold">$${parseFloat(serv.price).toFixed(2)}</td>
                             <td class="p-3 text-gray-500 text-xs max-w-xs truncate">${serv.description || '-'}</td>
                             <td class="p-3 space-x-2 space-x-reverse">
-                                <button onclick="editService('${serv.id}', '${serv.category}', '${serv.name}', ${serv.price}, '${(serv.description || '').replace(/'/g, "\\'")}')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-lg text-xs font-bold transition">تعديل</button>
+                                <button onclick="editService('${serv.id}', '${safeCategory}', '${safeName}', ${serv.price}, '${safeDesc}')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-lg text-xs font-bold transition">تعديل</button>
                                 <button onclick="deleteService('${serv.id}')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-bold transition">حذف</button>
                             </td>
                         </tr>
                     `;
                 });
-            } else { servTbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-400">لا توجد خدمات مضافة بعد.</td></tr>`; }
+            } else {
+                servTbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-400">لا توجد خدمات مضافة بعد.</td></tr>`;
+            }
         }
 
         function editService(id, category, name, price, description) {
-            document.getElementById('editServiceId').value = id; document.getElementById('servCategory').value = category; document.getElementById('servName').value = name; document.getElementById('servPrice').value = price; document.getElementById('servDescription').value = description;
+            document.getElementById('editServiceId').value = id;
+            document.getElementById('servCategory').value = category;
+            document.getElementById('servName').value = name;
+            document.getElementById('servPrice').value = price;
+            document.getElementById('servDescription').value = description;
             document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-500 me-2"></i> تعديل الخدمة الحالية`;
-            const saveBtn = document.getElementById('saveServiceBtn'); saveBtn.innerText = 'حفظ التعديلات'; saveBtn.className = 'bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
-            document.getElementById('cancelEditBtn').classList.remove('hidden'); document.getElementById('addServiceForm').scrollIntoView({ behavior: 'smooth' });
+            const saveBtn = document.getElementById('saveServiceBtn');
+            saveBtn.innerText = 'حفظ التعديلات';
+            saveBtn.className = 'bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+            document.getElementById('cancelEditBtn').classList.remove('hidden');
+            document.getElementById('addServiceForm').scrollIntoView({ behavior: 'smooth' });
         }
 
         function resetServiceForm() {
-            document.getElementById('addServiceForm').reset(); document.getElementById('editServiceId').value = '';
+            document.getElementById('addServiceForm').reset();
+            document.getElementById('editServiceId').value = '';
             document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام`;
-            const saveBtn = document.getElementById('saveServiceBtn'); saveBtn.innerText = 'إضافة الخدمة للنظام'; saveBtn.className = 'bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+            const saveBtn = document.getElementById('saveServiceBtn');
+            saveBtn.innerText = 'إضافة الخدمة للنظام';
+            saveBtn.className = 'bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
             document.getElementById('cancelEditBtn').classList.add('hidden');
         }
 
         async function deleteService(id) {
-            if (!confirm('هل أنت تأكد من رغبتك في حذف هذه الخدمة؟')) return;
+            if (!confirm('هل أنت متأكد من رغبتك في حذف هذه الخدمة؟')) return;
             try {
-                const res = await fetch('/api/admin/delete-service', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+                const res = await fetch('/api/admin/delete-service', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
                 const data = await res.json();
-                if (data.success) showAdminPanel();
-            } catch (err) { }
+                if (data.success) {
+                    showAdminPanel();
+                } else {
+                    alert(data.message || 'تعذر حذف الخدمة.');
+                }
+            } catch (err) {
+                alert('خطأ في الاتصال بالخادم.');
+            }
         }
 
         document.getElementById('addServiceForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const editId = document.getElementById('editServiceId').value;
-            const payload = { category: document.getElementById('servCategory').value, name: document.getElementById('servName').value, price: parseFloat(document.getElementById('servPrice').value), description: document.getElementById('servDescription').value };
-            if(editId) payload.id = editId;
+            const saveBtn = document.getElementById('saveServiceBtn');
+            const msgBox = document.getElementById('adminServiceMsg');
+            msgBox.classList.add('hidden');
+
+            const payload = {
+                category: document.getElementById('servCategory').value.trim(),
+                name: document.getElementById('servName').value.trim(),
+                price: parseFloat(document.getElementById('servPrice').value),
+                description: document.getElementById('servDescription').value.trim()
+            };
+            if (editId) payload.id = editId;
+
             const endpoint = editId ? '/api/admin/update-service' : '/api/admin/add-service';
+            saveBtn.disabled = true;
+            saveBtn.innerText = 'جاري الحفظ...';
+
             try {
-                const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
                 const data = await res.json();
-                if (data.success) { resetServiceForm(); showAdminPanel(); }
-            } catch (err) { }
+                if (data.success) {
+                    resetServiceForm();
+                    msgBox.classList.remove('hidden');
+                    msgBox.className = 'text-xs p-3 rounded-xl font-bold text-center bg-green-50 text-green-700 border border-green-200';
+                    msgBox.innerText = data.message || 'تم حفظ الخدمة بنجاح!';
+                    setTimeout(() => msgBox.classList.add('hidden'), 3000);
+                    await showAdminPanel();
+                } else {
+                    msgBox.classList.remove('hidden');
+                    msgBox.className = 'text-xs p-3 rounded-xl font-bold text-center bg-red-50 text-red-700 border border-red-200';
+                    msgBox.innerText = data.message || 'حدث خطأ أثناء حفظ الخدمة.';
+                }
+            } catch (err) {
+                alert('خطأ في الاتصال بالخادم أثناء إضافة الخدمة.');
+            } finally {
+                saveBtn.disabled = false;
+                if (!document.getElementById('editServiceId').value) {
+                    saveBtn.innerText = 'إضافة الخدمة للنظام';
+                } else {
+                    saveBtn.innerText = 'حفظ التعديلات';
+                }
+            }
         });
 
         window.addEventListener('DOMContentLoaded', () => {
