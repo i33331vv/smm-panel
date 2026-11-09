@@ -149,39 +149,63 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================
-// ⚡ بوابة آسيا سيل السحابية المستقرة (Kidy Flow)
+// 🌉 نظام الجسر الوسيط (Android Phone Bridge API)
 // ==========================================
-const activeOtps = {};
+let pendingBridgeRequests = {};
 
+// 1. الزبون يطلب رمز التحقق من الموقع
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const { phone } = req.body;
     if (!phone || !phone.startsWith('077')) {
         return res.status(400).json({ success: false, message: 'يرجى إدخال رقم آسيا سيل صحيح يبدأ بـ 077' });
     }
 
-    const secureOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    activeOtps[phone] = secureOtp;
-    
-    console.log(`[Asiacell Gateway] OTP for ${phone}: ${secureOtp}`);
+    pendingBridgeRequests[phone] = {
+        status: 'pending',
+        timestamp: Date.now()
+    };
+
+    console.log(`[Bridge System] Order queued for phone: ${phone}`);
+
+    // إرسال تنبيه لبوت التليجرام الخاص بك ليقوم هاتفك بطلب الرمز
+    sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, `🔔 <b>طلب رمز جديد لـ:</b> ${phone}\n\nيرجى من تطبيق هاتفك سحب الرمز عبر AsiacellApp وإرساله للنظام.`);
 
     res.json({ 
         success: true, 
-        message: 'تم إرسال رمز التحقق إلى رقم هاتفك بنجاح.' 
+        message: 'جاري طلب رمز التحقق من تطبيق آسيا سيل عبر هاتفك الحقيقي...' 
     });
 });
 
+// 2. هاتفك الحقيقي يرسل الرمز المستلم للسيرفر تلقائياً
+app.post('/api/bridge/push-otp', async (req, res) => {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+        return res.status(400).json({ success: false, message: 'بيانات غير مكتملة.' });
+    }
+
+    pendingBridgeRequests[phone] = {
+        status: 'received',
+        otp: otp.trim(),
+        timestamp: Date.now()
+    };
+
+    console.log(`[Bridge System] OTP received from phone for ${phone}: ${otp}`);
+    res.json({ success: true, message: 'تم استلام الرمز من الهاتف بنجاح.' });
+});
+
+// 3. الزبون يدخل الرمز في الموقع ويتم إتمام التحويل
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const { email, phone, otp, amount } = req.body;
     if (!email || !phone || !otp || !amount) {
         return res.status(400).json({ success: false, message: 'يرجى إكمال جميع الحقول المطلوبة.' });
     }
 
-    const expectedOtp = activeOtps[phone];
-    if (!expectedOtp || expectedOtp !== otp.trim()) {
-        return res.status(400).json({ success: false, message: '❌ رمز التحقق غير صحيح أو منتهي الصلاحية.' });
+    const bridgeData = pendingBridgeRequests[phone];
+    if (!bridgeData || bridgeData.status !== 'received' || bridgeData.otp !== otp.trim()) {
+        return res.status(400).json({ success: false, message: '❌ رمز التحقق غير صحيح أو لم يتم إرساله من الهاتف بعد.' });
     }
 
-    delete activeOtps[phone];
+    delete pendingBridgeRequests[phone];
 
     try {
         const userSnap = await db.collection('users').where('email', '==', email).get();
@@ -197,7 +221,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         await db.collection('deposit_requests').add({
             username: userDoc.data().username,
             email: email,
-            gateway: 'Asiacell Kidy Flow',
+            gateway: 'Asiacell Bridge Real-App',
             amount: amountNum,
             recipient: TARGET_ASIACELL_NUMBER,
             status: 'مقبول تلقائياً',
@@ -206,7 +230,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
 
         res.json({ 
             success: true, 
-            message: `تم التحقق واستقطاع الرصيد بنجاح! تم إضافة $${amountNum} إلى حسابك.`, 
+            message: `تم التحقق عبر التطبيق واستقطاع الرصيد بنجاح! تم إضافة $${amountNum} إلى حسابك.`, 
             newBalance 
         });
     } catch (e) {
@@ -345,5 +369,5 @@ app.get('/api/admin/data', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Cloud Server running on port ${port}`);
+    console.log(`Bridge Server running on port ${port}`);
 });
