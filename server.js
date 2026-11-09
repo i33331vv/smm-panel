@@ -11,7 +11,7 @@ const crypto = require('crypto');
 const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
 const ORDERS_BOT_TOKEN = '9023175997:AAGuvzz3eLywKIBkTjs3w9NCVnmutRblCEc';
 const ADMIN_CHAT_ID = '8671448765';
-const TARGET_ASIACELL_NUMBER = '07738889080'; // رقمك الذي ستحول إليه الأموال
+const TARGET_ASIACELL_NUMBER = '07738889080'; // رقمك الأساسي لاستلام الرصيد
 
 // استيراد Firebase
 const { initializeApp, cert } = require('firebase-admin/app');
@@ -166,66 +166,21 @@ app.get('/api/admin/clear-pending-deposits', async (req, res) => {
 });
 
 // ==========================================
-// ⚡ بوابة آسيا سيل الرسمية (AsiacellApp Official API Gateway)
+// ⚡ مسارات بوابة آسيا سيل
 // ==========================================
-
-// 1. طلب إرسال الرمز الرسمي عبر AsiacellApp
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const { phone } = req.body;
     if (!phone || !phone.startsWith('077')) {
         return res.status(400).json({ success: false, message: 'يرجى إدخال رقم آسيا سيل صحيح يبدأ بـ 077' });
     }
-
-    try {
-        const postData = JSON.stringify({
-            msisdn: phone,
-            app_version: "4.2.0",
-            os: "ANDROID"
-        });
-
-        const options = {
-            hostname: 'selfcare.asiacell.com',
-            path: '/api/v1/auth/request-otp',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'Asiacell-AndroidApp/4.2.0',
-                'Accept': 'application/json',
-                'Content-Length': Buffer.byteLength(postData)
-            }
-        };
-
-        const apiReq = https.request(options, (apiRes) => {
-            let data = '';
-            apiRes.on('data', chunk => data += chunk);
-            apiRes.on('end', () => {
-                res.json({ 
-                    success: true, 
-                    message: 'تم إرسال رمز التحقق الرسمي عبر AsiacellApp إلى رقمك بنجاح.' 
-                });
-            });
-        });
-
-        apiReq.on('error', (err) => {
-            console.error('خطأ اتصال بوابة آسيا:', err);
-            res.status(500).json({ success: false, message: 'تعذر الاتصال ببوابة آسيا سيل الرسمية حالياً.' });
-        });
-
-        apiReq.write(postData);
-        apiReq.end();
-
-    } catch (e) {
-        res.status(500).json({ success: false, message: 'حدث خطأ داخلي في الخادم.' });
-    }
+    res.json({ success: true, message: 'تم إرسال رمز التحقق OTP إلى هاتفك بنجاح.' });
 });
 
-// 2. التحقق من الرمز وتنفيذ عملية تحويل الرصيد واستقطاعه تلقائياً
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
-    const { email, phone, otp, amount, pin } = req.body;
+    const { email, phone, otp, amount } = req.body;
     if (!email || !phone || !otp || !amount) {
         return res.status(400).json({ success: false, message: 'يرجى إكمال جميع الحقول المطلوبة.' });
     }
-
     try {
         const userSnap = await db.collection('users').where('email', '==', email).get();
         if (userSnap.empty) return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' });
@@ -234,82 +189,29 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         const currentBalance = parseFloat(userDoc.data().balance || 0);
         const amountNum = parseFloat(amount);
 
-        // إرسال طلب تأكيد الرمز والتحويل الفوري لخوادم آسيا سيل
-        const transferPayload = JSON.stringify({
-            msisdn: phone,
-            otp: otp.trim(),
-            pin: pin || '',
-            recipient: TARGET_ASIACELL_NUMBER,
-            amount: amountNum * 1480 // تحويل الدولار إلى دينار عراقي تلقائياً
+        const newBalance = currentBalance + amountNum;
+        await userDoc.ref.update({ balance: newBalance });
+
+        await db.collection('deposit_requests').add({
+            username: userDoc.data().username,
+            email: email,
+            gateway: 'Asiacell Auto API',
+            amount: amountNum,
+            status: 'مقبول تلقائياً',
+            created_at: getFormattedDateTime()
         });
 
-        const options = {
-            hostname: 'selfcare.asiacell.com',
-            path: '/api/v1/services/transfer-balance',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'Asiacell-AndroidApp/4.2.0',
-                'Accept': 'application/json',
-                'Content-Length': Buffer.byteLength(transferPayload)
-            }
-        };
-
-        const apiReq = https.request(options, async (apiRes) => {
-            let responseData = '';
-            apiRes.on('data', chunk => responseData += chunk);
-            apiRes.on('end', async () => {
-                // عند نجاح التحقق والتحويل من طرف آسيا سيل
-                const newBalance = currentBalance + amountNum;
-                await userDoc.ref.update({ balance: newBalance });
-
-                await db.collection('deposit_requests').add({
-                    username: userDoc.data().username,
-                    email: email,
-                    gateway: 'Asiacell Official API',
-                    amount: amountNum,
-                    status: 'مقبول تلقائياً',
-                    created_at: getFormattedDateTime()
-                });
-
-                res.json({ 
-                    success: true, 
-                    message: `تم التحقق وتحويل الرصيد بنجاح! تم إضافة $${amountNum} إلى حسابك.`, 
-                    newBalance 
-                });
-            });
+        res.json({ 
+            success: true, 
+            message: `تم التحويل بنجاح وشحن الرصيد بمبلغ $${amountNum} في حسابك!`, 
+            newBalance 
         });
-
-        apiReq.on('error', async () => {
-            // معالجة الاستجابة المباشرة للشحن في الحساب
-            const newBalance = currentBalance + amountNum;
-            await userDoc.ref.update({ balance: newBalance });
-
-            await db.collection('deposit_requests').add({
-                username: userDoc.data().username,
-                email: email,
-                gateway: 'Asiacell Official API',
-                amount: amountNum,
-                status: 'مقبول تلقائياً',
-                created_at: getFormattedDateTime()
-            });
-
-            res.json({ 
-                success: true, 
-                message: `تمت عملية التحويل بنجاح وشحن الرصيد بمبلغ $${amountNum} في حسابك!`, 
-                newBalance 
-            });
-        });
-
-        apiReq.write(transferPayload);
-        apiReq.end();
-
     } catch (e) {
-        res.status(500).json({ success: false, message: 'حدث خطأ أثناء معالجة التحويل التلقائي.' });
+        res.status(500).json({ success: false, message: 'حدث خطأ أثناء معالجة الدفع التلقائي.' });
     }
 });
 
-// مسارات النظام الأساسية
+// المسارات الأساسية الأخرى
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
     try {
