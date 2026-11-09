@@ -480,14 +480,14 @@
             } else if (gateway === 'ZainCash') {
                 infoBox.innerHTML = `
                     قم بالتحويل عبر مسح الباركود التالي الخاص بزين كاش:<br>
-                    <img src="/zaincash-qr.jpg" alt="Zain Cash QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">
+                    <img src="/ZAINCASH.jpeg" alt="Zain Cash QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">
                 `;
             } else if (gateway === 'Mastercard') {
                 infoBox.innerHTML = `قم بتحويل المبلغ إلى الرقم:<br><span class="font-mono font-bold text-primary text-lg" dir="ltr">7111053109</span>`;
             } else if (gateway === 'Binance') {
                 infoBox.innerHTML = `
                     قم بالتحويل إلى المعرف: <span class="font-mono font-bold text-primary" dir="ltr">1075470705</span> أو عبر مسح الباركود التالي:<br>
-                    <img src="/binance-qr.jpg" alt="Binance QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">
+                    <img src="/BINANCE.jpeg" alt="Binance QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">
                 `;
             }
         }
@@ -504,9 +504,9 @@
             const formData = new FormData();
             formData.append('email', session.email); 
             formData.append('gateway', document.getElementById('depositGateway').value);
-            formData.append('amount', document.getElementById('depAmountInput').value);
+            formData.append('amount', document.getElementById('depAmountInput->value') || document.getElementById('depAmountInput').value);
             
-            // إرسال قيمة افتراضية لرقم العملية لتفادي أخطاء السيرفر
+            // إرسال قيمة افتراضية لرقم العملية لتفادي أخطاء السيرفر بعد حذفه من الواجهة
             formData.append('reference_id', 'بدون رقم عملية'); 
             formData.append('receiptImage', imageInput.files[0]);
 
