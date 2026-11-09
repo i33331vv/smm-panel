@@ -43,22 +43,18 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// دالة لتوليد التاريخ والوقت بدقة تامة (السنة، الشهر، اليوم، الساعة، الدقيقة، الثانية)
+// دالة لتوليد التاريخ والوقت بدقة تامة
 function getFormattedDateTime() {
     const now = new Date();
     return now.toLocaleString('ar-IQ', {
         timeZone: 'Asia/Baghdad',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
         hour12: true
     });
 }
 
-// دالة إرسال رسالة نصية بحتة مع الأزرار الشفافة
+// إرسال رسالة نصية لتليجرام
 function sendTelegramTextMessage(token, chatId, text, replyMarkup = null) {
     const data = JSON.stringify({
         chat_id: chatId,
@@ -69,22 +65,16 @@ function sendTelegramTextMessage(token, chatId, text, replyMarkup = null) {
     });
 
     const options = {
-        hostname: 'api.telegram.org',
-        path: `/bot${token}/sendMessage`,
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(data)
-        }
+        hostname: 'api.telegram.org', path: `/bot${token}/sendMessage`,
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
     };
 
-    const req = https.request(options, (res) => {});
+    const req = https.request(options);
     req.on('error', (e) => console.error(e));
-    req.write(data);
-    req.end();
+    req.write(data); req.end();
 }
 
-// دالة لإيقاف دوران الزر في تليجرام فوراً
+// دالة لإيقاف دوران الزر في تليجرام فوراً (إجابة تليجرام)
 function answerCallbackQuery(token, callbackQueryId, text) {
     const data = JSON.stringify({
         callback_query_id: callbackQueryId,
@@ -93,66 +83,124 @@ function answerCallbackQuery(token, callbackQueryId, text) {
     });
 
     const options = {
-        hostname: 'api.telegram.org',
-        path: `/bot${token}/answerCallbackQuery`,
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(data)
-        }
+        hostname: 'api.telegram.org', path: `/bot${token}/answerCallbackQuery`,
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
     };
 
-    const req = https.request(options, (res) => {});
-    req.on('error', (e) => {});
-    req.write(data);
-    req.end();
+    const req = https.request(options);
+    req.on('error', () => {});
+    req.write(data); req.end();
 }
 
-// دالة لتعديل الرسالة النصية وإزالة الأزرار نهائياً
-function editTelegramTextMessage(token, chatId, messageId, newText) {
+// دالة لتعديل الرسالة النصية وإزالة الأزرار
+function editTelegramTextMessage(token, chatId, messageId, newText, replyMarkup = { inline_keyboard: [] }) {
     const data = JSON.stringify({
         chat_id: chatId,
         message_id: messageId,
         text: newText,
         parse_mode: 'HTML',
         disable_web_page_preview: true,
-        reply_markup: { inline_keyboard: [] }
+        reply_markup: replyMarkup
     });
 
     const options = {
-        hostname: 'api.telegram.org',
-        path: `/bot${token}/editMessageText`,
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(data)
-        }
+        hostname: 'api.telegram.org', path: `/bot${token}/editMessageText`,
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
     };
 
-    const req = https.request(options, (res) => {});
-    req.on('error', (e) => {});
-    req.write(data);
-    req.end();
+    const req = https.request(options);
+    req.on('error', () => {});
+    req.write(data); req.end();
 }
 
-// مسار تسجيل الحساب
+// نظام الاستعلام المستمر (Polling) - يحل مشكلة الـ Webhook الجدار الناري 100%
+function startTelegramPolling(token) {
+    let offset = 0;
+    setInterval(() => {
+        https.get(`https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=5`, (res) => {
+            let body = '';
+            res.on('data', chunk => body += chunk);
+            res.on('end', async () => {
+                try {
+                    const data = JSON.parse(body);
+                    if (data.ok && data.result.length > 0) {
+                        for (const update of data.result) {
+                            offset = update.update_id + 1; 
+
+                            if (update.callback_query) {
+                                const callbackQuery = update.callback_query;
+                                const cbData = callbackQuery.data;
+                                const chatId = callbackQuery.message.chat.id;
+                                const messageId = callbackQuery.message.message_id;
+
+                                // 🚨 إيقاف دوران الزر فوراً عند الضغط
+                                answerCallbackQuery(token, callbackQuery.id, 'جاري تنفيذ الطلب...');
+
+                                try {
+                                    if (cbData.startsWith('dep_accept_')) {
+                                        const parts = cbData.split('_');
+                                        const depId = parts[2];
+                                        const email = parts[3];
+                                        const amount = parseFloat(parts[4]);
+
+                                        const userSnap = await db.collection('users').where('email', '==', email).get();
+                                        if (!userSnap.empty) {
+                                            const userDoc = userSnap.docs[0];
+                                            const currentBalance = parseFloat(userDoc.data().balance || 0);
+                                            await userDoc.ref.update({ balance: currentBalance + amount });
+                                            await db.collection('deposit_requests').doc(depId).update({ status: 'مقبول' });
+
+                                            const originalText = callbackQuery.message.text || '';
+                                            const updatedText = originalText + `\n\n✅ <b>تم شحن الرصيد بنجاح ($${amount}) وإضافته لحساب المستخدم!</b>`;
+                                            editTelegramTextMessage(token, chatId, messageId, updatedText);
+                                        }
+                                    } else if (cbData.startsWith('dep_reject_')) {
+                                        const depId = cbData.split('_')[2];
+                                        await db.collection('deposit_requests').doc(depId).update({ status: 'مرفوض' });
+                                        const originalText = callbackQuery.message.text || '';
+                                        const updatedText = originalText + `\n\n❌ <b>تم رفض طلب شحن الرصيد.</b>`;
+                                        editTelegramTextMessage(token, chatId, messageId, updatedText);
+                                    } else if (cbData.startsWith('ord_progress_')) {
+                                        const orderId = cbData.split('_')[2];
+                                        await db.collection('orders').doc(orderId).update({ status: 'قيد التنفيذ' });
+                                        const originalText = callbackQuery.message.text || '';
+                                        const updatedText = originalText.replace('🔄 الحالة: قيد المعالجة', '🔄 <b>الحالة: قيد التنفيذ حالياً</b>');
+                                        const newMarkup = { inline_keyboard: [[{ text: '✔️ تم الاكتمال', callback_data: `ord_complete_${orderId}` }]] };
+                                        editTelegramTextMessage(token, chatId, messageId, updatedText, newMarkup);
+                                    } else if (cbData.startsWith('ord_complete_')) {
+                                        const orderId = cbData.split('_')[2];
+                                        await db.collection('orders').doc(orderId).update({ status: 'مكتمل' });
+                                        const originalText = callbackQuery.message.text || '';
+                                        const updatedText = originalText.replace('🔄 الحالة: قيد التنفيذ حالياً', '✅ <b>الحالة: تم إكمال الطلب بنجاح</b>');
+                                        editTelegramTextMessage(token, chatId, messageId, updatedText);
+                                    }
+                                } catch (err) { console.error('خطأ قاعدة البيانات:', err); }
+                            }
+                        }
+                    }
+                } catch (e) {}
+            });
+        }).on('error', () => {});
+    }, 2500); // تحديث كل ثانيتين ونصف
+}
+
+// تفعيل نظام الاستعلام المباشر للبوتين
+startTelegramPolling(DEPOSIT_BOT_TOKEN);
+startTelegramPolling(ORDERS_BOT_TOKEN);
+
+// مسارات الموقع
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
     try {
         const usersRef = db.collection('users');
         const snapshot = await usersRef.where('email', '==', email).get();
         if (!snapshot.empty) return res.status(400).json({ success: false, message: 'البريد مسجل مسبقاً.' });
-
         const hashedPassword = await bcrypt.hash(password, 10);
-        await usersRef.add({
-            username, email, password: hashedPassword, balance: 0.00, role: 'user', created_at: getFormattedDateTime()
-        });
-
+        await usersRef.add({ username, email, password: hashedPassword, balance: 0.00, role: 'user', created_at: getFormattedDateTime() });
         res.json({ success: true, message: 'تم إنشاء الحساب بنجاح!', username, email, balance: 0.00 });
     } catch (e) { res.status(500).json({ success: false, message: 'خطأ في الخادم.' }); }
 });
 
-// مسار تسجيل الدخول
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -160,7 +208,6 @@ app.post('/api/login', async (req, res) => {
         if (snapshot.empty) return res.status(400).json({ success: false, message: 'البريد غير صحيح.' });
         const user = snapshot.docs[0].data();
         if (!await bcrypt.compare(password, user.password)) return res.status(400).json({ success: false, message: 'كلمة المرور خطأ.' });
-
         res.json({ success: true, message: 'تم تسجيل الدخول!', username: user.username, email: user.email, balance: user.balance });
     } catch (e) { res.status(500).json({ success: false, message: 'خطأ في الخادم.' }); }
 });
@@ -173,65 +220,42 @@ app.get('/api/user/:email', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// 1. استقبال طلب الشحن وإرساله لبوت التليجرام
+// طلب شحن
 app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) => {
     const { email, gateway, amount } = req.body;
     const uploadedFile = req.file;
-
-    if (!email || !gateway || !amount || !uploadedFile) {
-        return res.status(400).json({ success: false, message: 'الرجاء إكمال البيانات.' });
-    }
+    if (!email || !gateway || !amount || !uploadedFile) return res.status(400).json({ success: false, message: 'الرجاء إكمال البيانات.' });
 
     try {
         const userSnap = await db.collection('users').where('email', '==', email).get();
-        if (userSnap.empty) {
-            fs.unlinkSync(uploadedFile.path);
-            return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' });
-        }
+        if (userSnap.empty) { fs.unlinkSync(uploadedFile.path); return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' }); }
+        
         const username = userSnap.docs[0].data().username;
         const dateTime = getFormattedDateTime();
-
-        const depRef = await db.collection('deposit_requests').add({
-            username, email, gateway, amount: parseFloat(amount),
-            receipt_image: uploadedFile.filename,
-            status: 'معلق',
-            created_at: dateTime
-        });
-
+        const depRef = await db.collection('deposit_requests').add({ username, email, gateway, amount: parseFloat(amount), receipt_image: uploadedFile.filename, status: 'معلق', created_at: dateTime });
+        
         const receiptUrl = `https://mtnajm.com/${uploadedFile.filename}`;
         const text = `📥 <b>طلب شحن رصيد جديد</b>\n\n👤 <b>المستخدم:</b> ${username}\n📧 <b>البريد:</b> ${email}\n💰 <b>المبلغ:</b> $${amount}\n💳 <b>البوابة:</b> ${gateway}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}\n\n🔗 <a href="${receiptUrl}"><b>[ اضغط هنا لعرض صورة إيصال الدفع ]</b></a>`;
         
-        const replyMarkup = {
-            inline_keyboard: [
-                [
-                    { text: '✅ شحن الرصيد', callback_data: `dep_accept_${depRef.id}_${email}_${amount}` },
-                    { text: '❌ رفض', callback_data: `dep_reject_${depRef.id}` }
-                ]
-            ]
-        };
-
+        const replyMarkup = { inline_keyboard: [[ { text: '✅ شحن الرصيد', callback_data: `dep_accept_${depRef.id}_${email}_${amount}` }, { text: '❌ رفض', callback_data: `dep_reject_${depRef.id}` } ]] };
         sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, text, replyMarkup);
-
-        res.json({ success: true, message: 'تم إرسال طلب الشحن بنجاح وبانتظار المراجعة.' });
+        res.json({ success: true, message: 'تم إرسال طلب الشحن بنجاح.' });
     } catch (e) {
         if (uploadedFile && fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
-        res.status(500).json({ success: false, message: 'خطأ في الخادم.' });
+        res.status(500).json({ success: false });
     }
 });
 
-// 2. استقبال طلب الخدمة
+// طلب خدمة
 app.post('/api/order', async (req, res) => {
     const { username, service, link, quantity, charge } = req.body;
-
     try {
         const userSnap = await db.collection('users').where('username', '==', username).get();
         if (userSnap.empty) return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' });
-
         const userRef = userSnap.docs[0].ref;
         const userData = userSnap.docs[0].data();
-
         if (userData.balance < charge) return res.status(400).json({ success: false, message: 'رصيد غير كافٍ.' });
-
+        
         const newBalance = userData.balance - charge;
         const dateTime = getFormattedDateTime();
         let orderId = '';
@@ -240,114 +264,14 @@ app.post('/api/order', async (req, res) => {
             transaction.update(userRef, { balance: newBalance });
             const newOrderRef = db.collection('orders').doc();
             orderId = newOrderRef.id;
-            transaction.set(newOrderRef, {
-                username, service, link, quantity, charge,
-                status: 'قيد المعالجة',
-                created_at: dateTime
-            });
+            transaction.set(newOrderRef, { username, service, link, quantity, charge, status: 'قيد المعالجة', created_at: dateTime });
         });
 
         const text = `🚀 <b>طلب خدمة جديد</b>\n\n🆔 <b>رقم الطلب:</b> #${orderId}\n👤 <b>المستخدم:</b> ${username}\n📌 <b>الخدمة:</b> ${service}\n🔗 <b>الرابط:</b> ${link}\n📦 <b>الكمية:</b> ${quantity}\n💵 <b>السعر:</b> $${charge}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}\n\n🔄 <b>الحالة: قيد المعالجة</b>`;
-        const replyMarkup = {
-            inline_keyboard: [
-                [{ text: '🔄 قيد التنفيذ', callback_data: `ord_progress_${orderId}` }]
-            ]
-        };
-
+        const replyMarkup = { inline_keyboard: [[{ text: '🔄 قيد التنفيذ', callback_data: `ord_progress_${orderId}` }]] };
         sendTelegramTextMessage(ORDERS_BOT_TOKEN, ADMIN_CHAT_ID, text, replyMarkup);
-
         res.json({ success: true, newBalance, orderId });
-    } catch (e) { res.status(500).json({ success: false, message: 'خطأ في الخادم.' }); }
-});
-
-// 3. مسار استقبال الأزرار الشفافة وتحديث النظام فوراً (Webhook) مع الرد الفوري
-app.post('/api/telegram-webhook/:type', async (req, res) => {
-    const type = req.params.type; 
-    const update = req.body;
-
-    if (update.callback_query) {
-        const callbackQuery = update.callback_query;
-        const callbackQueryId = callbackQuery.id;
-        const data = callbackQuery.data;
-        const chatId = callbackQuery.message.chat.id;
-        const messageId = callbackQuery.message.message_id;
-        const token = type === 'deposit' ? DEPOSIT_BOT_TOKEN : ORDERS_BOT_TOKEN;
-
-        // إيقاف دوران الزر فوراً في تليجرام
-        answerCallbackQuery(token, callbackQueryId, 'جاري معالجة الطلب...');
-
-        try {
-            if (data.startsWith('dep_accept_')) {
-                const parts = data.split('_');
-                const depId = parts[2];
-                const email = parts[3];
-                const amount = parseFloat(parts[4]);
-
-                // البحث عن المستخدم وتحديث رصيده
-                const userSnap = await db.collection('users').where('email', '==', email).get();
-                if (!userSnap.empty) {
-                    const userDoc = userSnap.docs[0];
-                    const userRef = userDoc.ref;
-                    const userData = userDoc.data();
-                    const currentBalance = parseFloat(userData.balance || 0);
-                    const newBalance = currentBalance + amount;
-
-                    // تحديث الرصيد وحالة طلب الشحن في قاعدة البيانات
-                    await userRef.update({ balance: newBalance });
-                    await db.collection('deposit_requests').doc(depId).update({ status: 'مقبول' });
-
-                    const originalText = callbackQuery.message.text || '';
-                    const updatedText = originalText + `\n\n✅ <b>تم شحن الرصيد بنجاح ($${amount}) للمستخدم وإضافته لحسابه!</b>`;
-                    editTelegramTextMessage(token, chatId, messageId, updatedText);
-                }
-            } else if (data.startsWith('dep_reject_')) {
-                const depId = data.split('_')[2];
-                await db.collection('deposit_requests').doc(depId).update({ status: 'مرفوض' });
-
-                const originalText = callbackQuery.message.text || '';
-                const updatedText = originalText + `\n\n❌ <b>تم رفض طلب شحن الرصيد.</b>`;
-                editTelegramTextMessage(token, chatId, messageId, updatedText);
-            } else if (data.startsWith('ord_progress_')) {
-                const orderId = data.split('_')[2];
-                await db.collection('orders').doc(orderId).update({ status: 'قيد التنفيذ' });
-
-                const originalText = callbackQuery.message.text || '';
-                const updatedText = originalText.replace('🔄 الحالة: قيد المعالجة', '🔄 الحالة: قيد التنفيذ حالياً');
-                const newMarkup = {
-                    inline_keyboard: [
-                        [{ text: '✔️ تم الاكتمال', callback_data: `ord_complete_${orderId}` }]
-                    ]
-                };
-
-                // تعديل رسالة الطلب مع زر تم الاكتمال
-                const editData = JSON.stringify({
-                    chat_id: chatId,
-                    message_id: messageId,
-                    text: updatedText,
-                    parse_mode: 'HTML',
-                    disable_web_page_preview: true,
-                    reply_markup: newMarkup
-                });
-                https.request({
-                    hostname: 'api.telegram.org',
-                    path: `/bot${token}/editMessageText`,
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(editData) }
-                }).end(editData);
-
-            } else if (data.startsWith('ord_complete_')) {
-                const orderId = data.split('_')[2];
-                await db.collection('orders').doc(orderId).update({ status: 'مكتمل' });
-
-                const originalText = callbackQuery.message.text || '';
-                const updatedText = originalText.replace('🔄 الحالة: قيد التنفيذ حالياً', '✅ الحالة: تم إكمال الطلب بنجاح');
-                editTelegramTextMessage(token, chatId, messageId, updatedText);
-            }
-        } catch (e) {
-            console.error('خطأ في معالجة تفاعل التليجرام:', e);
-        }
-    }
-    res.sendStatus(200);
+    } catch (e) { res.status(500).json({ success: false }); }
 });
 
 app.get('/api/orders/:username', async (req, res) => {
@@ -366,29 +290,6 @@ app.get('/api/services', async (req, res) => {
         snapshot.forEach(doc => services.push({ id: doc.id, ...doc.data() }));
         res.json({ success: true, services });
     } catch (e) { res.json({ success: true, services: [] }); }
-});
-
-app.post('/api/admin/add-service', async (req, res) => {
-    const { category, name, price, description } = req.body;
-    try {
-        await db.collection('services').add({ category, name, price: parseFloat(price), description, created_at: getFormattedDateTime() });
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ success: false }); }
-});
-
-app.post('/api/admin/update-service', async (req, res) => {
-    const { id, category, name, price, description } = req.body;
-    try {
-        await db.collection('services').doc(id).update({ category, name, price: parseFloat(price), description });
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ success: false }); }
-});
-
-app.post('/api/admin/delete-service', async (req, res) => {
-    try {
-        await db.collection('services').doc(req.body.id).delete();
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ success: false }); }
 });
 
 app.listen(port, () => {
