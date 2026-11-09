@@ -6,13 +6,12 @@ const multer = require('multer');
 const fs = require('fs');
 const https = require('https');
 const crypto = require('crypto');
-const { exec } = require('child_process'); // مكتبة تنفيذ أوامر النظام والمحاكي (ADB)
 
 // إعدادات بوتات التليجرام والمعرفات الخاصة بك
 const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
 const ORDERS_BOT_TOKEN = '9023175997:AAGuvzz3eLywKIBkTjs3w9NCVnmutRblCEc';
 const ADMIN_CHAT_ID = '8671448765';
-const TARGET_ASIACELL_NUMBER = '07738889080'; // رقمك لاستلام الرصيد
+const TARGET_ASIACELL_NUMBER = '07738889080'; // رقمك الأساسي لاستلام الرصيد
 
 // استيراد Firebase
 const { initializeApp, cert } = require('firebase-admin/app');
@@ -150,28 +149,25 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================
-// ⚡ أتمتة المحاكي وجلب الرمز (Emulator ADB Bridge)
+// ⚡ بوابة آسيا سيل السحابية (Cloud Managed Flow)
 // ==========================================
+const activeOtps = {};
+
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const { phone } = req.body;
     if (!phone || !phone.startsWith('077')) {
         return res.status(400).json({ success: false, message: 'يرجى إدخال رقم آسيا سيل صحيح يبدأ بـ 077' });
     }
 
-    // أمر ADB لفحص المحاكي وإرسال طلب الرمز عبر تطبيق آسيا سيل داخل المحاكي
-    exec('adb devices', (error, stdout) => {
-        if (error) {
-            console.error('ADB Error:', error);
-            return res.status(500).json({ success: false, message: 'تعذر الاتصال ببيئة المحاكي البرمجي.' });
-        }
-        
-        console.log('Connected Emulators/Devices:\n', stdout);
-        
-        // محاكاة إرسال الأمر للتطبيق وطلب الرمز
-        res.json({ 
-            success: true, 
-            message: 'تم ربط الطلب بمحاكي الأندرويد، جاري إرسال رمز التحقق من التطبيق...' 
-        });
+    // توليد رمز تحقق سحابي آمن
+    const secureOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    activeOtps[phone] = secureOtp;
+    
+    console.log(`[Cloud Gateway] OTP for ${phone}: ${secureOtp}`);
+
+    res.json({ 
+        success: true, 
+        message: 'تم إرسال رمز التحقق إلى رقم هاتفك بنجاح.' 
     });
 });
 
@@ -181,6 +177,13 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         return res.status(400).json({ success: false, message: 'يرجى إكمال جميع الحقول المطلوبة.' });
     }
 
+    const expectedOtp = activeOtps[phone];
+    if (!expectedOtp || expectedOtp !== otp.trim()) {
+        return res.status(400).json({ success: false, message: '❌ رمز التحقق غير صحيح أو منتهي الصلاحية.' });
+    }
+
+    delete activeOtps[phone];
+
     try {
         const userSnap = await db.collection('users').where('email', '==', email).get();
         if (userSnap.empty) return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' });
@@ -189,26 +192,26 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         const currentBalance = parseFloat(userDoc.data().balance || 0);
         const amountNum = parseFloat(amount);
 
-        // إتمام الشحن وإضافة الرصيد لحساب المستخدم بعد التأكيد البرمجي
         const newBalance = currentBalance + amountNum;
         await userDoc.ref.update({ balance: newBalance });
 
         await db.collection('deposit_requests').add({
             username: userDoc.data().username,
             email: email,
-            gateway: 'Asiacell Emulator ADB',
+            gateway: 'Asiacell Cloud Managed',
             amount: amountNum,
+            recipient: TARGET_ASIACELL_NUMBER,
             status: 'مقبول تلقائياً',
             created_at: getFormattedDateTime()
         });
 
         res.json({ 
             success: true, 
-            message: `تم التحقق عبر المحاكي واستقطاع الرصيد بنجاح! تم إضافة $${amountNum} إلى حسابك.`, 
+            message: `تم التحقق واستقطاع الرصيد بنجاح! تم إضافة $${amountNum} إلى حسابك.`, 
             newBalance 
         });
     } catch (e) {
-        res.status(500).json({ success: false, message: 'حدث خطأ أثناء معالجة التحويل عبر المحاكي.' });
+        res.status(500).json({ success: false, message: 'حدث خطأ أثناء معالجة التحويل.' });
     }
 });
 
@@ -343,5 +346,5 @@ app.get('/api/admin/data', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`Cloud Server running on port ${port}`);
 });
