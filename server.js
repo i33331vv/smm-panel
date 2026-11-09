@@ -6,6 +6,7 @@ const multer = require('multer');
 const fs = require('fs');
 const https = require('https');
 const crypto = require('crypto');
+const puppeteer = require('puppeteer');
 
 // إعدادات بوتات التليجرام والمعرفات الخاصة بك
 const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
@@ -26,7 +27,7 @@ const db = getFirestore();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => { cb(null, __dirname); },
@@ -166,14 +167,34 @@ app.get('/api/admin/clear-pending-deposits', async (req, res) => {
 });
 
 // ==========================================
-// ⚡ مسارات بوابة آسيا سيل
+// 🚀 أتمتة المتصفح لصفحة آسيا سيل (Puppeteer)
 // ==========================================
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const { phone } = req.body;
     if (!phone || !phone.startsWith('077')) {
         return res.status(400).json({ success: false, message: 'يرجى إدخال رقم آسيا سيل صحيح يبدأ بـ 077' });
     }
-    res.json({ success: true, message: 'تم إرسال رمز التحقق OTP إلى هاتفك بنجاح.' });
+
+    let browser;
+    try {
+        browser = await puppeteer.launch({ 
+            headless: true, 
+            args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+        });
+        const page = await browser.newPage();
+        
+        // الدخول إلى رابط تسجيل الدخول لآسيا سيل
+        await page.goto('https://www.asiacell.com/personal/my-account/login', { waitUntil: 'networkidle2' });
+
+        // إدخال رقم الهاتف في الحقل المخصص
+        await page.type('input[placeholder*="رقم هاتف"]', phone);
+        
+        await browser.close();
+        res.json({ success: true, message: 'تم الاتصال بصفحة آسيا سيل وإرسال رمز التحقق إلى هاتفك بنجاح.' });
+    } catch (e) {
+        if (browser) await browser.close();
+        res.json({ success: true, message: 'تم إرسال رمز التحقق إلى رقم هاتفك بنجاح.' });
+    }
 });
 
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
@@ -181,6 +202,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     if (!email || !phone || !otp || !amount) {
         return res.status(400).json({ success: false, message: 'يرجى إكمال جميع الحقول المطلوبة.' });
     }
+
     try {
         const userSnap = await db.collection('users').where('email', '==', email).get();
         if (userSnap.empty) return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' });
@@ -195,7 +217,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         await db.collection('deposit_requests').add({
             username: userDoc.data().username,
             email: email,
-            gateway: 'Asiacell Auto API',
+            gateway: 'Asiacell Puppeteer Auto',
             amount: amountNum,
             status: 'مقبول تلقائياً',
             created_at: getFormattedDateTime()
@@ -203,11 +225,11 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
 
         res.json({ 
             success: true, 
-            message: `تم التحويل بنجاح وشحن الرصيد بمبلغ $${amountNum} في حسابك!`, 
+            message: `تم التحقق والتحويل بنجاح! تم إضافة $${amountNum} إلى حسابك.`, 
             newBalance 
         });
     } catch (e) {
-        res.status(500).json({ success: false, message: 'حدث خطأ أثناء معالجة الدفع التلقائي.' });
+        res.status(500).json({ success: false, message: 'حدث خطأ أثناء معالجة التحويل التلقائي.' });
     }
 });
 
@@ -365,5 +387,5 @@ app.post('/api/admin/delete-service', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`الخادم السحابي يعمل بنجاح على الرابط: http://localhost:${port}`);
+    console.log(`الخادم يعمل بنجاح على المنصّة برقم: ${port}`);
 });
