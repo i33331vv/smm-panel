@@ -148,11 +148,12 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================================
-// ⚡ نظام الدفع المؤمّن عبر آسياسيل (تحديث التوكن الفارغ + كشف مسار التحويل)
+// ⚡ نظام الدفع المؤمّن عبر آسياسيل (معالجة الهيدرز ومسارات ODP الرسمية)
 // ==========================================================
 
 async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '') {
     const currentDeviceId = deviceId || crypto.randomUUID();
+    // الهيدرز الرسمية الدقيقة لتطبيق آسياسيل بدون أي هيدر غريب يبطل الجلسة
     const headers = {
         'Content-Type': 'application/json; charset=UTF-8',
         'Accept': 'application/json, text/plain, */*',
@@ -169,12 +170,12 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     };
 
     if (accessToken) {
-        // التأكد من عدم تكرار كلمة Bearer إذا كانت موجودة مسبقاً في التوكن
         const cleanToken = String(accessToken).replace(/^Bearer\s+/i, '').trim();
         headers['Authorization'] = `Bearer ${cleanToken}`;
-        headers['X-Auth-Token'] = cleanToken;
     }
-    if (cookies) headers['Cookie'] = cookies;
+    if (cookies) {
+        headers['Cookie'] = cookies;
+    }
 
     const cleanEp = endpoint.replace(/^\/+/, '');
     const url = cleanEp.startsWith('http') ? cleanEp : (cleanEp.startsWith('api/') ? `https://odpapp.asiacell.com/${cleanEp}` : `https://odpapp.asiacell.com/api/v1/${cleanEp}`);
@@ -185,7 +186,6 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
         body: (method !== 'GET' && bodyData) ? (typeof bodyData === 'string' ? bodyData : JSON.stringify(bodyData)) : undefined
     });
 
-    // دمج الكوكيز الجديدة مع القديمة دون مسح جلسة الدخول الأصلية
     let cookieMap = {};
     if (cookies) {
         cookies.split(';').forEach(pair => {
@@ -246,32 +246,35 @@ function extractLoginSessionInfo(obj) {
     return result;
 }
 
-// استخراج جميع الروابط من كائن JSON مهما كان عمقها
-function extractAllUrlsFromJson(obj) {
-    let urls = [];
-    let transferActionUrl = '';
-    if (!obj || typeof obj !== 'object') return { urls, transferActionUrl };
+// استخراج جميع المسارات والروابط من أي كائن في التطبيق
+function extractTransferPaths(obj) {
+    let allPaths = [];
+    let bestTransferEp = '';
+    if (!obj || typeof obj !== 'object') return { allPaths, bestTransferEp };
 
-    function walk(node) {
+    function scan(node) {
         if (!node || typeof node !== 'object') return;
         const flat = JSON.stringify(node);
-        const hasTransferLabel = flat.includes('تحويل الرصيد') || flat.toLowerCase().includes('transfer credit') || flat.toLowerCase().includes('credit transfer');
+        const isTransferNode = flat.includes('تحويل الرصيد') || flat.toLowerCase().includes('transfer credit') || flat.toLowerCase().includes('credit transfer') || flat.toLowerCase().includes('credit-transfer');
 
         for (const [k, v] of Object.entries(node)) {
             if (v && typeof v === 'object') {
-                walk(v);
+                scan(v);
             } else if (typeof v === 'string') {
-                if ((v.startsWith('http') || v.startsWith('/') || v.includes('api/')) && !v.endsWith('.png') && !v.endsWith('.svg') && !v.endsWith('.jpg')) {
-                    urls.push(v);
-                    if (hasTransferLabel && !transferActionUrl && flat.length < 1200) {
-                        transferActionUrl = v;
+                const valTrim = v.trim();
+                if (!valTrim.endsWith('.png') && !valTrim.endsWith('.svg') && !valTrim.endsWith('.jpg') && valTrim.length > 2 && valTrim.length < 180) {
+                    if (valTrim.includes('/') || valTrim.toLowerCase().includes('transfer') || k.toLowerCase().includes('url') || k.toLowerCase().includes('link') || k.toLowerCase().includes('route') || k.toLowerCase().includes('action')) {
+                        allPaths.push(`${k}:${valTrim}`);
+                        if (isTransferNode && !bestTransferEp && (valTrim.includes('/') || valTrim.toLowerCase().includes('transfer'))) {
+                            bestTransferEp = valTrim;
+                        }
                     }
                 }
             }
         }
     }
-    walk(obj);
-    return { urls: [...new Set(urls)], transferActionUrl };
+    scan(obj);
+    return { allPaths: [...new Set(allPaths)], bestTransferEp };
 }
 
 // 1. طلب رمز الدخول
@@ -304,7 +307,7 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
     }
 });
 
-// 2. التحقق من رمز الدخول وحفظ الرد الكامل
+// 2. التحقق من رمز الدخول
 app.post('/api/asiacell/verify-login', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const cleanOtp = (req.body.otp || '').trim();
@@ -333,15 +336,9 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
             return res.status(400).json({ success: false, message: `❌ رد آسياسيل: ${vr.data?.message || JSON.stringify(vr.data)}` });
         }
 
-        // حفظ كل مفاتيح رد الدخول لاكتشاف بنية التوكن والروابط المرفقة معه
-        const extractedFromVerify = extractAllUrlsFromJson(vr.data);
-
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
             accessToken: token,
             cookies: vr.cookies || s.cookies || '',
-            verifyDataSnapshot: JSON.stringify(vr.data).substring(0, 600),
-            discoveredUrls: extractedFromVerify.urls,
-            discoveredTransferUrl: extractedFromVerify.transferActionUrl || '',
             step: 'SELECT_AMOUNT',
             updatedAt: Date.now()
         });
@@ -370,18 +367,24 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        // 1. استعلام من المسارات التي تقبل POST و GET لمعرفة الروابط الحية في الجلسة
-        let foundTransferUrl = s.discoveredTransferUrl || '';
-        let allSessionUrls = [...(s.discoveredUrls || [])];
-        let debugStatuses = [];
+        // 1. استعلام نظيف من مسار profile/lineinfo?lang=ar (بواسطة GET كما ظهر في حسابك) لاستخراج مسارات الحساب
+        let discoveredEp = '';
+        let collectedPaths = [];
+        let lineInfoSummary = '';
 
-        for (const [pageEp, method] of [['home?lang=ar', 'GET'], ['more?lang=ar', 'GET'], ['profile/lineinfo?lang=ar', 'POST'], ['cdr/check?lang=ar', 'GET']]) {
-            if (foundTransferUrl) break;
-            const r = await callAsiacellAPI(pageEp, method, method === 'POST' ? { username: cleanPhone } : null, s.accessToken, s.deviceId, s.cookies);
-            debugStatuses.push(`${pageEp}(${method}):${r.status}`);
-            const ext = extractAllUrlsFromJson(r.data);
-            allSessionUrls.push(...ext.urls);
-            if (ext.transferActionUrl) foundTransferUrl = ext.transferActionUrl;
+        const liRes = await callAsiacellAPI('profile/lineinfo?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies);
+        lineInfoSummary = JSON.stringify(liRes.data || {}).substring(0, 260);
+        const extLi = extractTransferPaths(liRes.data);
+        collectedPaths.push(...extLi.allPaths);
+        if (extLi.bestTransferEp) discoveredEp = extLi.bestTransferEp;
+
+        // فحص مسار القوائم في تطبيق ODP إذا لم يكن الرابط داخل lineinfo
+        for (const menuEp of ['app/init?lang=ar', 'menu?lang=ar', 'dashboard?lang=ar']) {
+            if (discoveredEp) break;
+            const mRes = await callAsiacellAPI(menuEp, 'GET', null, s.accessToken, s.deviceId, s.cookies);
+            const extM = extractTransferPaths(mRes.data);
+            collectedPaths.push(...extM.allPaths);
+            if (extM.bestTransferEp) discoveredEp = extM.bestTransferEp;
         }
 
         const transferPayload = {
@@ -389,28 +392,37 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             recipientMsisdn: TARGET_ASIACELL_NUMBER,
             msisdn: TARGET_ASIACELL_NUMBER,
             targetMsisdn: TARGET_ASIACELL_NUMBER,
+            phoneNumber: TARGET_ASIACELL_NUMBER,
             amount: formattedAmountDecimal,
             transferAmount: amountIQD
         };
 
-        // تجربة الرابط المكتشف أولاً ثم المسارات القياسية لتطبيق آسياسيل
-        const endpointsToTry = [];
-        if (foundTransferUrl) endpointsToTry.push(foundTransferUrl);
-        endpointsToTry.push(
-            'transfercredit?lang=ar',
-            'credittransfer?lang=ar',
-            'profile/transfer?lang=ar',
-            'cdr/transfer?lang=ar',
-            'credit-transfer/transfer?lang=ar'
+        // المسارات الفعلية المعتمدة في نظام ODP Asiacell لتحويل الرصيد
+        const candidateEndpoints = [];
+        if (discoveredEp) candidateEndpoints.push(discoveredEp);
+        candidateEndpoints.push(
+            'credit-transfer?lang=ar',
+            'balance-transfer?lang=ar',
+            'transfer-credit?lang=ar',
+            'profile/credit-transfer?lang=ar',
+            'cdr/credit-transfer?lang=ar',
+            'vas/credit-transfer?lang=ar',
+            'services/credit-transfer?lang=ar',
+            'recharge/transfer?lang=ar'
         );
 
         let tr = null;
         let trInfo = { pid: '', validationUrl: '' };
+        let nonNotFoundReplies = [];
 
-        for (const ep of endpointsToTry) {
+        for (const ep of candidateEndpoints) {
             const attempt = await callAsiacellAPI(ep, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
             const info = extractLoginSessionInfo(attempt.data);
-            debugStatuses.push(`${ep}:${attempt.status}`);
+            const rawReply = JSON.stringify(attempt.data || {});
+
+            if (!rawReply.includes('Resource not found') && attempt.status !== 404) {
+                nonNotFoundReplies.push(`${ep}->${rawReply.substring(0, 140)}`);
+            }
 
             const isGenuineTransferOtpSent = (
                 attempt.data?.success === true &&
@@ -427,7 +439,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: `🔍 تشخيص الجلسة: الحالات=[${debugStatuses.join(', ')}] | الروابط المكتشفة=[${[...new Set(allSessionUrls)].slice(0, 8).join(' , ')}] | رد الدخول المحفوظ=(${(s.verifyDataSnapshot || 'غير متوفر - يرجى الضغط على تغيير رقم الهاتف وتسجيل الدخول مرة واحدة لحفظ الجلسة الجديدة').substring(0, 220)})`
+                message: `🔍 محتوى lineinfo(GET): (${lineInfoSummary}) | المسارات المكتشفة: [${[...new Set(collectedPaths)].slice(0, 10).join(' , ')}] | ردود مختلفة عن Not Found: [${nonNotFoundReplies.join(' | ')}]`
             });
         }
 
