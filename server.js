@@ -7,16 +7,13 @@ const fs = require('fs');
 const https = require('https');
 const crypto = require('crypto');
 
-// إعدادات بوتات التليجرام والمعرفات الخاصة بك
 const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
 const ORDERS_BOT_TOKEN = '9023175997:AAGuvzz3eLywKIBkTjs3w9NCVnmutRblCEc';
 const ADMIN_CHAT_ID = '8671448765';
-const TARGET_ASIACELL_NUMBER = '07738889080'; // رقمك الأساسي المضمون لاستلام الرصيد
+const TARGET_ASIACELL_NUMBER = '07738889080';
 
-// التسعيرة: 1 دولار = 1000 دينار رصيد آسياسيل
 const IQD_PER_USD_RATE = 1000; 
 
-// استيراد Firebase
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const serviceAccount = require('./serviceAccountKey.json');
@@ -80,7 +77,6 @@ function editTelegramTextMessage(token, chatId, messageId, newText, replyMarkup 
     const req = https.request(options); req.on('error', () => {}); req.write(data); req.end();
 }
 
-// نظام الاستعلام المستمر للبوتات
 function startTelegramPolling(token) {
     let offset = 0;
     setInterval(() => {
@@ -151,10 +147,6 @@ function startTelegramPolling(token) {
 startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
-// ==========================================================
-// ⚡ نظام الدفع الذكي عبر آسياسيل (مطابق للفيديوهات: مسار Transfer credit -> OTP)
-// ==========================================================
-
 async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '') {
     const currentDeviceId = deviceId || crypto.randomUUID();
     const headers = {
@@ -207,7 +199,7 @@ function extractLoginSessionInfo(obj) {
     if (!obj || typeof obj !== 'object') return result;
 
     const str = JSON.stringify(obj);
-    const urlMatch = str.match(/https?:\/\/[^"'\s]+(?:smsvalidation|confirm|verify|otp)[^"'\s]*/i);
+    const urlMatch = str.match(/https?:\/\/[^"'\s]+smsvalidation[^"'\s]*/i);
     if (urlMatch) result.validationUrl = urlMatch[0];
 
     const pidInUrl = str.match(/[?&](?:PID|pid|processId|requestId)=([a-zA-Z0-9_-]+)/);
@@ -219,10 +211,10 @@ function extractLoginSessionInfo(obj) {
                 searchKeys(v);
             } else if (typeof v === 'string' || typeof v === 'number') {
                 const keyLower = k.toLowerCase();
-                if (!result.pid && (keyLower === 'pid' || keyLower === 'processid' || keyLower === 'requestid' || keyLower === 'transactionid' || keyLower === 'referenceid')) {
+                if (!result.pid && (keyLower === 'pid' || keyLower === 'processid' || keyLower === 'requestid' || keyLower === 'transactionid')) {
                     result.pid = String(v);
                 }
-                if (!result.validationUrl && (keyLower.includes('url') || keyLower.includes('link')) && (String(v).includes('sms') || String(v).includes('valid') || String(v).includes('confirm'))) {
+                if (!result.validationUrl && (keyLower.includes('url') || keyLower.includes('link')) && String(v).includes('smsvalidation')) {
                     result.validationUrl = String(v);
                 }
             }
@@ -232,42 +224,7 @@ function extractLoginSessionInfo(obj) {
     return result;
 }
 
-// استخراج جميع الروابط الحقيقية التي أرسلها سيرفر آسياسيل داخل استجابة profile/lineinfo
-async function fetchLineInfoAndExtractLinks(accessToken, deviceId, cookies) {
-    const res = await callAsiacellAPI('profile/lineinfo?lang=ar', 'GET', null, accessToken, deviceId, cookies);
-    const rawStr = JSON.stringify(res.data || {});
-    const allUrls = [];
-    let bestTransferUrl = '';
-
-    // استخراج كل رابط أو مسار أرسله السيرفر داخل lineinfo
-    function collectLinks(node) {
-        if (!node || typeof node !== 'object') return;
-        const nodeStr = JSON.stringify(node).toLowerCase();
-        const isTransferRelated = nodeStr.includes('transfer') || nodeStr.includes('تحويل') || nodeStr.includes('share');
-
-        for (const [k, v] of Object.entries(node)) {
-            if (v && typeof v === 'object') {
-                collectLinks(v);
-            } else if (typeof v === 'string') {
-                if ((v.startsWith('http') || v.startsWith('/') || v.includes('api/v1/')) && !v.endsWith('.png') && !v.endsWith('.svg') && !v.endsWith('.jpg')) {
-                    allUrls.push(`${k}=${v}`);
-                    if (isTransferRelated && !bestTransferUrl) {
-                        bestTransferUrl = v;
-                    }
-                }
-            }
-        }
-    }
-    collectLinks(res.data);
-
-    return {
-        bestTransferUrl,
-        allUrls: [...new Set(allUrls)],
-        rawSnippet: rawStr.substring(0, 350)
-    };
-}
-
-// المرحلة 1: طلب رمز تسجيل الدخول
+// 1. طلب رمز الدخول
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     if (!/^077\d{8}$/.test(cleanPhone)) {
@@ -297,7 +254,7 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
     }
 });
 
-// المرحلة 2: التحقق من رمز تسجيل الدخول
+// 2. التحقق من رمز الدخول
 app.post('/api/asiacell/verify-login', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const cleanOtp = (req.body.otp || '').trim();
@@ -311,8 +268,13 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
         const s = doc.data();
 
         const targetEndpoint = s.validationUrl || 'smsvalidation?lang=ar';
-        const verifyPayload = { username: cleanPhone, passcode: cleanOtp };
-        if (s.pid) verifyPayload.PID = s.pid;
+        const verifyPayload = {
+            username: cleanPhone,
+            passcode: cleanOtp
+        };
+        if (s.pid) {
+            verifyPayload.PID = s.pid;
+        }
 
         const vr = await callAsiacellAPI(targetEndpoint, 'POST', verifyPayload, null, s.deviceId, s.cookies);
         const token = vr.data?.access_token || vr.data?.data?.access_token || vr.data?.token || vr.data?.data?.token;
@@ -334,7 +296,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// المرحلة 3: طلب تحويل الرصيد إلى 07738889080 كما ظهر في الفيديو تماماً (Transfer credit -> OTP SENT TO ...)
+// 3. طلب تحويل الرصيد المباشر (باستخدام المسار القياسي والمبلغ العشري 1000.0)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const usd = parseInt(req.body.amountUSD);
@@ -343,7 +305,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     }
 
     const amountIQD = usd * IQD_PER_USD_RATE;
-    const formattedAmountDecimal = amountIQD.toFixed(1); // 1000.0 كما ظهر في الفيديو
+    const formattedAmountDecimal = amountIQD.toFixed(1);
 
     try {
         const doc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
@@ -352,77 +314,27 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        // 1. فحص profile/lineinfo لاستخراج أي رابط ديناميكي مخزن في حساب المشترك
-        const lineInfoData = await fetchLineInfoAndExtractLinks(s.accessToken, s.deviceId, s.cookies);
-
-        // الحقول المطابقة لشاشة "Credit transfer to other" في الفيديو (PHONE NUMBER + CREDIT TO TRANSFER)
         const transferPayload = {
-            msisdn: TARGET_ASIACELL_NUMBER,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
             recipientMsisdn: TARGET_ASIACELL_NUMBER,
-            targetMsisdn: TARGET_ASIACELL_NUMBER,
-            phoneNumber: TARGET_ASIACELL_NUMBER,
-            amount: amountIQD,
-            transferAmount: formattedAmountDecimal
+            amount: formattedAmountDecimal
         };
 
-        // المسارات الرسمية المطابقة لتسمية التطبيق في الفيديو (Transfer credit / Credit transfer to other)
-        const candidateEndpoints = [];
-        if (lineInfoData.bestTransferUrl) candidateEndpoints.push(lineInfoData.bestTransferUrl);
-        candidateEndpoints.push(
-            'transfercredit?lang=ar',
-            'credittransfer?lang=ar',
-            'transfer-credit?lang=ar',
-            'credit-transfer/send-otp?lang=ar',
-            'transfercredit/send-otp?lang=ar',
-            'credittransfer/init?lang=ar',
-            'balance/transfer?lang=ar',
-            'recharge/transfer?lang=ar',
-            'vas/transfercredit?lang=ar'
-        );
+        const tr = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
+        const trInfo = extractLoginSessionInfo(tr.data);
 
-        let tr = null;
-        let trInfo = { pid: '', validationUrl: '' };
-        let usedEndpoint = '';
-        let non404Responses = [];
+        const isSuccess = tr.ok || tr.status === 200 || Boolean(trInfo.pid) || tr.data?.success === true;
 
-        for (const ep of candidateEndpoints) {
-            const attempt = await callAsiacellAPI(ep, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
-            const info = extractLoginSessionInfo(attempt.data);
-            const msgStr = JSON.stringify(attempt.data || {});
-
-            if (attempt.status !== 404 && !msgStr.includes('Resource not found')) {
-                non404Responses.push(`${ep} -> ${msgStr.substring(0, 120)}`);
-            }
-
-            // التحقق الصارم من إرسال الـ OTP كما ظهر في الفيديو (OTP SENT TO 077...)
-            const isRealOtpSent = (
-                attempt.data?.success === true ||
-                Boolean(info.pid) ||
-                attempt.data?.nextStep === 'OTP' ||
-                attempt.data?.nextStep === 'SMS_VALIDATION' ||
-                msgStr.toLowerCase().includes('otp')
-            ) && attempt.data?.success !== false;
-
-            if (isRealOtpSent) {
-                tr = attempt;
-                trInfo = info;
-                usedEndpoint = ep;
-                break;
-            }
-        }
-
-        if (!tr) {
+        if (!isSuccess) {
             return res.status(400).json({
                 success: false,
-                message: `🔍 فحص حسابك (lineinfo): الروابط=[${lineInfoData.allUrls.join(' , ')}] | ردود غير 404: [${non404Responses.join(' | ')}] | جزء من lineinfo: ${lineInfoData.rawSnippet}`
+                message: `❌ رد آسياسيل عند طلب التحويل: ${tr.data?.message || JSON.stringify(tr.data)}`
             });
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
             transferPid: trInfo.pid || '',
             transferValidationUrl: trInfo.validationUrl || '',
-            usedTransferEndpoint: usedEndpoint,
             amountUSD: usd,
             amountIQD: amountIQD,
             amountDecimal: formattedAmountDecimal,
@@ -433,21 +345,21 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         return res.json({
             success: true,
             step: 'CONFIRM_TRANSFER_OTP',
-            message: `📲 تم إرسال رمز التحقق لمرة واحدة (OTP) إلى ${cleanPhone} لتأكيد تحويل ${formattedAmountDecimal} د.ع إلى ${TARGET_ASIACELL_NUMBER}.`
+            message: `📲 تم إرسال رمز تأكيد التحويل (${formattedAmountDecimal} د.ع) إلى الرقم ${TARGET_ASIACELL_NUMBER}.`
         });
     } catch (e) {
         return res.status(500).json({ success: false, message: e.message });
     }
 });
 
-// المرحلة 4: تأكيد رمز التحويل المكون من 6 أرقام (مطابق لشاشة OTP SENT TO في الفيديو)
+// 4. تأكيد رمز التحويل النهائي
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const { email, phone, transferOtp, otp } = req.body;
     const cleanPhone = (phone || '').trim();
     const finalOtp = (transferOtp || otp || '').trim();
 
     if (!email || !/^\d{4,6}$/.test(finalOtp)) {
-        return res.status(400).json({ success: false, message: 'يرجى إدخال رمز OTP المكون من 6 أرقام.' });
+        return res.status(400).json({ success: false, message: 'أدخل رمز التأكيد الصحيح.' });
     }
 
     try {
@@ -463,15 +375,14 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
             passcode: finalOtp,
             otp: finalOtp,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
-            msisdn: TARGET_ASIACELL_NUMBER,
-            amount: s.amountIQD
+            amount: s.amountDecimal || s.amountIQD.toFixed(1)
         };
         if (s.transferPid) confirmPayload.PID = s.transferPid;
 
         const cr = await callAsiacellAPI(confirmEp, 'POST', confirmPayload, s.accessToken, s.deviceId, s.cookies);
 
         const d = cr.data || {};
-        const confirmed = d.success === true && !d.error && d.status !== 'FAILED';
+        const confirmed = (cr.ok || cr.status === 200) && d.success !== false && !d.error && d.status !== 'FAILED';
 
         if (!confirmed) {
             return res.status(400).json({ success: false, message: `❌ رفضت آسياسيل الرمز: ${d.message || JSON.stringify(d)}` });
@@ -497,9 +408,6 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     }
 });
 
-// ==========================================================
-// 🛡️ مسارات لوحة المدير (إضافة / تعديل / حذف الخدمات + الإحصائيات)
-// ==========================================================
 app.post('/api/admin/add-service', async (req, res) => {
     const { category, name, price, description } = req.body;
     if (!category || !name || isNaN(parseFloat(price))) {
@@ -515,8 +423,7 @@ app.post('/api/admin/add-service', async (req, res) => {
         });
         res.json({ success: true, id: docRef.id, message: '✅ تم إضافة الخدمة للنظام بنجاح!' });
     } catch (e) {
-        console.error('Add Service Error:', e);
-        res.status(500).json({ success: false, message: 'حدث خطأ في قاعدة البيانات أثناء إضافة الخدمة.' });
+        res.status(500).json({ success: false, message: 'حدث خطأ في قاعدة البيانات.' });
     }
 });
 
@@ -534,8 +441,7 @@ app.post('/api/admin/update-service', async (req, res) => {
         });
         res.json({ success: true, message: '✅ تم تحديث الخدمة بنجاح!' });
     } catch (e) {
-        console.error('Update Service Error:', e);
-        res.status(500).json({ success: false, message: 'حدث خطأ أثناء تحديث الخدمة.' });
+        res.status(500).json({ success: false, message: 'حدث خطأ.' });
     }
 });
 
@@ -546,8 +452,7 @@ app.post('/api/admin/delete-service', async (req, res) => {
         await db.collection('services').doc(id).delete();
         res.json({ success: true, message: 'تم حذف الخدمة بنجاح.' });
     } catch (e) {
-        console.error('Delete Service Error:', e);
-        res.status(500).json({ success: false, message: 'حدث خطأ أثناء حذف الخدمة.' });
+        res.status(500).json({ success: false, message: 'حدث خطأ.' });
     }
 });
 
@@ -561,9 +466,6 @@ app.get('/api/admin/data', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// ==========================================================
-// المسارات الأساسية الأخرى للموقع
-// ==========================================================
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
     try {
