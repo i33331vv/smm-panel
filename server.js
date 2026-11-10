@@ -297,7 +297,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// المرحلة 3: طلب تحويل الرصيد عبر مسار الخدمات المعتمد لآسياسيل
+// المرحلة 3: طلب تحويل الرصيد مع الاكتشاف الذاتي للمسار الصحيح
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const usd = parseInt(req.body.amountUSD);
@@ -314,27 +314,41 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        const epToCall = 'services/transfer?lang=ar';
         const transferPayload = {
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
             recipientMsisdn: TARGET_ASIACELL_NUMBER,
             amount: amountIQD
         };
 
-        let tr = await callAsiacellAPI(epToCall, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
-        let trInfo = extractLoginSessionInfo(tr.data);
+        const possibleEndpoints = [
+            'credit-transfer/transfer?lang=ar',
+            'services/transfer?lang=ar',
+            'transfer?lang=ar',
+            'balance/transfer?lang=ar',
+            'vas/transfer?lang=ar',
+            'p2p/transfer?lang=ar'
+        ];
 
-        if (tr.data?.success !== true && !trInfo.pid) {
-            tr = await callAsiacellAPI('profile/transfer?lang=ar', 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
-            trInfo = extractLoginSessionInfo(tr.data);
+        let tr = null;
+        for (const ep of possibleEndpoints) {
+            const attempt = await callAsiacellAPI(ep, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
+            if (attempt.status !== 404 && !JSON.stringify(attempt.data).includes('Resource not found')) {
+                tr = attempt;
+                break;
+            }
         }
 
-        const isSuccess = tr.data?.success === true || Boolean(trInfo.pid) || tr.data?.nextStep === 'OTP' || tr.data?.nextStep === 'SMS_VALIDATION';
+        if (!tr) {
+            tr = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
+        }
 
-        if (!isSuccess) {
+        const trInfo = extractLoginSessionInfo(tr.data);
+        const isSuccess = tr.data?.success === true || Boolean(trInfo.pid) || tr.data?.nextStep === 'OTP' || tr.data?.nextStep === 'SMS_VALIDATION' || tr.status === 200;
+
+        if (!isSuccess && tr.data?.success !== true) {
             return res.status(400).json({
                 success: false,
-                message: `❌ رد آسياسيل عند طلب التحويل: ${tr.data?.message || JSON.stringify(tr.data)}`
+                message: `❌ رد آسياسيل: ${tr.data?.message || JSON.stringify(tr.data)}`
             });
         }
 
