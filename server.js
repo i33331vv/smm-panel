@@ -152,7 +152,7 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================================
-// ⚡ نظام الدفع المتكامل والمؤمّن عبر آسياسيل (منع الشحن الوهمي + التحقق الصارم)
+// ⚡ نظام الدفع المتكامل والمؤمّن عبر آسياسيل (مع الاكتشاف التلقائي لرابط التحويل)
 // ==========================================================
 
 async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '') {
@@ -184,7 +184,7 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     const response = await fetch(url, {
         method: method,
         headers: headers,
-        body: bodyData ? JSON.stringify(bodyData) : undefined
+        body: (method !== 'GET' && bodyData) ? JSON.stringify(bodyData) : undefined
     });
 
     let newCookies = cookies;
@@ -201,27 +201,32 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     }
 
     const text = await response.text();
-    console.log(`[Asiacell API - ${endpoint}] Status: ${response.status} | Body: ${text}`);
+    console.log(`[Asiacell API - ${method} ${endpoint}] Status: ${response.status} | Body: ${text.substring(0, 500)}`);
 
     let json = {};
     try {
         json = JSON.parse(text);
     } catch (err) {
-        return { status: response.status, ok: false, data: { success: false, message: `مسار غير متاح لدى آسياسيل (${response.status})` }, deviceId: currentDeviceId, cookies: newCookies };
+        return { status: response.status, ok: false, data: { success: false, message: `مسار غير متاح (${response.status})` }, deviceId: currentDeviceId, cookies: newCookies };
     }
 
     return { status: response.status, ok: response.ok, data: json, deviceId: currentDeviceId, cookies: newCookies };
 }
 
 function extractSessionInfo(obj) {
-    let result = { pid: '', validationUrl: '' };
+    let result = { pid: '', validationUrl: '', transferUrl: '' };
     if (!obj || typeof obj !== 'object') return result;
 
     const str = JSON.stringify(obj);
 
-    const urlMatch = str.match(/https?:\/\/[^"'\s]+(?:smsvalidation|confirm|transfer|verify)[^"'\s]*/i);
-    if (urlMatch) {
-        result.validationUrl = urlMatch[0];
+    const valUrlMatch = str.match(/https?:\/\/[^"'\s]+(?:smsvalidation|confirm|verify)[^"'\s]*/i);
+    if (valUrlMatch) {
+        result.validationUrl = valUrlMatch[0];
+    }
+
+    const transUrlMatch = str.match(/https?:\/\/[^"'\s]+(?:transfer|share|send-credit|p2p)[^"'\s]*/i);
+    if (transUrlMatch) {
+        result.transferUrl = transUrlMatch[0];
     }
 
     const pidInUrl = str.match(/[?&](?:PID|pid|processId|requestId)=([a-zA-Z0-9_-]+)/);
@@ -235,11 +240,15 @@ function extractSessionInfo(obj) {
                 searchKeys(v);
             } else if (typeof v === 'string' || typeof v === 'number') {
                 const keyLower = k.toLowerCase();
+                const valStr = String(v);
                 if (!result.pid && (keyLower === 'pid' || keyLower === 'processid' || keyLower === 'requestid' || keyLower === 'transactionid' || keyLower === 'sessionid' || keyLower === 'referenceid')) {
-                    result.pid = String(v);
+                    result.pid = valStr;
                 }
-                if (!result.validationUrl && (keyLower.includes('url') || keyLower.includes('link')) && String(v).startsWith('http')) {
-                    result.validationUrl = String(v);
+                if (!result.validationUrl && (keyLower.includes('url') || keyLower.includes('link')) && valStr.startsWith('http') && (valStr.includes('sms') || valStr.includes('valid') || valStr.includes('confirm'))) {
+                    result.validationUrl = valStr;
+                }
+                if (!result.transferUrl && (valStr.includes('transfer') || keyLower.includes('transfer')) && (valStr.startsWith('http') || valStr.includes('/'))) {
+                    result.transferUrl = valStr;
                 }
             }
         }
@@ -247,6 +256,21 @@ function extractSessionInfo(obj) {
     searchKeys(obj);
 
     return result;
+}
+
+// دالة ذكية لفحص حساب المستخدم في آسياسيل واكتشاف رابط تحويل الرصيد المخصص لشريحته
+async function discoverTransferEndpoint(accessToken, deviceId, cookies) {
+    const discoveryPaths = ['home?lang=ar', 'profile?lang=ar', 'dashboard?lang=ar', 'services?lang=ar'];
+    for (const path of discoveryPaths) {
+        try {
+            const res = await callAsiacellAPI(path, 'GET', null, accessToken, deviceId, cookies);
+            if (res.ok && res.data) {
+                const info = extractSessionInfo(res.data);
+                if (info.transferUrl) return info.transferUrl;
+            }
+        } catch (e) {}
+    }
+    return '';
 }
 
 function formatAsiacellErrorMessage(rawMessage) {
@@ -257,6 +281,9 @@ function formatAsiacellErrorMessage(rawMessage) {
     }
     if (msg.includes('fee') || msg.includes('charge') || msg.includes('كلفة') || msg.includes('رسوم')) {
         return '❌ عذراً، ليس لديك رصيد كافٍ لتغطية كلفة (رسوم) خدمة تحويل الرصيد من آسياسيل.';
+    }
+    if (msg.includes('not eligible') || msg.includes('not allowed') || msg.includes('غير مسموح') || msg.includes('غير مؤهل')) {
+        return '❌ عذراً، شريحتك الحالية غير مؤهلة لخدمة تحويل الرصيد في تطبيق آسياسيل (ميزة تحويل الرصيد غير مفعلة لهذا الرقم).';
     }
     return `⚠️ إشعار آسياسيل: ${rawMessage}`;
 }
@@ -345,11 +372,16 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
         }
 
         const refreshToken = verifyResult.data?.refresh_token || verifyResult.data?.data?.refresh_token || '';
+        const updatedCookies = verifyResult.cookies || session.cookies || '';
+
+        // فحص الرابط المخصص للتحويل في حساب هذا الرقم إذا وجد في رد الدخول
+        const loginInfo = extractSessionInfo(verifyResult.data);
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
             accessToken: accessToken,
             refreshToken: refreshToken,
-            cookies: verifyResult.cookies || session.cookies || '',
+            cookies: updatedCookies,
+            discoveredTransferUrl: loginInfo.transferUrl || '',
             step: 'SELECT_AMOUNT',
             updatedAt: Date.now()
         });
@@ -384,48 +416,92 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 
         const session = sessionDoc.data();
 
-        // تجربة المسارات المعتمدة لتحويل الرصيد في تطبيق آسياسيل وتمرير كافة الحقول المطلوبة
+        // تجهيز جميع الصيغ القياسية لحقول تحويل الرصيد في آسياسيل
         const transferPayload = {
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
             recipientMsisdn: TARGET_ASIACELL_NUMBER,
             targetMsisdn: TARGET_ASIACELL_NUMBER,
+            destMsisdn: TARGET_ASIACELL_NUMBER,
+            toMsisdn: TARGET_ASIACELL_NUMBER,
             msisdn: TARGET_ASIACELL_NUMBER,
-            amount: transferAmountIQD
+            phoneNumber: TARGET_ASIACELL_NUMBER,
+            amount: transferAmountIQD,
+            transferAmount: transferAmountIQD
         };
 
-        let transferResult = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
-        let transferInfo = extractSessionInfo(transferResult.data);
+        // 1. محاولة اكتشاف رابط التحويل الديناميكي من بروفايل المستخدم في آسياسيل
+        let dynamicUrl = session.discoveredTransferUrl;
+        if (!dynamicUrl) {
+            dynamicUrl = await discoverTransferEndpoint(session.accessToken, session.deviceId, session.cookies);
+        }
 
-        // إذا أرجع المسار الأول خطأ أو لم يولد PID، نجرب المسار البديل لخدمة تحويل الرصيد في تطبيق آسياسيل
-        if (transferResult.data?.success !== true && !transferInfo.pid) {
-            const altResult = await callAsiacellAPI('balance-transfer/initiate?lang=ar', 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
-            const altInfo = extractSessionInfo(altResult.data);
-            if (altResult.data?.success === true || altInfo.pid) {
-                transferResult = altResult;
-                transferInfo = altInfo;
+        // قائمة مسارات التحويل المحتملة في مختلف إصدارات API تطبيق آسياسيل
+        const candidateEndpoints = [];
+        if (dynamicUrl) candidateEndpoints.push(dynamicUrl);
+        candidateEndpoints.push(
+            'credit-transfer?lang=ar',
+            'credittransfer?lang=ar',
+            'balance-transfer?lang=ar',
+            'balancetransfer?lang=ar',
+            'transfer-credit?lang=ar',
+            'transfercredit?lang=ar',
+            'p2p-transfer?lang=ar',
+            'share-credit?lang=ar',
+            'vas/credit-transfer?lang=ar',
+            'account/transfer?lang=ar',
+            'user/transfer?lang=ar'
+        );
+
+        let transferResult = null;
+        let transferInfo = { pid: '', validationUrl: '' };
+        let usedEndpoint = '';
+        let lastNon404Result = null;
+
+        for (const ep of candidateEndpoints) {
+            const attempt = await callAsiacellAPI(ep, 'POST', transferPayload, session.accessToken, session.deviceId, session.cookies);
+            const info = extractSessionInfo(attempt.data);
+            const msgStr = String(attempt.data?.message || '').toLowerCase();
+            const isNotFound = attempt.status === 404 || msgStr.includes('resource not found') || msgStr.includes('not found');
+
+            if (!isNotFound) {
+                lastNon404Result = attempt;
+                usedEndpoint = ep;
+            }
+
+            if (
+                attempt.data?.success === true ||
+                Boolean(info.pid) ||
+                attempt.data?.nextStep === 'OTP' ||
+                attempt.data?.nextStep === 'SMS_VALIDATION' ||
+                attempt.data?.data?.nextStep === 'OTP'
+            ) {
+                transferResult = attempt;
+                transferInfo = info;
+                usedEndpoint = ep;
+                break;
             }
         }
 
-        // التحقق الصارم: لا ننتقل للمرحلة 4 إلا إذا أكدت آسياسيل إرسال رمز التحويل أو أرجعت PID حقيقي للعملية!
-        const isTransferOtpSent = (
-            transferResult.data?.success === true ||
-            Boolean(transferInfo.pid) ||
-            transferResult.data?.nextStep === 'OTP' ||
-            transferResult.data?.nextStep === 'SMS_VALIDATION' ||
-            transferResult.data?.data?.nextStep === 'OTP'
-        );
-
-        if (!isTransferOtpSent) {
-            const rawErr = transferResult.data?.message || transferResult.data?.error_description || JSON.stringify(transferResult.data);
-            return res.status(400).json({
-                success: false,
-                message: `${formatAsiacellErrorMessage(rawErr)} | (رد السيرفر: ${JSON.stringify(transferResult.data)})`
-            });
+        // إذا لم ينجح أي مسار، نعرض السبب الدقيق (أو نوضح أن الشريحة لا تحتوي على ميزة تحويل الرصيد)
+        if (!transferResult) {
+            if (lastNon404Result) {
+                const rawErr = lastNon404Result.data?.message || lastNon404Result.data?.error_description || JSON.stringify(lastNon404Result.data);
+                return res.status(400).json({
+                    success: false,
+                    message: `${formatAsiacellErrorMessage(rawErr)} [المسار: ${usedEndpoint}]`
+                });
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: '❌ عذراً، خدمة "تحويل الرصيد" غير متاحة لهذا الرقم في تطبيق آسياسيل (تأكد من أن زر تحويل الرصيد يظهر لرقمك داخل تطبيق آسياسيل وأن شريحتك مؤهلة للتحويل).'
+                });
+            }
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
             transferPid: transferInfo.pid || '',
             transferValidationUrl: transferInfo.validationUrl || '',
+            usedTransferEndpoint: usedEndpoint,
             amountUSD: usd,
             amountIQD: transferAmountIQD,
             step: 'WAIT_TRANSFER_OTP',
@@ -465,13 +541,11 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
 
         const session = sessionDoc.data();
 
-        // منع التخطي إذا لم تكن الجلسة في مرحلة انتظار رمز التحويل فعلياً
         if (session.step !== 'WAIT_TRANSFER_OTP' || !session.accessToken) {
             return res.status(400).json({ success: false, message: '⚠️ لا يوجد طلب تحويل مفعل من آسياسيل حالياً لتأكيده.' });
         }
 
-        // تحديد مسار تأكيد رمز التحويل (سواء عبر رابط التحقق المرسل من آسياسيل أو مسار تأكيد التحويل)
-        const confirmEndpoint = session.transferValidationUrl || (session.transferPid ? 'smsvalidation?lang=ar' : 'credit-transfer/confirm?lang=ar');
+        const confirmEndpoint = session.transferValidationUrl || 'smsvalidation?lang=ar';
 
         const confirmPayload = {
             PID: session.transferPid || undefined,
@@ -484,7 +558,6 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
 
         const confirmResult = await callAsiacellAPI(confirmEndpoint, 'POST', confirmPayload, session.accessToken, session.deviceId, session.cookies);
 
-        // حماية صارمة: لا نقبل النجاح بمجرد أن HTTP = 200، بل يجب أن يكون رد آسياسيل يحمل تأكيد نجاح صريح وخالٍ من رسائل الخطأ!
         const resData = confirmResult.data || {};
         const hasErrorFlag = (
             resData.success === false ||
@@ -513,7 +586,6 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         const creditAmountUSD = session.amountUSD || parseInt(amount || 1);
         const transferAmountIQD = session.amountIQD || (creditAmountUSD * IQD_PER_USD_RATE);
 
-        // مسح الجلسة بعد التأكد القطعي من نجاح التحويل
         await db.collection('asiacell_sessions').doc(cleanPhone).delete();
 
         const userSnap = await db.collection('users').where('email', '==', email).get();
