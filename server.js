@@ -152,7 +152,7 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================================
-// ⚡ نظام الدفع الموحد عبر آسياسيل (تطبيق آلية دالة تسجيل الدخول بحذافيرها)
+// ⚡ نظام الدفع الذكي عبر آسياسيل (مطابق لتنسيق 1000.0 وإلغاء التخطي الوهمي)
 // ==========================================================
 
 async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '') {
@@ -181,7 +181,7 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     const response = await fetch(url, {
         method,
         headers,
-        body: (method !== 'GET' && bodyData) ? JSON.stringify(bodyData) : undefined
+        body: (method !== 'GET' && bodyData) ? (typeof bodyData === 'string' ? bodyData : JSON.stringify(bodyData)) : undefined
     });
 
     let newCookies = cookies;
@@ -194,6 +194,8 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     }
 
     const text = await response.text();
+    console.log(`[Asiacell API - ${method} ${endpoint}] Status: ${response.status} | Body: ${text.substring(0, 500)}`);
+
     let json = {};
     try { json = JSON.parse(text); } catch (e) { json = { rawText: text }; }
 
@@ -230,7 +232,57 @@ function extractLoginSessionInfo(obj) {
     return result;
 }
 
-// المرحلة 1: طلب رمز تسجيل الدخول (تعمل بنجاح وتصل الرسالة)
+// دالة ذكية لاستخراج أي رابط متعلق بالتحويل من صفحات التطبيق (العربية والإنجليزية)
+async function findDynamicTransferInfo(accessToken, deviceId, cookies) {
+    let foundEndpoint = '';
+    let allDiscoveredUrls = [];
+
+    const pages = ['more?lang=ar', 'home?lang=ar', 'more?lang=en', 'home?lang=en'];
+    for (const p of pages) {
+        try {
+            const res = await callAsiacellAPI(p, 'GET', null, accessToken, deviceId, cookies);
+            const raw = JSON.stringify(res.data || {});
+
+            // جمع كل الروابط البرمجية الموجودة في استجابة التطبيق
+            const matches = raw.match(/(?:https?:\/\/odpapp\.asiacell\.com\/api\/v\d+\/|\/api\/v\d+\/)([a-zA-Z0-9_\/-]+)/g) || [];
+            allDiscoveredUrls.push(...matches);
+
+            // البحث الدقيق عن الكائن الذي يحتوي على "تحويل الرصيد" أو "Credit transfer"
+            function searchForTransferNode(node) {
+                if (!node || typeof node !== 'object' || foundEndpoint) return;
+                const nodeValues = Object.values(node).map(v => typeof v === 'string' ? v.toLowerCase() : '');
+                const hasTransferTitle = nodeValues.some(v =>
+                    v.includes('تحويل الرصيد') ||
+                    v.includes('credit transfer') ||
+                    v.includes('credit-transfer') ||
+                    v.includes('balancetransfer') ||
+                    v.includes('balance transfer')
+                );
+
+                if (hasTransferTitle) {
+                    for (const [k, v] of Object.entries(node)) {
+                        if (typeof v === 'string' && !v.endsWith('.png') && !v.endsWith('.svg') && !v.endsWith('.jpg')) {
+                            if (v.startsWith('http') || v.includes('/')) {
+                                foundEndpoint = v;
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                for (const child of Object.values(node)) {
+                    if (child && typeof child === 'object') searchForTransferNode(child);
+                }
+            }
+            searchForTransferNode(res.data);
+            if (foundEndpoint) break;
+        } catch (e) {}
+    }
+
+    return { foundEndpoint, allDiscoveredUrls: [...new Set(allDiscoveredUrls)] };
+}
+
+// المرحلة 1: طلب رمز تسجيل الدخول
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     if (!/^077\d{8}$/.test(cleanPhone)) {
@@ -297,7 +349,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// المرحلة 3: طلب تحويل الرصيد (استخدام نفس هيكل دالة تسجيل الدخول لضمان إرسال الكود الفعلي عبر الـ SMS)
+// المرحلة 3: طلب تحويل الرصيد (بتنسيق 1000.0 الدقيق كما في التطبيق + منع التخطي الوهمي)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const usd = parseInt(req.body.amountUSD);
@@ -306,6 +358,8 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     }
 
     const amountIQD = usd * IQD_PER_USD_RATE;
+    // تنسيق المبلغ بفاصلة عشرية (مثل 1000.0) تماماً كما يظهر في تطبيق آسياسيل الرسمي
+    const formattedAmountDecimal = amountIQD.toFixed(1);
 
     try {
         const doc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
@@ -314,43 +368,69 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        // استخدام نفس أسلوب طلب الـ OTP القياسي في آسياسيل (تمرير رقم المستلم والمبلغ بنفس هيكل الـ login)
+        // 1. البحث في صفحات التطبيق عن المسار المرتبط بزر "تحويل الرصيد" / "Credit transfer"
+        const discovery = await findDynamicTransferInfo(s.accessToken, s.deviceId, s.cookies);
+
+        // تجهيز البيانات بالتنسيق العشري (1000.0) والتنسيق الرقمي معاً
         const transferPayload = {
-            username: cleanPhone,
+            msisdn: TARGET_ASIACELL_NUMBER,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
-            amount: amountIQD
+            recipientMsisdn: TARGET_ASIACELL_NUMBER,
+            phoneNumber: TARGET_ASIACELL_NUMBER,
+            amount: formattedAmountDecimal
         };
 
-        // إرسال الطلب عبر مسار تحويل الرصيد المباشر مع الاحتفاظ بـ AccessToken وجلسة المستخدم
-        const tr = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
-        const trInfo = extractLoginSessionInfo(tr.data);
+        const candidateEndpoints = [];
+        if (discovery.foundEndpoint) candidateEndpoints.push(discovery.foundEndpoint);
+        candidateEndpoints.push(
+            'credit-transfer?lang=ar',
+            'credit-transfer/initiate?lang=ar',
+            'credit-transfer/send-otp?lang=ar',
+            'balance-transfer?lang=ar',
+            'transfer-credit?lang=ar',
+            'p2p/transfer?lang=ar'
+        );
 
-        // إذا لم يعيد المسار الأول PID، نجرب إرساله كطلب خدمة مصادقة OTP جديدة لتوليد رسالة نصية حقيقية
-        let finalPid = trInfo.pid;
-        let finalValidationUrl = trInfo.validationUrl;
+        let tr = null;
+        let trInfo = { pid: '', validationUrl: '' };
+        let lastResponseData = null;
+        let testedEndpoint = '';
 
-        if (!finalPid && (tr.status === 200 || tr.ok)) {
-            // طلب إرسال رمز التحقق الثاني تماماً مثل خطوة تسجيل الدخول الأولى
-            const otpTrigger = await callAsiacellAPI('credit-transfer/send-otp?lang=ar', 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
-            const otpInfo = extractLoginSessionInfo(otpTrigger.data);
-            finalPid = otpInfo.pid || trInfo.pid;
-            finalValidationUrl = otpInfo.validationUrl || trInfo.validationUrl;
+        for (const ep of candidateEndpoints) {
+            const attempt = await callAsiacellAPI(ep, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
+            const info = extractLoginSessionInfo(attempt.data);
+            lastResponseData = attempt.data;
+            testedEndpoint = ep;
+
+            // الشرط الصارم: لا نعتبر أن الرمز أُرسل إلا إذا كانت success === true صراحةً أو وُجد PID حقيقي!
+            const isRealOtpSent = (
+                attempt.data?.success === true ||
+                Boolean(info.pid) ||
+                attempt.data?.nextStep === 'OTP' ||
+                attempt.data?.nextStep === 'SMS_VALIDATION'
+            );
+
+            if (isRealOtpSent) {
+                tr = attempt;
+                trInfo = info;
+                break;
+            }
         }
 
-        const isSuccess = tr.ok || Boolean(finalPid) || tr.status === 200;
-
-        if (!isSuccess) {
+        // إذا لم يتم إرسال رمز حقيقي، نوقف العملية فوراً ولا ننتقل لشاشة الرمز أبداً!
+        if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: `❌ رد آسياسيل عند طلب التحويل: ${tr.data?.message || JSON.stringify(tr.data)}`
+                message: `⚠️ لم تُرسل آسياسيل الرمز بعد. رد السيرفر: (${JSON.stringify(lastResponseData)}) | الروابط المكتشفة في حسابك: [${discovery.allDiscoveredUrls.join(' , ')}]`
             });
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
-            transferPid: finalPid || '',
-            transferValidationUrl: finalValidationUrl || '',
+            transferPid: trInfo.pid || '',
+            transferValidationUrl: trInfo.validationUrl || '',
             amountUSD: usd,
             amountIQD: amountIQD,
+            amountDecimal: formattedAmountDecimal,
             step: 'WAIT_TRANSFER_OTP',
             updatedAt: Date.now()
         });
@@ -358,14 +438,14 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         return res.json({
             success: true,
             step: 'CONFIRM_TRANSFER_OTP',
-            message: `📲 تم إرسال رمز تأكيد التحويل (${amountIQD} د.ع) إلى هاتفك بنجاح.`
+            message: `📲 تم إرسال رمز تأكيد تحويل (${formattedAmountDecimal} د.ع) إلى هاتفك بنجاح.`
         });
     } catch (e) {
         return res.status(500).json({ success: false, message: e.message });
     }
 });
 
-// المرحلة 4: تأكيد رمز التحويل النهائي واستقطاع الرصيد وإضافته للموقع
+// المرحلة 4: تأكيد رمز التحويل النهائي (حماية صارمة ضد أي رمز عشوائي)
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const { email, phone, transferOtp, otp } = req.body;
     const cleanPhone = (phone || '').trim();
@@ -382,20 +462,21 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         }
 
         const s = doc.data();
-        const confirmEp = s.transferValidationUrl || 'credit-transfer/confirm?lang=ar';
+        // استخدام نفس مسار التحقق من الـ SMS المعتمد في المرحلة 2 مع تمرير الـ AccessToken والـ PID الجديد
+        const confirmEp = s.transferValidationUrl || 'smsvalidation?lang=ar';
         const confirmPayload = {
             username: cleanPhone,
             passcode: finalOtp,
-            otp: finalOtp,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
-            amount: s.amountIQD
+            amount: s.amountDecimal || s.amountIQD.toFixed(1)
         };
         if (s.transferPid) confirmPayload.PID = s.transferPid;
 
         const cr = await callAsiacellAPI(confirmEp, 'POST', confirmPayload, s.accessToken, s.deviceId, s.cookies);
 
         const d = cr.data || {};
-        const confirmed = (cr.ok || cr.status === 200) && d.success !== false && !d.error && d.status !== 'FAILED';
+        // شرط صارم جداً: يجب أن تكون d.success === true صراحةً
+        const confirmed = d.success === true && !d.error && d.status !== 'FAILED';
 
         if (!confirmed) {
             return res.status(400).json({ success: false, message: `❌ رفضت آسياسيل الرمز: ${d.message || JSON.stringify(d)}` });
