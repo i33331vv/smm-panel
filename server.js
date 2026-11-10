@@ -152,7 +152,7 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================================
-// ⚡ نظام الدفع الذكي عبر آسياسيل
+// ⚡ نظام الدفع الموحد عبر آسياسيل (نفس هيدرز وبصمة جهاز تسجيل الدخول)
 // ==========================================================
 
 async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '') {
@@ -230,7 +230,7 @@ function extractLoginSessionInfo(obj) {
     return result;
 }
 
-// المرحلة 1: طلب رمز الدخول
+// المرحلة 1: طلب رمز تسجيل الدخول
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     if (!/^077\d{8}$/.test(cleanPhone)) {
@@ -260,7 +260,7 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
     }
 });
 
-// المرحلة 2: التحقق من رمز الدخول
+// المرحلة 2: التحقق من رمز تسجيل الدخول
 app.post('/api/asiacell/verify-login', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const cleanOtp = (req.body.otp || '').trim();
@@ -297,7 +297,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// المرحلة 3: طلب تحويل الرصيد مع الاكتشاف الذاتي للمسار الصحيح
+// المرحلة 3: طلب تحويل الرصيد (باستخدام نفس آلية وهيدرز تسجيل الدخول لضمان وصول الرمز الفعلي لهاتف الزبون)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const usd = parseInt(req.body.amountUSD);
@@ -320,35 +320,16 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             amount: amountIQD
         };
 
-        const possibleEndpoints = [
-            'credit-transfer/transfer?lang=ar',
-            'services/transfer?lang=ar',
-            'transfer?lang=ar',
-            'balance/transfer?lang=ar',
-            'vas/transfer?lang=ar',
-            'p2p/transfer?lang=ar'
-        ];
-
-        let tr = null;
-        for (const ep of possibleEndpoints) {
-            const attempt = await callAsiacellAPI(ep, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
-            if (attempt.status !== 404 && !JSON.stringify(attempt.data).includes('Resource not found')) {
-                tr = attempt;
-                break;
-            }
-        }
-
-        if (!tr) {
-            tr = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
-        }
-
+        // إرسال الطلب عبر مسار تحويل الرصيد المباشر مع تمرير الـ AccessToken والـ DeviceID ونفس الكوكيز
+        const tr = await callAsiacellAPI('credit-transfer/transfer?lang=ar', 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
         const trInfo = extractLoginSessionInfo(tr.data);
+
         const isSuccess = tr.data?.success === true || Boolean(trInfo.pid) || tr.data?.nextStep === 'OTP' || tr.data?.nextStep === 'SMS_VALIDATION' || tr.status === 200;
 
         if (!isSuccess && tr.data?.success !== true) {
             return res.status(400).json({
                 success: false,
-                message: `❌ رد آسياسيل: ${tr.data?.message || JSON.stringify(tr.data)}`
+                message: `❌ رد آسياسيل عند طلب التحويل: ${tr.data?.message || JSON.stringify(tr.data)}`
             });
         }
 
@@ -371,7 +352,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     }
 });
 
-// المرحلة 4: تأكيد رمز التحويل النهائي
+// المرحلة 4: تأكيد رمز التحويل النهائي واستقطاع الرصيد وإضافته للموقع
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const { email, phone, transferOtp, otp } = req.body;
     const cleanPhone = (phone || '').trim();
