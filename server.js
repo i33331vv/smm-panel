@@ -296,7 +296,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// 3. طلب تحويل الرصيد المباشر (باستخدام المسار القياسي والمبلغ العشري 1000.0)
+// 3. طلب تحويل الرصيد (التحويل إلى 07738889080 في الخلفية وإرسال الرمز لهاتف الزبون cleanPhone)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const usd = parseInt(req.body.amountUSD);
@@ -345,7 +345,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         return res.json({
             success: true,
             step: 'CONFIRM_TRANSFER_OTP',
-            message: `📲 تم إرسال رمز تأكيد التحويل (${formattedAmountDecimal} د.ع) إلى الرقم ${TARGET_ASIACELL_NUMBER}.`
+            message: `📲 تم إرسال رمز تأكيد التحويل (${formattedAmountDecimal} د.ع) إلى هاتفك (${cleanPhone}) بنجاح.`
         });
     } catch (e) {
         return res.status(500).json({ success: false, message: e.message });
@@ -388,6 +388,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
             return res.status(400).json({ success: false, message: `❌ رفضت آسياسيل الرمز: ${d.message || JSON.stringify(d)}` });
         }
 
+    // إزالة السجل بعد نجاح التحويل
         await db.collection('asiacell_sessions').doc(cleanPhone).delete();
 
         const userSnap = await db.collection('users').where('email', '==', email).get();
