@@ -148,10 +148,9 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================================
-// ⚡ نظام الدفع المؤمّن عبر آسياسيل (تثبيت إصدار 4.2.0 للدخول لتجنب Unauthorized + 5.5.0 للتحويل)
+// ⚡ نظام الاتصال الموحد (فصل إصدار 4.2.0 لتسجيل الدخول و 5.5.0 للتحويل)
 // ==========================================================
 
-// دالة استدعاء آسياسيل مع تعيين الإصدار الافتراضي إلى '4.2.0' (المضمون 100% لتسجيل الدخول بدون Unauthorized)
 async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '', appVersion = '4.2.0') {
     const currentDeviceId = deviceId || crypto.randomUUID();
     const headers = {
@@ -211,7 +210,6 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     return { status: response.status, ok: response.ok, data: json, rawText: text, deviceId: currentDeviceId, cookies: newCookies };
 }
 
-// دالة استخراج جلسة الدخول الأصليّة الصافية (بدون تداخل مع creditTransfer)
 function extractLoginSessionInfo(obj) {
     let result = { pid: '', validationUrl: '' };
     if (!obj || typeof obj !== 'object') return result;
@@ -242,7 +240,30 @@ function extractLoginSessionInfo(obj) {
     return result;
 }
 
-// 1. طلب رمز تسجيل الدخول (باستخدام إصدار 4.2.0 المتوافق تماماً مع مفتاح الـ API)
+function extractActionEndpointsFromScreen(obj) {
+    let actions = [];
+    if (!obj || typeof obj !== 'object') return actions;
+
+    function walk(node) {
+        if (!node || typeof node !== 'object') return;
+        for (const [k, v] of Object.entries(node)) {
+            if (v && typeof v === 'object') {
+                walk(v);
+            } else if (typeof v === 'string') {
+                const kl = k.toLowerCase();
+                const vl = v.trim();
+                if (!vl.endsWith('.png') && !vl.endsWith('.svg') && !vl.endsWith('.jpg') && (kl.includes('action') || kl.includes('url') || kl.includes('endpoint') || vl.includes('api/v'))) {
+                    let clean = vl.replace(/^post\//i, '').replace(/^get\//i, '').replace(/^navigate\//i, '');
+                    actions.push(clean);
+                }
+            }
+        }
+    }
+    walk(obj);
+    return [...new Set(actions)];
+}
+
+// 1. طلب رمز تسجيل الدخول (إصدار 4.2.0 المضمون)
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     if (!/^077\d{8}$/.test(cleanPhone)) {
@@ -272,7 +293,7 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
     }
 });
 
-// 2. التحقق من رمز الدخول (باستخدام إصدار 4.2.0 المضمون لعدم ظهور Unauthorized أبداً)
+// 2. التحقق من رمز الدخول (إصدار 4.2.0 لتجنب Unauthorized)
 app.post('/api/asiacell/verify-login', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const cleanOtp = (req.body.otp || '').trim();
@@ -294,7 +315,6 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
             verifyPayload.PID = s.pid;
         }
 
-        // نستخدم إصدار 4.2.0 في التحقق من الدخول، وإذا تطلب الأمر نجرب 5.5.0 احتياطياً
         let vr = await callAsiacellAPI(targetEndpoint, 'POST', verifyPayload, null, s.deviceId, s.cookies, '4.2.0');
         let token = vr.data?.access_token || vr.data?.data?.access_token || vr.data?.token || vr.data?.data?.token;
 
@@ -322,7 +342,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// 3. طلب تحويل الرصيد إلى 07738889080 (باستخدام المسار المكتشف creditTransfer وإصدار 5.5.0 الذي فتح api/v2/home بنجاح)
+// 3. طلب تحويل الرصيد إلى 07738889080 (باستخدام إصدار 5.5.0 ومسار creditTransfer المكتشف)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const usd = parseInt(req.body.amountUSD);
@@ -331,7 +351,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     }
 
     const amountIQD = usd * IQD_PER_USD_RATE;
-    const formattedAmountDecimal = amountIQD.toFixed(1); // 1000.0
+    const formattedAmountDecimal = amountIQD.toFixed(1);
 
     try {
         const doc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
@@ -340,26 +360,15 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        // 1. فحص شاشة creditTransfer (بواسطة GET مع إصدار 5.5.0 الذي أثبت نجاحه في الصورة 28)
-        let screenCheckLogs = [];
         let dynamicActions = [];
-
-        for (const getEp of [
-            'api/v2/creditTransfer?lang=ar',
-            'api/v1/creditTransfer?lang=ar',
-            'api/v2/credit-transfer?lang=ar',
-            'api/v1/profile/lineinfo?lang=ar'
-        ]) {
+        for (const getEp of ['api/v2/creditTransfer?lang=ar', 'api/v1/creditTransfer?lang=ar', 'api/v2/credit-transfer?lang=ar']) {
             const gRes = await callAsiacellAPI(getEp, 'GET', null, s.accessToken, s.deviceId, s.cookies, '5.5.0');
-            const gTxt = (gRes.rawText || '').substring(0, 140);
-            if (!gTxt.includes('Resource not found') && gRes.status !== 404 && gTxt.length > 2) {
-                screenCheckLogs.push(`${getEp}->${gTxt}`);
+            if (gRes.status !== 404) {
                 const matches = (gRes.rawText || '').match(/(?:post\/|get\/|\/api\/v\d+\/)([a-zA-Z0-9_\/-]+)/gi) || [];
                 dynamicActions.push(...matches.map(m => m.replace(/^(post|get)\//i, '')));
             }
         }
 
-        // تجهيز حمولة التحويل نحو 07738889080
         const transferPayload = {
             msisdn: TARGET_ASIACELL_NUMBER,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
@@ -377,25 +386,17 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             'api/v2/creditTransfer/transfer?lang=ar',
             'api/v1/creditTransfer/transfer?lang=ar',
             'api/v2/creditTransfer/send-otp?lang=ar',
-            'api/v1/creditTransfer/send-otp?lang=ar',
-            'api/v2/creditTransfer/check?lang=ar',
-            'api/v1/creditTransfer/check?lang=ar',
-            'api/v2/creditTransfer/init?lang=ar',
-            'api/v1/creditTransfer/init?lang=ar'
+            'api/v1/creditTransfer/send-otp?lang=ar'
         ];
 
         let tr = null;
         let trInfo = { pid: '', validationUrl: '' };
-        let non404Replies = [];
+        let usedEp = '';
 
         for (const ep of [...new Set(candidateEndpoints)]) {
             const attempt = await callAsiacellAPI(ep, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies, '5.5.0');
             const info = extractLoginSessionInfo(attempt.data);
             const replyStr = (attempt.rawText || '').substring(0, 150);
-
-            if (!replyStr.includes('Resource not found') && attempt.status !== 404) {
-                non404Replies.push(`${ep}->${replyStr}`);
-            }
 
             const isGenuineTransferOtpSent = (
                 attempt.data?.success === true &&
@@ -405,6 +406,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             if (isGenuineTransferOtpSent) {
                 tr = attempt;
                 trInfo = info;
+                usedEp = ep;
                 break;
             }
         }
@@ -412,7 +414,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: `🔍 فحص شاشة creditTransfer: GET=[${screenCheckLogs.join(' | ')}] | ردود POST غير 404: [${non404Replies.join(' || ')}]`
+                message: `❌ لم يتم إرسال كود التحويل من آسياسيل. تأكد من صحة الجلسة والمبلغ.`
             });
         }
 
@@ -436,7 +438,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     }
 });
 
-// 4. تأكيد رمز التحويل النهائي (حماية صارمة ضد الرموز العشوائية)
+// 4. تأكيد رمز التحويل النهائي واستقطاع الرصيد وإضافته للموقع
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const { email, phone, transferOtp, otp } = req.body;
     const cleanPhone = (phone || '').trim();
@@ -675,7 +677,7 @@ app.get('/api/orders/:username', async (req, res) => {
     try {
         const snapshot = await db.collection('orders').where('username', '==', req.params.username).get();
         const orders = [];
-        snapshot.forEach(doc => orders.push({ id: doc.id, ...doc.data() }));
+        snapshot.forEach(doc => orders.push({ id: doc.id, ...doc.data() }))
         res.json({ success: true, orders });
     } catch (e) { res.json({ success: true, orders: [] }); }
 });
