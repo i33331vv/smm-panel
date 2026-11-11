@@ -243,7 +243,6 @@ function extractLoginSessionInfo(obj) {
     return result;
 }
 
-// دالة ذكية لاستخراج رابط الـ POST الحقيقي من كائن الصفحة الرئيسية أو استخدام البديل
 function extractDynamicTransferEndpoint(obj) {
     if (!obj || typeof obj !== 'object') return null;
     let foundEndpoint = null;
@@ -334,7 +333,6 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
 
         const freshCookies = vr.cookies || s.cookies || '';
 
-        // استخراج مسار التحويل الديناميكي من استجابة الصفحة الرئيسية فوراً
         let dynamicTransferEp = '';
         try {
             const homeRes = await callAsiacellAPI('api/v2/home?lang=ar', 'GET', null, token, s.deviceId, freshCookies, '5.5.0');
@@ -358,7 +356,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// 3. طلب تحويل الرصيد باستخدام المسار الديناميكي المستخرج من الجلسة الحية
+// 3. طلب تحويل الرصيد مع استخراج معرف الخدمة الديناميكي وتجاوز خطأ الجلسة
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const usd = parseInt(req.body.amountUSD);
@@ -376,19 +374,34 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
+        let activeServiceId = 294;
+        try {
+            const profileRes = await callAsiacellAPI('api/v1/profile/lineinfo?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies, '5.5.0');
+            const profileStr = JSON.stringify(profileRes.data || {});
+            const foundId = profileStr.match(/"(?:serviceId|itemId|id)"\s*:\s*(\d{2,4})/);
+            if (foundId) {
+                activeServiceId = parseInt(foundId[1]);
+            }
+        } catch (e) {}
+
         const transferPayload = {
+            id: activeServiceId,
+            itemId: activeServiceId,
+            serviceId: activeServiceId,
             msisdn: TARGET_ASIACELL_NUMBER,
-            amount: formattedAmountDecimal
+            receiverMsisdn: TARGET_ASIACELL_NUMBER,
+            amount: formattedAmountDecimal,
+            transferAmount: amountIQD
         };
 
-        // استخدام المسار المستخرج ديناميكياً أو البدائل الآمنة
         const endpointsToTry = [];
         if (s.dynamicTransferEp) endpointsToTry.push(s.dynamicTransferEp);
         endpointsToTry.push(
             'api/v2/creditTransfer?lang=ar',
             'api/v1/creditTransfer?lang=ar',
             'api/v2/transfer/send-otp?lang=ar',
-            'api/v1/transfer/send-otp?lang=ar'
+            'api/v1/transfer/send-otp?lang=ar',
+            'api/v1/confirmSubscription?itemId=294&lang=ar'
         );
 
         let tr = null;
@@ -414,7 +427,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: `❌ لم يتم إرسال كود التحويل من آسياسيل. تأكد من صحة الجلسة والرصيد.`
+                message: `❌ لم يتم إرسال كود التحويل. تأكد من أن خطك يحتوي على رصيد كافٍ لإتمام عملية التحويل.`
             });
         }
 
