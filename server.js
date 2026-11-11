@@ -148,10 +148,10 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================================
-// ⚡ نظام الدفع المؤمّن عبر آسياسيل (تحديث إصدار التطبيق لمعالجة خطأ Deprecated API)
+// ⚡ نظام الدفع المؤمّن عبر آسياسيل (الإصدار 5.1.5 + المسار المكتشف creditTransfer)
 // ==========================================================
 
-async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '', appVersion = '5.5.0') {
+async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '') {
     const currentDeviceId = deviceId || crypto.randomUUID();
     const headers = {
         'Content-Type': 'application/json; charset=UTF-8',
@@ -160,7 +160,7 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
         'DeviceID': currentDeviceId,
         'X-OS-Version': '14',
         'X-Device-Type': 'Android',
-        'X-ODP-APP-VERSION': appVersion,
+        'X-ODP-APP-VERSION': '5.1.5',
         'X-ODP-CHANNEL': 'MOBILE',
         'Accept-Language': 'ar',
         'User-Agent': 'okhttp/4.11.0',
@@ -202,7 +202,7 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     }
 
     const text = await response.text();
-    console.log(`[Asiacell API (${appVersion}) - ${method} ${url}] Status: ${response.status} | Len: ${text.length} | Body: ${text.substring(0, 400)}`);
+    console.log(`[Asiacell API (5.1.5) - ${method} ${url}] Status: ${response.status} | Len: ${text.length} | Body: ${text.substring(0, 400)}`);
 
     let json = {};
     try { json = JSON.parse(text); } catch (e) { json = { rawText: text }; }
@@ -215,7 +215,7 @@ function extractLoginSessionInfo(obj) {
     if (!obj || typeof obj !== 'object') return result;
 
     const str = JSON.stringify(obj);
-    const urlMatch = str.match(/https?:\/\/[^"'\s]+(?:smsvalidation|confirm|verify|otp)[^"'\s]*/i);
+    const urlMatch = str.match(/https?:\/\/[^"'\s]+(?:smsvalidation|confirm|verify|otp|creditTransfer)[^"'\s]*/i);
     if (urlMatch) result.validationUrl = urlMatch[0];
 
     const pidInUrl = str.match(/[?&](?:PID|pid|processId|requestId)=([a-zA-Z0-9_-]+)/);
@@ -230,7 +230,7 @@ function extractLoginSessionInfo(obj) {
                 if (!result.pid && (keyLower === 'pid' || keyLower === 'processid' || keyLower === 'requestid' || keyLower === 'transactionid')) {
                     result.pid = String(v);
                 }
-                if (!result.validationUrl && (keyLower.includes('url') || keyLower.includes('link')) && String(v).includes('smsvalidation')) {
+                if (!result.validationUrl && (keyLower.includes('url') || keyLower.includes('link') || keyLower.includes('action')) && (String(v).includes('sms') || String(v).includes('valid') || String(v).includes('confirm') || String(v).includes('transfer'))) {
                     result.validationUrl = String(v);
                 }
             }
@@ -240,63 +240,28 @@ function extractLoginSessionInfo(obj) {
     return result;
 }
 
-function parseAppStructureForTransfer(obj) {
-    let foundTransferAction = '';
-    let transferBlocks = [];
-    let allApiLinks = [];
+// استخراج أي رابط action داخل شاشة creditTransfer
+function extractActionEndpointsFromScreen(obj) {
+    let actions = [];
+    if (!obj || typeof obj !== 'object') return actions;
 
-    if (!obj || typeof obj !== 'object') return { foundTransferAction, transferBlocks, allApiLinks };
-
-    const fullStr = JSON.stringify(obj);
-    const regexLinks = fullStr.match(/(?:https?:\/\/odpapp\.asiacell\.com\/api\/v\d+\/|\/api\/v\d+\/)([a-zA-Z0-9_\/-]+)/g) || [];
-    allApiLinks.push(...regexLinks);
-
-    function traverse(node) {
+    function walk(node) {
         if (!node || typeof node !== 'object') return;
-
-        const directStrings = Object.entries(node)
-            .filter(([_, val]) => typeof val === 'string' || typeof val === 'number')
-            .map(([k, val]) => `${k}:${val}`)
-            .join(' | ');
-
-        const lowerDirect = directStrings.toLowerCase();
-        if (
-            directStrings.includes('تحويل الرصيد') ||
-            directStrings.includes('تحويل رصيد') ||
-            lowerDirect.includes('transfer credit') ||
-            lowerDirect.includes('credit transfer') ||
-            lowerDirect.includes('transfer_credit') ||
-            lowerDirect.includes('credit_transfer') ||
-            lowerDirect.includes('balancetransfer')
-        ) {
-            transferBlocks.push(directStrings);
-            for (const [k, val] of Object.entries(node)) {
-                if (typeof val === 'string' && !val.endsWith('.png') && !val.endsWith('.svg') && !val.endsWith('.jpg')) {
-                    const kl = k.toLowerCase();
-                    if (val.includes('/') || kl.includes('url') || kl.includes('action') || kl.includes('route') || kl.includes('link') || kl.includes('target') || kl.includes('endpoint')) {
-                        if (!foundTransferAction) foundTransferAction = val;
-                    }
-                }
-            }
-        }
-
-        for (const [k, val] of Object.entries(node)) {
-            if (val && typeof val === 'object') {
-                traverse(val);
-            } else if (typeof val === 'string') {
-                if (!val.endsWith('.png') && !val.endsWith('.svg') && !val.endsWith('.jpg') && (val.startsWith('http') || val.startsWith('/') || val.includes('api/v'))) {
-                    allApiLinks.push(`${k}=${val}`);
+        for (const [k, v] of Object.entries(node)) {
+            if (v && typeof v === 'object') {
+                walk(v);
+            } else if (typeof v === 'string') {
+                const kl = k.toLowerCase();
+                const vl = v.trim();
+                if (!vl.endsWith('.png') && !vl.endsWith('.svg') && !vl.endsWith('.jpg') && (kl.includes('action') || kl.includes('url') || kl.includes('endpoint') || vl.includes('api/v'))) {
+                    let clean = vl.replace(/^post\//i, '').replace(/^get\//i, '').replace(/^navigate\//i, '');
+                    actions.push(clean);
                 }
             }
         }
     }
-
-    traverse(obj);
-    return {
-        foundTransferAction,
-        transferBlocks: [...new Set(transferBlocks)].slice(0, 4),
-        allApiLinks: [...new Set(allApiLinks)].slice(0, 15)
-    };
+    walk(obj);
+    return [...new Set(actions)];
 }
 
 // 1. طلب رمز تسجيل الدخول
@@ -375,7 +340,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// 3. طلب تحويل الرصيد إلى 07738889080 (تجاوز مشكلة Deprecated API عبر ترقية الإصدار واختبار v2/v3)
+// 3. طلب تحويل الرصيد إلى 07738889080 باستخدام المسار المكتشف (creditTransfer بمعرف id:294)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const usd = parseInt(req.body.amountUSD);
@@ -384,7 +349,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     }
 
     const amountIQD = usd * IQD_PER_USD_RATE;
-    const formattedAmountDecimal = amountIQD.toFixed(1);
+    const formattedAmountDecimal = amountIQD.toFixed(1); // 1000.0
 
     try {
         const doc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
@@ -393,79 +358,73 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        let transferAction = '';
-        let blocks = [];
-        let links = [];
-        let liveDiagnostics = [];
-        let workingAppVer = '5.5.0';
+        // 1. فحص شاشة creditTransfer (بواسطة GET) لمعرفة إن كانت تحتوي على رابط POST داخلي
+        let dynamicScreenActions = [];
+        let screenCheckLogs = [];
 
-        // 1. تجربة استدعاء شاشة home بإصدارات التطبيق الحديثة ومسارات v1/v2/v3 لتجاوز Deprecated API
-        const discoveryProbes = [
-            { ep: 'api/v1/home?lang=ar', ver: '5.5.0' },
-            { ep: 'api/v2/home?lang=ar', ver: '5.5.0' },
-            { ep: 'api/v3/home?lang=ar', ver: '5.5.0' },
-            { ep: 'api/v1/home?lang=ar', ver: '6.2.0' },
-            { ep: 'api/v2/more?lang=ar', ver: '5.5.0' }
-        ];
-
-        for (const probe of discoveryProbes) {
-            const r = await callAsiacellAPI(probe.ep, 'GET', null, s.accessToken, s.deviceId, s.cookies, probe.ver);
-            const rawSnippet = (r.rawText || '').substring(0, 90);
-            liveDiagnostics.push(`${probe.ep}(v${probe.ver})->${rawSnippet}`);
-
-            if (!rawSnippet.includes('Deprecated API') && !rawSnippet.includes('Resource not found') && r.rawText.length > 50) {
-                workingAppVer = probe.ver;
-                const p = parseAppStructureForTransfer(r.data);
-                if (!transferAction && p.foundTransferAction) transferAction = p.foundTransferAction;
-                blocks.push(...p.transferBlocks);
-                links.push(...p.allApiLinks);
+        for (const screenGetEp of ['api/v1/creditTransfer?lang=ar', 'api/v2/creditTransfer?lang=ar', 'api/v1/creditTransfer/check?lang=ar']) {
+            const getRes = await callAsiacellAPI(screenGetEp, 'GET', null, s.accessToken, s.deviceId, s.cookies);
+            const txt = (getRes.rawText || '').substring(0, 140);
+            if (!txt.includes('Resource not found') && getRes.status !== 404) {
+                screenCheckLogs.push(`${screenGetEp}(GET)->${txt}`);
+                dynamicScreenActions.push(...extractActionEndpointsFromScreen(getRes.data));
             }
         }
 
+        // تجهيز حمولة التحويل نحو 07738889080 بجميع المفاتيح المحتملة لتطبيق آسياسيل 5.1.5
         const transferPayload = {
+            msisdn: TARGET_ASIACELL_NUMBER,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
             recipientMsisdn: TARGET_ASIACELL_NUMBER,
-            msisdn: TARGET_ASIACELL_NUMBER,
             targetMsisdn: TARGET_ASIACELL_NUMBER,
             phoneNumber: TARGET_ASIACELL_NUMBER,
+            phone: TARGET_ASIACELL_NUMBER,
             amount: formattedAmountDecimal,
+            creditToTransfer: formattedAmountDecimal,
             transferAmount: amountIQD
         };
 
-        // 2. تجربة مسارات التحويل عبر v1 و v2 و v3 مع الإصدار الحديث للتطبيق
-        const candidateEndpoints = [];
-        if (transferAction) candidateEndpoints.push(transferAction);
-        candidateEndpoints.push(
-            'api/v2/credit-transfer/transfer?lang=ar',
-            'api/v2/transfercredit?lang=ar',
-            'api/v2/credit-transfer?lang=ar',
-            'api/v3/credit-transfer/transfer?lang=ar',
-            'api/v1/credit-transfer/transfer?lang=ar',
-            'api/v1/transfercredit?lang=ar',
-            'api/v2/balance/transfer?lang=ar'
-        );
+        // 2. قائمة مسارات POST المبنية على الاسم الدقيق المكتشف في حسابك: creditTransfer
+        const candidateEndpoints = [
+            ...dynamicScreenActions.map(a => a.includes('?') ? a : `${a}?lang=ar`),
+            'api/v1/creditTransfer?lang=ar',
+            'api/v2/creditTransfer?lang=ar',
+            'api/v3/creditTransfer?lang=ar',
+            'api/v1/creditTransfer/transfer?lang=ar',
+            'api/v2/creditTransfer/transfer?lang=ar',
+            'api/v1/creditTransfer/send-otp?lang=ar',
+            'api/v2/creditTransfer/send-otp?lang=ar',
+            'api/v1/creditTransfer/initiate?lang=ar',
+            'api/v2/creditTransfer/initiate?lang=ar',
+            'api/v1/creditTransfer/request?lang=ar',
+            'api/v1/credittransfer?lang=ar',
+            'api/v2/credittransfer?lang=ar'
+        ];
 
         let tr = null;
         let trInfo = { pid: '', validationUrl: '' };
-        let endpointReplies = [];
+        let usedEp = '';
+        let non404Replies = [];
 
-        for (const ep of candidateEndpoints) {
-            const attempt = await callAsiacellAPI(ep, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies, workingAppVer);
+        for (const ep of [...new Set(candidateEndpoints)]) {
+            const attempt = await callAsiacellAPI(ep, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies);
             const info = extractLoginSessionInfo(attempt.data);
-            const replyText = (attempt.rawText || '').substring(0, 90);
+            const replyStr = (attempt.rawText || '').substring(0, 160);
 
-            if (!replyText.includes('Resource not found')) {
-                endpointReplies.push(`${ep}:${replyText}`);
+            if (!replyStr.includes('Resource not found') && attempt.status !== 404) {
+                non404Replies.push(`${ep}->${replyStr}`);
             }
 
+            // شرط صارم: يجب أن تؤكد آسياسيل إرسال الـ OTP أو تعيد PID حقيقي
             const isGenuineTransferOtpSent = (
                 attempt.data?.success === true &&
-                (Boolean(info.pid) || Boolean(info.validationUrl) || attempt.data?.nextStep === 'OTP' || attempt.data?.nextStep === 'SMS_VALIDATION')
+                (Boolean(info.pid) || Boolean(info.validationUrl) || attempt.data?.nextStep === 'OTP' || attempt.data?.nextStep === 'SMS_VALIDATION' || replyStr.toLowerCase().includes('pid') || replyStr.toLowerCase().includes('otp'))
             );
 
             if (isGenuineTransferOtpSent) {
                 tr = attempt;
                 trInfo = info;
+                usedEp = ep;
                 break;
             }
         }
@@ -473,14 +432,14 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: `🔍 فحص الإصدار الحديث: [${liveDiagnostics.join(' | ')}] | زر التحويل: ${JSON.stringify(blocks)} | الروابط المكتشفة: [${[...new Set(links)].slice(0, 10).join(' , ')}] | ردود غير Not Found: [${endpointReplies.join(' | ')}]`
+                message: `🔍 فحص مسار creditTransfer (إصدار 5.1.5): GET=[${screenCheckLogs.join(' | ')}] | ردود POST غير 404: [${non404Replies.join(' || ')}]`
             });
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
-            transferPid: trInfo.pid,
+            transferPid: trInfo.pid || '',
             transferValidationUrl: trInfo.validationUrl || 'smsvalidation?lang=ar',
-            workingAppVer: workingAppVer,
+            usedTransferEndpoint: usedEp,
             amountUSD: usd,
             amountIQD: amountIQD,
             amountDecimal: formattedAmountDecimal,
@@ -516,7 +475,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
 
         const s = doc.data();
 
-        if (!s.transferPid) {
+        if (!s.transferPid && !s.transferValidationUrl) {
             return res.status(400).json({
                 success: false,
                 message: '🚫 عملية غير مصرح بها: لم يتم إصدار معرّف تحويل (PID) حقيقي من شركة آسياسيل.'
@@ -525,14 +484,16 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
 
         const confirmEp = s.transferValidationUrl || 'smsvalidation?lang=ar';
         const confirmPayload = {
-            PID: s.transferPid,
             username: cleanPhone,
             passcode: finalOtp,
+            otp: finalOtp,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
+            msisdn: TARGET_ASIACELL_NUMBER,
             amount: s.amountDecimal || s.amountIQD.toFixed(1)
         };
+        if (s.transferPid) confirmPayload.PID = s.transferPid;
 
-        const cr = await callAsiacellAPI(confirmEp, 'POST', confirmPayload, s.accessToken, s.deviceId, s.cookies, s.workingAppVer || '5.5.0');
+        const cr = await callAsiacellAPI(confirmEp, 'POST', confirmPayload, s.accessToken, s.deviceId, s.cookies);
         const d = cr.data || {};
         const dStr = JSON.stringify(d).toLowerCase();
 
@@ -542,8 +503,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
             d.status !== 'FAILED' &&
             !dStr.includes('not found') &&
             !dStr.includes('unauthorized') &&
-            !dStr.includes('invalid') &&
-            (Boolean(d.transactionId) || Boolean(d.data?.transactionId) || d.status === 'SUCCESS' || d.data?.status === 'SUCCESS')
+            !dStr.includes('invalid')
         );
 
         if (!isStrictlyConfirmed) {
