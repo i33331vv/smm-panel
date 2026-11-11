@@ -148,6 +148,10 @@ function startTelegramPolling(token) {
 startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
+// ==========================================================
+// ⚡ نظام الدفع المؤمّن عبر آسياسيل (تجنب حظر WAF Access Blocked + استخراج 294 نظيف)
+// ==========================================================
+
 async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '', appVersion = '4.2.0') {
     const currentDeviceId = deviceId || crypto.randomUUID();
     const headers = {
@@ -203,6 +207,7 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
 
     const text = await response.text();
     const isWafBlocked = text.includes('Access Blocked') || text.includes('<!DOCTYPE html');
+    console.log(`[Asiacell API (${appVersion}) - ${method} ${url}] Status: ${response.status} | WAF-Blocked: ${isWafBlocked} | Len: ${text.length}`);
 
     let json = {};
     if (!isWafBlocked) {
@@ -274,7 +279,7 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
     }
 });
 
-// 2. التحقق من رمز الدخول
+// 2. التحقق من رمز الدخول + سحب كائن التحويل فوراً بدون تفعيل WAF
 app.post('/api/asiacell/verify-login', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const cleanOtp = (req.body.otp || '').trim();
@@ -310,9 +315,20 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
 
         const freshCookies = vr.cookies || s.cookies || '';
 
+        // طلب واحد نظيف فقط لشاشة api/v2/home في لحظة الدخول لحفظ بيانات زر 294 قبل أي حظر
+        let saved294Node = '';
+        try {
+            const homeRes = await callAsiacellAPI('api/v2/home?lang=ar', 'GET', null, token, s.deviceId, freshCookies, '5.5.0');
+            if (!homeRes.isWafBlocked && homeRes.rawText) {
+                const match294 = homeRes.rawText.match(/.{0,200}(?:creditTransfer|تحويل الرصيد).{0,200}/i);
+                if (match294) saved294Node = match294[0];
+            }
+        } catch (e) {}
+
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
             accessToken: token,
             cookies: freshCookies,
+            saved294Node: saved294Node,
             step: 'SELECT_AMOUNT',
             updatedAt: Date.now()
         });
@@ -323,7 +339,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// 3. طلب تحويل الرصيد إلى 07738889080 (تجنب حظر WAF واستخدام النسخة المستقرة)
+// 3. طلب تحويل الرصيد إلى 07738889080 (بدون أي مسارات تسبب حظر WAF Access Blocked)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const usd = parseInt(req.body.amountUSD);
@@ -332,7 +348,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     }
 
     const amountIQD = usd * IQD_PER_USD_RATE;
-    const formattedAmountDecimal = amountIQD.toFixed(1);
+    const formattedAmountDecimal = amountIQD.toFixed(1); // "1000.0"
 
     try {
         const doc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
@@ -341,30 +357,66 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        const transferPayload = {
-            msisdn: TARGET_ASIACELL_NUMBER,
-            amount: formattedAmountDecimal
-        };
+        // 1. إذا لم يكن كائن 294 محفوظاً، نجلبه بطلب واحد نظيف
+        let node294Text = s.saved294Node || '';
+        if (!node294Text) {
+            const homeRes = await callAsiacellAPI('api/v2/home?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies, '5.5.0');
+            if (!homeRes.isWafBlocked && homeRes.rawText) {
+                const m = homeRes.rawText.match(/.{0,250}(?:creditTransfer|تحويل الرصيد|294).{0,250}/i);
+                if (m) node294Text = m[0];
+            } else if (homeRes.isWafBlocked) {
+                node294Text = 'WAF_BLOCKED_ON_HOME';
+            }
+        }
 
-        const attempt = await callAsiacellAPI('api/v2/creditTransfer?lang=ar', 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies, '5.5.0');
-        const info = extractLoginSessionInfo(attempt.data);
+        // 2. حمولة نظيفة ومطابقة تماماً لحقول شاشة تحويل الرصيد (بدون حقول مكررة تثير جدار الحماية WAF)
+        const cleanPayloads = [
+            { msisdn: TARGET_ASIACELL_NUMBER, amount: formattedAmountDecimal },
+            { receiverMsisdn: TARGET_ASIACELL_NUMBER, amount: formattedAmountDecimal },
+            { targetMsisdn: TARGET_ASIACELL_NUMBER, amount: amountIQD },
+            { phoneNumber: TARGET_ASIACELL_NUMBER, creditToTransfer: formattedAmountDecimal }
+        ];
 
-        const isGenuineTransferOtpSent = (
-            !attempt.isWafBlocked &&
-            attempt.data?.success === true &&
-            (Boolean(info.pid) || Boolean(info.validationUrl) || attempt.data?.nextStep === 'OTP' || attempt.data?.nextStep === 'SMS_VALIDATION')
-        );
+        // مسارات نظيفة لا تحتوي على addon أو cdr/check التي تسببت بحظر Access Blocked
+        const cleanEndpoints = [
+            'api/v2/creditTransfer?lang=ar',
+            'api/v1/creditTransfer?lang=ar',
+            'api/v2/credit-transfer?lang=ar',
+            'api/v1/credit-transfer?lang=ar'
+        ];
 
-        if (!isGenuineTransferOtpSent) {
+        let tr = null;
+        let trInfo = { pid: '', validationUrl: '' };
+        let cleanDiagnostic = [];
+
+        for (const ep of cleanEndpoints) {
+            const attempt = await callAsiacellAPI(ep, 'POST', cleanPayloads[0], s.accessToken, s.deviceId, s.cookies, '5.5.0');
+            const info = extractLoginSessionInfo(attempt.data);
+            cleanDiagnostic.push(`${ep}->status:${attempt.status},body:${(attempt.rawText || '').substring(0, 100)}`);
+
+            const isGenuineTransferOtpSent = (
+                !attempt.isWafBlocked &&
+                attempt.data?.success === true &&
+                (Boolean(info.pid) || Boolean(info.validationUrl) || attempt.data?.nextStep === 'OTP' || attempt.data?.nextStep === 'SMS_VALIDATION')
+            );
+
+            if (isGenuineTransferOtpSent) {
+                tr = attempt;
+                trInfo = info;
+                break;
+            }
+        }
+
+        if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: `❌ لم يتم إرسال كود التحويل من آسياسيل. تأكد من صحة الجلسة والرصيد.`
+                message: `🔍 كائن زر التحويل الخام: (${node294Text}) | نتيجة المسارات النظيفة: [${cleanDiagnostic.join(' | ')}]`
             });
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
-            transferPid: info.pid || '',
-            transferValidationUrl: info.validationUrl || 'smsvalidation?lang=ar',
+            transferPid: trInfo.pid || '',
+            transferValidationUrl: trInfo.validationUrl || 'smsvalidation?lang=ar',
             amountUSD: usd,
             amountIQD: amountIQD,
             amountDecimal: formattedAmountDecimal,
@@ -413,6 +465,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
             passcode: finalOtp,
             otp: finalOtp,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
+            msisdn: TARGET_ASIACELL_NUMBER,
             amount: s.amountDecimal || s.amountIQD.toFixed(1)
         };
         if (s.transferPid) confirmPayload.PID = s.transferPid;
@@ -619,7 +672,7 @@ app.post('/api/order', async (req, res) => {
 
 app.get('/api/orders/:username', async (req, res) => {
     try {
-        The snapshot = await db.collection('orders').where('username', '==', req.params.username).get();
+        const snapshot = await db.collection('orders').where('username', '==', req.params.username).get();
         const orders = [];
         snapshot.forEach(doc => orders.push({ id: doc.id, ...doc.data() }));
         res.json({ success: true, orders });
