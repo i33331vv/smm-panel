@@ -11,7 +11,6 @@ const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
 const ORDERS_BOT_TOKEN = '9023175997:AAGuvzz3eLywKIBkTjs3w9NCVnmutRblCEc';
 const ADMIN_CHAT_ID = '8671448765';
 const TARGET_ASIACELL_NUMBER = '07738889080';
-const TARGET_ASIACELL_SHORT = '38889080';
 
 const IQD_PER_USD_RATE = 1000; 
 
@@ -149,7 +148,7 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================================
-// ⚡ نظام الاتصال الموحد مع آسياسيل (استدعاء المسارات الحقيقية التي قبلها السيرفر بدون 404)
+// ⚡ نظام الاتصال الموحد مع آسياسيل (طريقة طلب رموز OTP القديمة)
 // ==========================================================
 
 async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '', appVersion = '4.2.0') {
@@ -207,7 +206,6 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
 
     const text = await response.text();
     const isWafBlocked = text.includes('Access Blocked') || text.includes('<!DOCTYPE html');
-    console.log(`[Asiacell API (${appVersion}) - ${method} ${url}] Status: ${response.status} | WAF: ${isWafBlocked} | Body: ${text.substring(0, 300)}`);
 
     let json = {};
     if (!isWafBlocked) {
@@ -249,7 +247,7 @@ function extractLoginSessionInfo(obj) {
     return result;
 }
 
-// 1. طلب رمز تسجيل الدخول
+// 1. طلب رمز تسجيل الدخول (OTP)
 app.post('/api/asiacell/send-otp', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     if (!/^077\d{8}$/.test(cleanPhone)) {
@@ -279,7 +277,7 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
     }
 });
 
-// 2. التحقق من رمز الدخول
+// 2. التحقق من رمز تسجيل الدخول
 app.post('/api/asiacell/verify-login', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const cleanOtp = (req.body.otp || '').trim();
@@ -328,6 +326,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
+// 3. بدء عملية التحويل وطلب رمز OTP للتحويل
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const selectedUsd = parseInt(req.body.amountUSD) || 1;
@@ -345,16 +344,12 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        // التحقق من صلاحية الـ 10 دقائق قبل البدء
         if (Date.now() - (s.updatedAt || 0) > 10 * 60 * 1000) {
             await db.collection('asiacell_sessions').doc(cleanPhone).delete();
             return res.status(400).json({ success: false, message: 'انتهت صلاحية الجلسة (10 دقائق)، أعد تسجيل الدخول.' });
         }
 
-        // جلب شاشة التطبيق الرئيسية لاستخراج رابط خدمة التحويل الديناميكي الحقيقي
         const homeRes = await callAsiacellAPI('api/v1/home?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies, '4.2.0');
-        
-        // البحث عن أي رابط داخل استجابة التطبيق يحتوي على transfer أو me2u أو addon
         const allUrls = (homeRes.rawText || '').match(/[a-zA-Z0-9_\/-]+(?:transfer|me2u|credit|balance|send)[a-zA-Z0-9_\/?-]*/gi) || [];
         
         const candidateEndpoints = [
@@ -374,12 +369,10 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 
         let tr = null;
         let trInfo = { pid: '', validationUrl: '' };
-        let debugList = [];
 
         for (const ep of [...new Set(candidateEndpoints)]) {
             const attempt = await callAsiacellAPI(ep, 'POST', payload, s.accessToken, s.deviceId, s.cookies, '4.2.0');
             const info = extractLoginSessionInfo(attempt.data);
-            debugList.push(`${ep}->(${attempt.status}):${(attempt.rawText || '').substring(0, 70)}`);
 
             if (!attempt.isWafBlocked && attempt.data?.success === true && (info.pid || info.validationUrl || attempt.data?.nextStep)) {
                 tr = attempt;
@@ -391,7 +384,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: `المسارات المكتشفة في حسابك: [${allUrls.join(', ') || 'لا يوجد في home'}] | الردود: [${debugList.slice(0, 4).join(' || ')}]`
+                message: 'تعذر بدء عملية التحويل، يرجى المحاولة لاحقاً.'
             });
         }
 
@@ -414,14 +407,15 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         return res.status(500).json({ success: false, message: e.message });
     }
 });
-// 4. تأكيد رمز التحويل النهائي
+
+// 4. تأكيد رمز تحويل الرصيد النهائي
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const { email, phone, transferOtp, otp } = req.body;
     const cleanPhone = (phone || '').trim();
     const finalOtp = (transferOtp || otp || '').trim();
 
     if (!email || !/^\d{4,6}$/.test(finalOtp)) {
-        return res.status(400).json({ success: false, message: 'أدخل رمز التأكيد الصحيح المكون من 6 أرقام.' });
+        return res.status(400).json({ success: false, message: 'أدخل رمز التأكيد الصحيح المكون من أرقام.' });
     }
 
     try {
@@ -431,14 +425,6 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         }
 
         const s = doc.data();
-
-        if (!s.transferPid && !s.transferValidationUrl) {
-            return res.status(400).json({
-                success: false,
-                message: '🚫 عملية غير مصرح بها: لم يتم إصدار معرّف تحويل (PID) حقيقي من شركة آسياسيل.'
-            });
-        }
-
         const confirmEp = s.transferValidationUrl || 'smsvalidation?lang=ar';
         const confirmPayload = {
             username: cleanPhone,
@@ -478,17 +464,53 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         await userDoc.ref.update({ balance: newBalance });
 
         await db.collection('deposit_requests').add({
-            username: userDoc.data().username, email, gateway: 'Asiacell Auto',
+            username: userDoc.data().username, email, gateway: 'Asiacell OTP Auto',
             sender_phone: cleanPhone, amount: s.amountUSD, amount_iqd: s.amountIQD,
             recipient: TARGET_ASIACELL_NUMBER, status: 'مقبول تلقائياً', created_at: getFormattedDateTime()
         });
 
-        sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, `✅ <b>شحن آسياسيل ناجح:</b> $${s.amountUSD} (${s.amountIQD} د.ع) من ${cleanPhone} إلى ${TARGET_ASIACELL_NUMBER}`);
+        sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, `✅ <b>شحن آسياسيل ناجح (OTP):</b> $${s.amountUSD} (${s.amountIQD} د.ع) من ${cleanPhone}`);
         return res.json({ success: true, message: `🎉 تم الشحن بنجاح! أضيف $${s.amountUSD} لحسابك.`, newBalance });
     } catch (e) {
         return res.status(500).json({ success: false, message: e.message });
     }
 });
+
+// ==========================================================
+// 💳 بوابة الدفع الإلكتروني (Wayl Webhook)
+// ==========================================================
+app.post('/api/wayl/webhook', async (req, res) => {
+    const event = req.body;
+    try {
+        if (event && (event.event === 'payment.completed' || event.status === 'success')) {
+            const email = event.customer?.email || event.metadata?.email;
+            const amountUSD = parseFloat(event.amount_usd || (event.amount / 1000) || 0);
+
+            if (email && amountUSD > 0) {
+                const userSnap = await db.collection('users').where('email', '==', email).get();
+                if (!userSnap.empty) {
+                    const userDoc = userSnap.docs[0];
+                    const currentBalance = parseFloat(userDoc.data().balance || 0);
+                    await userDoc.ref.update({ balance: currentBalance + amountUSD });
+
+                    await db.collection('deposit_requests').add({
+                        username: userDoc.data().username, email, gateway: 'Wayl Electronic Card',
+                        amount: amountUSD, status: 'مقبول تلقائياً عبر Wayl', created_at: getFormattedDateTime()
+                    });
+
+                    sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, `💳 <b>شحن إلكتروني ناجح (Wayl):</b>\nالمستخدم: ${email}\nالمبلغ: $${amountUSD}`);
+                }
+            }
+        }
+        res.status(200).send('OK');
+    } catch (e) {
+        res.status(500).send(e.message);
+    }
+});
+
+// ==========================================================
+// 🛠️ إدارة الخدمات والمستخدمين
+// ==========================================================
 
 app.post('/api/admin/add-service', async (req, res) => {
     const { category, name, price, description } = req.body;
