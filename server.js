@@ -1,3 +1,7 @@
+// ==========================================================
+// 📓 Notebook: server.js (النسخة الكاملة المصححة)
+// ==========================================================
+
 const express = require('express');
 const path = require('path');
 const app = express();
@@ -17,7 +21,7 @@ const { getFirestore } = require('firebase-admin/firestore');
 const serviceAccount = require('./serviceAccountKey.json');
 
 initializeApp({
-  credential: cert(serviceAccount)
+    credential: cert(serviceAccount)
 });
 
 const db = getFirestore();
@@ -86,7 +90,7 @@ function startTelegramPolling(token) {
                     const data = JSON.parse(body);
                     if (data.ok && data.result.length > 0) {
                         for (const update of data.result) {
-                            offset = update.update_id + 1; 
+                            offset = update.update_id + 1;
                             if (update.callback_query) {
                                 const callbackQuery = update.callback_query;
                                 const cbData = callbackQuery.data;
@@ -139,7 +143,7 @@ function startTelegramPolling(token) {
                 } catch (e) {}
             });
         }).on('error', () => {});
-    }, 2500); 
+    }, 2500);
 }
 
 startTelegramPolling(DEPOSIT_BOT_TOKEN);
@@ -179,8 +183,13 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     });
 
     let newCookies = cookies;
-    const sc = response.headers.get('set-cookie');
-    if (sc) newCookies = sc.split(/,(?=\s*[a-zA-Z0-9_-]+=)/).map(c => c.split(';')[0].trim()).join('; ');
+    if (typeof response.headers.getSetCookie === 'function') {
+        const list = response.headers.getSetCookie();
+        if (list?.length) newCookies = list.map(c => c.split(';')[0].trim()).join('; ');
+    } else {
+        const sc = response.headers.get('set-cookie');
+        if (sc) newCookies = sc.split(/,(?=\s*[a-zA-Z0-9_-]+=)/).map(c => c.split(';')[0].trim()).join('; ');
+    }
 
     const text = await response.text();
     const isWafBlocked = text.includes('Access Blocked') || text.includes('<!DOCTYPE html');
@@ -194,14 +203,34 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     return { status: response.status, ok: response.ok, isWafBlocked, data: json, rawText: text, deviceId: currentDeviceId, cookies: newCookies };
 }
 
+// فحص شامل ومتعمق لاستخراج PID ورابط التحقق من جميع مستويات الكائن
 function extractLoginSessionInfo(obj) {
     let result = { pid: '', validationUrl: '' };
     if (!obj || typeof obj !== 'object') return result;
+
     const str = JSON.stringify(obj);
-    const urlMatch = str.match(/https?:\/\/[^"'\s]+smsvalidation[^"'\s]*/i);
+    const urlMatch = str.match(/https?:\/\/[^"'\s]+(?:smsvalidation|verify|otp|confirm)[^"'\s]*/i);
     if (urlMatch) result.validationUrl = urlMatch[0];
-    const pidInUrl = str.match(/[?&](?:PID|pid|processId|requestId)=([a-zA-Z0-9_-]+)/);
+
+    const pidInUrl = str.match(/[?&](?:PID|pid|processId|requestId|transactionId)=([a-zA-Z0-9_-]+)/);
     if (pidInUrl) result.pid = pidInUrl[1];
+
+    function searchKeys(o) {
+        for (const [k, v] of Object.entries(o)) {
+            if (v && typeof v === 'object') {
+                searchKeys(v);
+            } else if (typeof v === 'string' || typeof v === 'number') {
+                const keyLower = k.toLowerCase();
+                if (!result.pid && ['pid', 'processid', 'requestid', 'transactionid', 'referenceid'].includes(keyLower)) {
+                    result.pid = String(v);
+                }
+                if (!result.validationUrl && (keyLower.includes('url') || keyLower.includes('link') || keyLower.includes('endpoint')) && /smsvalidation|verify|otp/i.test(String(v))) {
+                    result.validationUrl = String(v);
+                }
+            }
+        }
+    }
+    searchKeys(obj);
     return result;
 }
 
@@ -273,103 +302,73 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const amountDecimal = `${amountIQD}.0`;
 
     if (!cleanPhone) {
-        return res.status(400).json({
-            success: false,
-            message: 'رقم الهاتف مفقود.'
-        });
+        return res.status(400).json({ success: false, message: 'رقم الهاتف مفقود.' });
     }
 
     try {
-        const doc = await db
-            .collection('asiacell_sessions')
-            .doc(cleanPhone)
-            .get();
-
+        const doc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
         if (!doc.exists || !doc.data().accessToken) {
-            return res.status(400).json({
-                success: false,
-                message: 'انتهت الجلسة، سجل دخولك مجدداً.'
-            });
+            return res.status(400).json({ success: false, message: 'انتهت الجلسة، سجل دخولك مجدداً.' });
         }
 
         const s = doc.data();
 
-        const homeRes = await callAsiacellAPI(
-            'api/v1/home?lang=ar',
-            'GET',
-            null,
-            s.accessToken,
-            s.deviceId,
-            s.cookies
-        );
+        const homeRes = await callAsiacellAPI('api/v1/home?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies);
+        const allUrls = (homeRes.rawText || '').match(/[a-zA-Z0-9_\/-]+(?:transfer|me2u|credit|balance|send)[a-zA-Z0-9_\/?-]*/gi) || [];
 
-        const allUrls = (homeRes.rawText || '').match(
-            /[a-zA-Z0-9_\/-]+(?:transfer|me2u|credit|balance|send)[a-zA-Z0-9_\/?-]*/gi
-        ) || [];
-
-        // نفس المسارات الموجودة في كودك، لم يتم إثبات صحتها بعد.
         const candidateEndpoints = [
             ...allUrls,
+            'api/v1/credit-transfer/initiate?lang=ar',
             'api/v1/credit-transfer?lang=ar',
+            'api/v1/me2u/transfer?lang=ar',
             'api/v1/me2u?lang=ar',
-            'api/v1/balance-transfer?lang=ar'
+            'api/v1/balance-transfer?lang=ar',
+            'api/v1/services/me2u?lang=ar'
         ];
 
         const payload = {
+            senderMsisdn: cleanPhone,
             receiverMsisdn: TARGET_ASIACELL_NUMBER,
             msisdn: TARGET_ASIACELL_NUMBER,
+            destMsisdn: TARGET_ASIACELL_NUMBER,
+            targetMsisdn: TARGET_ASIACELL_NUMBER,
             amount: amountIQD,
             transferAmount: amountDecimal
         };
 
         let tr = null;
-        let trInfo = {
-            pid: '',
-            validationUrl: ''
-        };
+        let trInfo = { pid: '', validationUrl: '' };
+        let lastServerMsg = '';
 
         for (const ep of [...new Set(candidateEndpoints)]) {
-            const attempt = await callAsiacellAPI(
-                ep,
-                'POST',
-                payload,
-                s.accessToken,
-                s.deviceId,
-                s.cookies
-            );
-
+            const attempt = await callAsiacellAPI(ep, 'POST', payload, s.accessToken, s.deviceId, s.cookies);
             const info = extractLoginSessionInfo(attempt.data);
+            const nextStep = attempt.data?.nextStep ?? attempt.data?.data?.nextStep;
 
-            // التعديل: تسجيل معلومات التشخيص دون طباعة بيانات الجلسة.
             console.log('ASIACELL_TRANSFER_DEBUG', {
                 endpoint: ep.split('?')[0],
                 httpStatus: attempt.status,
                 wafBlocked: attempt.isWafBlocked,
                 success: attempt.data?.success,
                 message: attempt.data?.message,
-                status: attempt.data?.status,
-                nextStep:
-                    attempt.data?.nextStep ??
-                    attempt.data?.data?.nextStep,
-                responseKeys: Object.keys(attempt.data || {}),
-                dataKeys:
-                    attempt.data?.data &&
-                    typeof attempt.data.data === 'object'
-                        ? Object.keys(attempt.data.data)
-                        : [],
+                nextStep: nextStep,
                 hasProcessId: Boolean(info.pid),
                 hasValidationUrl: Boolean(info.validationUrl)
             });
 
-            if (
-                !attempt.isWafBlocked &&
-                attempt.data?.success === true &&
-                (
-                    info.pid ||
-                    info.validationUrl ||
-                    attempt.data?.nextStep
-                )
-            ) {
+            if (attempt.data?.message && attempt.data.message !== 'Resource not found') {
+                lastServerMsg = attempt.data.message;
+            }
+
+            const isAccepted = !attempt.isWafBlocked && (
+                (attempt.data?.success === true && (info.pid || info.validationUrl || nextStep)) ||
+                nextStep === 'OTP' ||
+                nextStep === 'SMS_VALIDATION' ||
+                Boolean(info.pid) ||
+                Boolean(info.validationUrl)
+            );
+
+            if (isAccepted) {
                 tr = attempt;
                 trInfo = info;
                 break;
@@ -379,37 +378,29 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message:
-                    'لم يتم تأكيد إرسال رمز التحويل. راجع سجل الخادم لمعرفة رد آسياسيل.'
+                message: lastServerMsg || 'لم يتم تأكيد إرسال رمز التحويل من خادم آسياسيل. راجع سجل السيرفر (Console) لمعرفة تفاصيل الرد.'
             });
         }
 
-        await db
-            .collection('asiacell_sessions')
-            .doc(cleanPhone)
-            .update({
-                transferPid: trInfo.pid || '',
-                transferValidationUrl:
-                    trInfo.validationUrl || 'smsvalidation?lang=ar',
-                amountUSD: selectedUsd,
-                amountIQD,
-                amountDecimal,
-                step: 'WAIT_TRANSFER_OTP',
-                updatedAt: Date.now()
-            });
+        await db.collection('asiacell_sessions').doc(cleanPhone).update({
+            transferPid: trInfo.pid || '',
+            transferValidationUrl: trInfo.validationUrl || 'smsvalidation?lang=ar',
+            amountUSD: selectedUsd,
+            amountIQD,
+            amountDecimal,
+            step: 'WAIT_TRANSFER_OTP',
+            updatedAt: Date.now()
+        });
 
         return res.json({
             success: true,
-            message:
-                `📲 تم إرسال رمز تأكيد تحويل (${amountIQD} د.ع) إلى رقمك.`
+            message: `📲 تم إرسال رمز تأكيد تحويل (${amountIQD} د.ع) إلى رقمك.`
         });
     } catch (e) {
-        return res.status(500).json({
-            success: false,
-            message: e.message
-        });
+        return res.status(500).json({ success: false, message: e.message });
     }
 });
+
 // 4. تأكيد رمز التحويل النهائي وإضافة الرصيد للمستخدم
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     const { email, phone, transferOtp, amount } = req.body;
@@ -425,14 +416,24 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         const s = doc.data();
 
         const confirmEp = s.transferValidationUrl || 'smsvalidation?lang=ar';
-        const confirmPayload = { username: cleanPhone, passcode: finalOtp, otp: finalOtp, receiverMsisdn: TARGET_ASIACELL_NUMBER, amount: s.amountDecimal || "1000.0" };
+        const confirmPayload = {
+            username: cleanPhone,
+            passcode: finalOtp,
+            otp: finalOtp,
+            receiverMsisdn: TARGET_ASIACELL_NUMBER,
+            amount: s.amountDecimal || '1000.0'
+        };
         if (s.transferPid) confirmPayload.PID = s.transferPid;
 
         const cr = await callAsiacellAPI(confirmEp, 'POST', confirmPayload, s.accessToken, s.deviceId, s.cookies);
         const d = cr.data || {};
+        const dStr = JSON.stringify(d).toLowerCase();
 
-        if (cr.isWafBlocked || d.success === false || d.status === 'FAILED') {
-            return res.status(400).json({ success: false, message: `❌ رمز التحويل غير صحيح أو مرفوض من الشركة.` });
+        if (cr.isWafBlocked || d.success !== true || d.status === 'FAILED' || dStr.includes('not found') || dStr.includes('invalid')) {
+            return res.status(400).json({
+                success: false,
+                message: `❌ رمز التحويل غير صحيح أو مرفوض: (${d.message || 'تأكد من الرمز'})`
+            });
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).delete();
@@ -581,21 +582,21 @@ app.post('/api/deposit/submit', upload.single('receiptImage'), async (req, res) 
 
         const userSnap = await db.collection('users').where('email', '==', email).get();
         if (userSnap.empty) { fs.unlinkSync(uploadedFile.path); return res.status(400).json({ success: false, message: 'المستخدم غير موجود.' }); }
-        
+
         const username = userSnap.docs[0].data().username;
         const dateTime = getFormattedDateTime();
-        
-        const depRef = await db.collection('deposit_requests').add({ 
-            username, email, gateway, amount: parseFloat(amount), 
+
+        const depRef = await db.collection('deposit_requests').add({
+            username, email, gateway, amount: parseFloat(amount),
             receipt_image: uploadedFile.filename, image_hash: fileHash,
-            status: 'معلق', created_at: dateTime 
+            status: 'معلق', created_at: dateTime
         });
-        
+
         const receiptUrl = `https://mtnajm.com/${uploadedFile.filename}`;
         const text = `📥 <b>طلب شحن رصيد جديد</b>\n\n👤 <b>المستخدم:</b> ${username}\n📧 <b>البريد:</b> ${email}\n💰 <b>المبلغ:</b> $${amount}\n💳 <b>البوابة:</b> ${gateway}\n🕒 <b>التاريخ والوقت:</b> ${dateTime}\n\n🔗 <a href="${receiptUrl}"><b>[ عرض صورة الإيصال ]</b></a>`;
         const replyMarkup = { inline_keyboard: [[ { text: '✅ شحن الرصيد', callback_data: `dep_accept_${depRef.id}_${email}_${amount}` }, { text: '❌ رفض', callback_data: `dep_reject_${depRef.id}` } ]] };
         sendTelegramTextMessage(DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, text, replyMarkup);
-        
+
         res.json({ success: true, message: 'تم إرسال طلب الشحن بنجاح.' });
     } catch (e) {
         if (uploadedFile && fs.existsSync(uploadedFile.path)) fs.unlinkSync(uploadedFile.path);
@@ -611,7 +612,7 @@ app.post('/api/order', async (req, res) => {
         const userRef = userSnap.docs[0].ref;
         const userData = userSnap.docs[0].data();
         if (userData.balance < charge) return res.status(400).json({ success: false, message: 'رصيد غير كافٍ.' });
-        
+
         const newBalance = userData.balance - charge;
         const dateTime = getFormattedDateTime();
         let orderId = '';
