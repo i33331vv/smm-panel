@@ -328,16 +328,13 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// 3. طلب تحويل الرصيد (استخدام المسارات الوحيدة الموجودة فعلياً في تطبيقك بدون Resource not found + فحص بدون WAF)
+// 3. طلب تحويل الرصيد (تحديث مختصر ومباشر على المسار المستجيب addon/subscribe بإصدار 5.5.0)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
-    if (!cleanPhone) {
-        return res.status(400).json({ success: false, message: 'يرجى إدخال رقم الهاتف.' });
-    }
+    if (!cleanPhone) return res.status(400).json({ success: false, message: 'يرجى إدخال رقم الهاتف.' });
 
     const fixedAmountDecimal = "1000.0";
     const fixedAmountInt = 1000;
-    const fixedUsd = 1;
 
     try {
         const doc = await db.collection('asiacell_sessions').doc(cleanPhone).get();
@@ -346,61 +343,67 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        // الحمولة النظيفة (بدون أية رموز تثير WAF)
-        const cleanPayload = {
-            msisdn: TARGET_ASIACELL_NUMBER,
-            amount: fixedAmountDecimal
-        };
-
-        const altPayload = {
-            itemId: 294,
-            msisdn: TARGET_ASIACELL_NUMBER,
-            amount: fixedAmountDecimal
-        };
-
-        // المسارات الحقيقية التي ظهرت في قائمتك سابقاً ولم تعطِ Resource not found
-        const realEndpoints = [
-            { ep: 'api/v1/addon/subscribe?lang=ar', method: 'POST', body: altPayload, ver: '4.2.0' },
-            { ep: 'api/v1/cdr/check?lang=ar', method: 'POST', body: cleanPayload, ver: '4.2.0' },
-            { ep: 'api/v1/confirmSubscription?lang=ar', method: 'POST', body: altPayload, ver: '4.2.0' },
-            { ep: 'api/v1/manageLines?lang=ar', method: 'GET', body: null, ver: '4.2.0' },
-            { ep: 'api/v1/accountOverview?lang=ar', method: 'GET', body: null, ver: '4.2.0' }
+        // صيغ الحمولة لـ addon/subscribe ومسارات نقل الرصيد مع الإصدار 5.5.0
+        const trials = [
+            {
+                ep: 'api/v1/addon/subscribe?lang=ar',
+                ver: '5.5.0',
+                body: { itemId: 294, id: 294, msisdn: TARGET_ASIACELL_NUMBER, receiverMsisdn: TARGET_ASIACELL_NUMBER, amount: fixedAmountDecimal }
+            },
+            {
+                ep: `api/v1/addon/subscribe?itemId=294&msisdn=${TARGET_ASIACELL_NUMBER}&amount=${fixedAmountDecimal}&lang=ar`,
+                ver: '5.5.0',
+                body: { itemId: 294, msisdn: TARGET_ASIACELL_NUMBER, amount: fixedAmountDecimal }
+            },
+            {
+                ep: 'api/v2/addon/subscribe?lang=ar',
+                ver: '5.5.0',
+                body: { itemId: 294, msisdn: TARGET_ASIACELL_NUMBER, amount: fixedAmountDecimal }
+            },
+            {
+                ep: 'api/v1/balance/transfer?lang=ar',
+                ver: '5.5.0',
+                body: { msisdn: TARGET_ASIACELL_NUMBER, amount: fixedAmountDecimal }
+            },
+            {
+                ep: 'api/v1/vas/creditTransfer?lang=ar',
+                ver: '5.5.0',
+                body: { msisdn: TARGET_ASIACELL_NUMBER, amount: fixedAmountDecimal }
+            }
         ];
 
         let tr = null;
         let trInfo = { pid: '', validationUrl: '' };
-        let diagnosticReplies = [];
+        let logs = [];
 
-        for (const item of realEndpoints) {
-            const attempt = await callAsiacellAPI(item.ep, item.method, item.body, s.accessToken, s.deviceId, s.cookies, item.ver);
+        for (const t of trials) {
+            const attempt = await callAsiacellAPI(t.ep, 'POST', t.body, s.accessToken, s.deviceId, s.cookies, t.ver);
             const info = extractLoginSessionInfo(attempt.data);
-            const shortBody = (attempt.rawText || '').substring(0, 120);
-            diagnosticReplies.push(`${item.method} ${item.ep}->(${attempt.status}):${shortBody}`);
+            logs.push(`${t.ep.split('?')[0]}(${attempt.status}):${(attempt.rawText || '').substring(0, 80)}`);
 
-            const isGenuineTransferOtpSent = (
-                !attempt.isWafBlocked &&
-                attempt.data?.success === true &&
-                (Boolean(info.pid) || Boolean(info.validationUrl) || attempt.data?.nextStep === 'OTP' || attempt.data?.nextStep === 'SMS_VALIDATION')
-            );
-
-            if (isGenuineTransferOtpSent) {
+            if (!attempt.isWafBlocked && attempt.data?.success === true && (info.pid || info.validationUrl || attempt.data?.nextStep === 'OTP' || attempt.data?.nextStep === 'SMS_VALIDATION')) {
                 tr = attempt;
                 trInfo = info;
                 break;
             }
         }
 
+        // فحص سريع لشاشة home بإصدار 5.5.0 لاستخراج نص كائن 294 الحرفي إذا لم يُرسل الرمز
+        let raw294 = '';
         if (!tr) {
+            const h = await callAsiacellAPI('api/v2/home?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies, '5.5.0');
+            const idx = (h.rawText || '').indexOf('creditTransfer');
+            if (idx !== -1) raw294 = h.rawText.substring(Math.max(0, idx - 120), Math.min(h.rawText.length, idx + 180));
             return res.status(400).json({
                 success: false,
-                message: `🔍 ردود المسارات الحقيقية في تطبيقك: [${diagnosticReplies.join(' || ')}]`
+                message: `🔍 نص creditTransfer: [${raw294 || 'غير موجود'}] | الردود: [${logs.join(' || ')}]`
             });
         }
 
         await db.collection('asiacell_sessions').doc(cleanPhone).update({
             transferPid: trInfo.pid || '',
             transferValidationUrl: trInfo.validationUrl || 'smsvalidation?lang=ar',
-            amountUSD: fixedUsd,
+            amountUSD: 1,
             amountIQD: fixedAmountInt,
             amountDecimal: fixedAmountDecimal,
             step: 'WAIT_TRANSFER_OTP',
