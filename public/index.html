@@ -4,29 +4,69 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mtnajm - MT</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { sans: ['Tajawal', 'sans-serif'] },
-                    colors: { primary: '#6b1d2f', secondary: '#8a253d', dark: '#1e293b' }
+                    fontFamily: {
+                        sans: ['Tajawal', 'sans-serif']
+                    },
+                    colors: {
+                        primary: '#6b1d2f',
+                        secondary: '#8a253d',
+                        dark: '#1e293b'
+                    }
                 }
             }
-        }
+        };
     </script>
+
     <style>
-        body { font-family: 'Tajawal', sans-serif; background-color: #f3f4f6; }
-        .hero-bg { background-image: radial-gradient(circle at top right, #fce4e8 0%, transparent 40%), radial-gradient(circle at bottom left, #f7d6dd 0%, transparent 40%); }
-        .modal { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
-        .modal.active { opacity: 1; pointer-events: auto; }
-        .modal-content { transform: scale(0.95) translateY(-20px); transition: all 0.3s ease; }
-        .modal.active .modal-content { transform: scale(1) translateY(0); }
-        .amount-btn.selected { background-color: #dc2626; color: white; border-color: #dc2626; transform: scale(1.03); }
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .hero-bg {
+            background-image:
+                radial-gradient(circle at top right, #fce4e8 0%, transparent 40%),
+                radial-gradient(circle at bottom left, #f7d6dd 0%, transparent 40%);
+        }
+
+        .modal {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            transform: scale(0.95) translateY(-20px);
+            transition: all 0.3s ease;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .amount-btn.selected {
+            background-color: #dc2626;
+            color: white;
+            border-color: #dc2626;
+            transform: scale(1.03);
+        }
     </style>
 </head>
+
 <body class="text-gray-800 antialiased selection:bg-primary selection:text-white">
 
     <!-- الصفحة الرئيسية -->
@@ -35,24 +75,38 @@
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center h-20">
                     <div class="flex-shrink-0 flex items-center space-x-2 space-x-reverse">
-                        <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-xl shadow-md">MT</div>
-                        <span class="font-extrabold text-xl text-dark tracking-wide">mtnajm</span>
+                        <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-xl shadow-md">
+                            MT
+                        </div>
+                        <span class="font-extrabold text-xl text-dark tracking-wide">
+                            mtnajm
+                        </span>
                     </div>
+
                     <div class="flex items-center space-x-4 space-x-reverse">
-                        <button onclick="openModal('loginModal')" class="text-dark font-medium hover:text-primary transition">تسجيل الدخول</button>
-                        <button onclick="openModal('registerModal')" class="bg-primary hover:bg-[#531423] text-white px-6 py-2 rounded-full font-medium shadow-md transition transform hover:-translate-y-0.5">حساب جديد</button>
+                        <button onclick="openModal('loginModal')" class="text-dark font-medium hover:text-primary transition">
+                            تسجيل الدخول
+                        </button>
+                        <button onclick="openModal('registerModal')" class="bg-primary hover:bg-[#531423] text-white px-6 py-2 rounded-full font-medium shadow-md transition transform hover:-translate-y-0.5">
+                            حساب جديد
+                        </button>
                     </div>
                 </div>
             </div>
         </header>
+
         <main class="flex-grow hero-bg">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 text-center">
                 <h1 class="text-4xl md:text-6xl font-extrabold text-dark tracking-tight mb-6 leading-tight">
-                    كبّر حساباتك مع منصة <span class="text-primary">mtnajm</span> للدعم الرقمي
+                    كبّر حساباتك مع منصة
+                    <span class="text-primary">mtnajm</span>
+                    للدعم الرقمي
                 </h1>
+
                 <p class="mt-4 text-xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
                     نقدم لك خدمات زيادة المتابعين، اللايكات، والمشاهدات بأسعار تنافسية وبطرق شحن مرنة ومضمونة.
                 </p>
+
                 <button onclick="openModal('registerModal')" class="bg-primary hover:bg-[#531423] text-white px-8 py-4 rounded-full font-bold text-lg shadow-xl transition transform hover:-translate-y-1">
                     ابدأ الآن - أنشئ حسابك
                 </button>
@@ -60,17 +114,24 @@
         </main>
     </div>
 
-    <!-- لوحة التحكم الكاملة -->
+    <!-- لوحة التحكم -->
     <div id="dashboard-page" class="hidden min-h-screen bg-[#f8fafc] flex flex-col md:flex-row transition-opacity duration-300">
+
         <aside class="w-full md:w-64 bg-white border-l border-gray-200 shadow-sm flex-shrink-0 flex flex-col">
             <div class="h-20 flex items-center justify-center md:justify-start md:px-6 flex-shrink-0 space-x-3 space-x-reverse">
-                <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-lg shadow-md">MT</div>
+                <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center font-extrabold text-lg shadow-md">
+                    MT
+                </div>
                 <div class="flex flex-col">
-                    <span class="font-extrabold text-lg text-dark leading-none">mtnajm</span>
-                    <span class="text-[10px] text-gray-400 mt-1">SMM Panel</span>
+                    <span class="font-extrabold text-lg text-dark leading-none">
+                        mtnajm
+                    </span>
+                    <span class="text-[10px] text-gray-400 mt-1">
+                        SMM Panel
+                    </span>
                 </div>
             </div>
-            
+
             <div class="px-4 pb-4 border-b border-gray-100 text-center md:text-right flex-shrink-0">
                 <p class="text-xs font-bold text-primary bg-[#fdf2f4] py-2 px-3 rounded-lg shadow-sm">
                     خدمات زيادة متابعين وتفاعل حقيقية فقط
@@ -78,48 +139,80 @@
             </div>
 
             <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
-                <a href="#" id="navNewOrder" onclick="showNewOrderPage()" class="flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer"><i class="fa-solid fa-plus-circle w-6 text-center text-lg me-3"></i> طلب جديد</a>
-                <a href="#" id="navOrders" onclick="showOrdersPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer"><i class="fa-solid fa-list w-6 text-center text-lg me-3"></i> الطلبات</a>
-                <a href="#" id="navDeposit" onclick="showDepositPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer"><i class="fa-solid fa-wallet w-6 text-center text-lg me-3"></i> شحن الرصيد</a>
-                <a href="#" id="adminNavLink" onclick="showAdminPanel()" class="hidden items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-medium transition cursor-pointer"><i class="fa-solid fa-shield-halved w-6 text-center text-lg me-3"></i> لوحة المدير</a>
+                <a href="#" id="navNewOrder" onclick="showNewOrderPage()" class="flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer">
+                    <i class="fa-solid fa-plus-circle w-6 text-center text-lg me-3"></i>
+                    طلب جديد
+                </a>
+
+                <a href="#" id="navOrders" onclick="showOrdersPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer">
+                    <i class="fa-solid fa-list w-6 text-center text-lg me-3"></i>
+                    الطلبات
+                </a>
+
+                <a href="#" id="navDeposit" onclick="showDepositPage()" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer">
+                    <i class="fa-solid fa-wallet w-6 text-center text-lg me-3"></i>
+                    شحن الرصيد
+                </a>
+
+                <a href="#" id="adminNavLink" onclick="showAdminPanel()" class="hidden items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-medium transition cursor-pointer">
+                    <i class="fa-solid fa-shield-halved w-6 text-center text-lg me-3"></i>
+                    لوحة المدير
+                </a>
             </nav>
         </aside>
 
         <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
             <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-10 flex-shrink-0">
-                <h2 id="pageTitle" class="text-xl font-bold text-dark hidden sm:block">إنشاء طلب جديد</h2>
+                <h2 id="pageTitle" class="text-xl font-bold text-dark hidden sm:block">
+                    إنشاء طلب جديد
+                </h2>
+
                 <div class="flex items-center space-x-4 space-x-reverse">
                     <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-1.5 rounded-full flex items-center text-sm font-bold shadow-sm">
-                        <i class="fa-solid fa-coins me-2 text-yellow-500"></i> الرصيد: <span id="displayBalance" class="ms-1" dir="ltr">$0.00</span>
+                        <i class="fa-solid fa-coins me-2 text-yellow-500"></i>
+                        الرصيد:
+                        <span id="displayBalance" class="ms-1" dir="ltr">$0.00</span>
                     </div>
+
                     <div class="flex items-center bg-gray-50 p-2 rounded-lg transition">
-                        <div id="displayUsernameIcon" class="w-8 h-8 rounded-full bg-[#fdf2f4] text-primary flex items-center justify-center font-bold text-sm">U</div>
-                        <span id="displayUsernameText" class="font-bold text-sm text-gray-700 ms-2">المستخدم</span>
+                        <div id="displayUsernameIcon" class="w-8 h-8 rounded-full bg-[#fdf2f4] text-primary flex items-center justify-center font-bold text-sm">
+                            U
+                        </div>
+                        <span id="displayUsernameText" class="font-bold text-sm text-gray-700 ms-2">
+                            المستخدم
+                        </span>
                     </div>
                 </div>
             </header>
 
             <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                 <div class="max-w-5xl mx-auto space-y-4">
-                    
+
                     <div class="bg-gradient-to-r from-[#6b1d2f] to-[#8a253d] text-white p-3.5 rounded-2xl shadow-md flex items-center justify-center space-x-3 space-x-reverse text-center">
                         <i class="fa-solid fa-shield-halved text-yellow-300 text-lg"></i>
-                        <span class="text-xs sm:text-sm font-bold tracking-wide">منصة عراقية موثوقة 100% — صُنعت بِسواعد وعقول عراقية لخدمتكم بثقة وأمان</span>
+                        <span class="text-xs sm:text-sm font-bold tracking-wide">
+                            منصة عراقية موثوقة 100% — صُنعت بِسواعد وعقول عراقية لخدمتكم بثقة وأمان
+                        </span>
                     </div>
 
-                    <!-- 1. نموذج الطلب للمستخدم -->
+                    <!-- طلب جديد -->
                     <div id="new-order-section" class="space-y-6">
                         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                             <form id="orderForm" class="space-y-5">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                     <div>
-                                        <label class="block text-sm font-bold text-gray-700 mb-2">قسم الخدمة</label>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">
+                                            قسم الخدمة
+                                        </label>
                                         <select id="categorySelect" onchange="onCategoryChange()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-medium">
                                             <option value="">-- اختر القسم --</option>
                                         </select>
                                     </div>
+
                                     <div id="serviceSelectContainer" class="hidden">
-                                        <label class="block text-sm font-bold text-gray-700 mb-2">نوع الخدمة</label>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">
+                                            نوع الخدمة
+                                        </label>
                                         <select id="serviceSelect" onchange="onServiceChange()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-medium">
                                             <option value="">-- اختر الخدمة --</option>
                                         </select>
@@ -127,32 +220,52 @@
                                 </div>
 
                                 <div id="serviceDescriptionBox" class="hidden bg-[#fdf2f4] border border-[#f7d6dd] p-4 rounded-xl text-sm text-[#531423] leading-relaxed">
-                                    <span class="font-bold block mb-1"><i class="fa-solid fa-circle-info me-1"></i> وصف الخدمة:</span>
+                                    <span class="font-bold block mb-1">
+                                        <i class="fa-solid fa-circle-info me-1"></i>
+                                        وصف الخدمة:
+                                    </span>
                                     <p id="serviceDescText" class="whitespace-pre-wrap"></p>
                                 </div>
 
                                 <div id="orderDetailsContainer" class="hidden space-y-5">
                                     <div>
-                                        <label id="orderLinkLabel" class="block text-sm font-bold text-gray-700 mb-2">ضع رابط حسابك في انستقرام (تأكد أن الحساب عام وليس خاص)</label>
+                                        <label id="orderLinkLabel" class="block text-sm font-bold text-gray-700 mb-2">
+                                            ضع رابط حسابك في انستقرام (تأكد أن الحساب عام وليس خاص)
+                                        </label>
+
                                         <div class="flex gap-2">
                                             <input type="text" id="orderLink" placeholder="https://www.instagram.com/username" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50" dir="ltr" required>
-                                            <button type="button" onclick="previewInstagramAccount()" id="checkIgBtn" class="bg-dark hover:bg-slate-700 text-white px-4 py-3 rounded-xl text-xs font-bold whitespace-nowrap transition">فحص الرابط</button>
+
+                                            <button type="button" onclick="previewInstagramAccount()" id="checkIgBtn" class="bg-dark hover:bg-slate-700 text-white px-4 py-3 rounded-xl text-xs font-bold whitespace-nowrap transition">
+                                                فحص الرابط
+                                            </button>
                                         </div>
+
                                         <div id="igPreviewBox" class="hidden mt-2 p-3 rounded-xl text-xs font-bold"></div>
                                     </div>
+
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                         <div>
-                                            <label id="quantityLabel" class="block text-sm font-bold text-gray-700 mb-2">الكمية</label>
+                                            <label id="quantityLabel" class="block text-sm font-bold text-gray-700 mb-2">
+                                                الكمية
+                                            </label>
                                             <input type="number" id="quantity" oninput="calculatePrice()" placeholder="1000" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50" required>
                                         </div>
+
                                         <div>
-                                            <label class="block text-sm font-bold text-gray-700 mb-2">السعر الإجمالي ($)</label>
+                                            <label class="block text-sm font-bold text-gray-700 mb-2">
+                                                السعر الإجمالي ($)
+                                            </label>
                                             <input type="text" id="charge" readonly placeholder="0.00" class="block w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-100 text-gray-500 font-bold cursor-not-allowed">
                                         </div>
                                     </div>
-                                    <button type="submit" id="submitOrderBtn" class="w-full bg-primary hover:bg-[#531423] text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition">فحص الحساب وتأكيد الطلب</button>
+
+                                    <button type="submit" id="submitOrderBtn" class="w-full bg-primary hover:bg-[#531423] text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition">
+                                        فحص الحساب وتأكيد الطلب
+                                    </button>
                                 </div>
                             </form>
+
                             <div id="successOrderMsg" class="hidden mt-4 bg-green-50 text-green-700 border border-green-200 p-4 rounded-xl text-sm text-center font-bold"></div>
                             <div id="errorOrderMsg" class="hidden mt-4 bg-red-50 text-red-700 border border-red-200 p-4 rounded-xl text-sm text-center font-bold"></div>
                         </div>
@@ -161,11 +274,15 @@
                     <!-- سجل الطلبات -->
                     <div id="orders-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
-                            <h3 class="text-xl font-bold text-dark">سجل الطلبات السابقة</h3>
+                            <h3 class="text-xl font-bold text-dark">
+                                سجل الطلبات السابقة
+                            </h3>
                             <span class="text-xs text-green-600 font-bold bg-green-50 border border-green-200 px-3 py-1 rounded-full">
-                                <i class="fa-solid fa-rotate fa-spin me-1"></i> مراقبة وتحديث مباشر لعداد المتابعين
+                                <i class="fa-solid fa-rotate fa-spin me-1"></i>
+                                مراقبة وتحديث مباشر لعداد المتابعين
                             </span>
                         </div>
+
                         <div class="overflow-x-auto">
                             <table class="w-full text-right border-collapse">
                                 <thead>
@@ -185,14 +302,22 @@
                         </div>
                     </div>
 
-                    <!-- شحن الرصيد التلقائي واليدوي -->
+                    <!-- شحن الرصيد -->
                     <div id="deposit-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
                         <div class="border-b pb-4">
-                            <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-bolt text-yellow-500 me-2"></i> شحن الرصيد التلقائي / اليدوي</h3>
-                            <p class="text-sm text-gray-500 mt-1">اختر طريقة الدفع المناسبة لشحن حسابك فوراً.</p>
+                            <h3 class="text-xl font-bold text-dark">
+                                <i class="fa-solid fa-bolt text-yellow-500 me-2"></i>
+                                شحن الرصيد التلقائي / اليدوي
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">
+                                اختر طريقة الدفع المناسبة لشحن حسابك فوراً.
+                            </p>
                         </div>
+
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-2">طريقة الدفع</label>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">
+                                طريقة الدفع
+                            </label>
                             <select id="depositGateway" onchange="toggleDepositMode()" class="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-medium">
                                 <option value="AsiacellAuto">آسيا سيل (دفع وتأكيد تلقائي بالـ OTP) ⚡</option>
                                 <option value="ZainCash">زين كاش (Zain Cash)</option>
@@ -201,7 +326,7 @@
                             </select>
                         </div>
 
-                        <!-- ⚡ 1. واجهة آسيا سيل التلقائية -->
+                        <!-- آسياسيل -->
                         <div id="asiaAutoBox" class="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
                             <div class="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs font-bold text-center">
                                 شحن تلقائي فوري عبر آسياسيل (كل 1$ يعادل 1,000 دينار رصيد)
@@ -209,9 +334,12 @@
 
                             <div id="asiaStep1" class="space-y-4">
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-700 mb-1">ضع رقم هاتفك (آسيا سيل)</label>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">
+                                        ضع رقم هاتفك (آسيا سيل)
+                                    </label>
                                     <input type="text" id="asiaPhoneInput" placeholder="077XXXXXXXX" maxlength="11" class="w-full px-4 py-3 border rounded-xl text-center text-base font-mono font-bold" dir="ltr">
                                 </div>
+
                                 <button type="button" onclick="requestAsiaLoginOTP()" id="sendLoginOtpBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-sm">
                                     إرسال رمز تسجيل الدخول
                                 </button>
@@ -219,12 +347,16 @@
 
                             <div id="asiaStep2" class="hidden space-y-4">
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-700 mb-1">ضع رمز تسجيل الدخول المرسل إلى هاتفك</label>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">
+                                        ضع رمز تسجيل الدخول المرسل إلى هاتفك
+                                    </label>
                                     <input type="text" id="asiaLoginOtpInput" placeholder="123456" maxlength="6" class="w-full px-4 py-3 border rounded-xl text-center font-mono text-lg font-bold tracking-widest" dir="ltr">
                                 </div>
+
                                 <button type="button" onclick="verifyAsiaLoginOTP()" id="verifyLoginOtpBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-sm">
                                     تأكيد رمز الدخول والمتابعة
                                 </button>
+
                                 <button type="button" onclick="resetAsiaFlow()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 rounded-xl text-xs transition">
                                     تغيير رقم الهاتف
                                 </button>
@@ -232,21 +364,65 @@
 
                             <div id="asiaStep3" class="hidden space-y-4">
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-800 mb-2 text-center">اختر كم تريد أن تشحن حسابك:</label>
+                                    <label class="block text-sm font-bold text-gray-800 mb-2 text-center">
+                                        اختر كم تريد أن تشحن حسابك:
+                                    </label>
+
                                     <input type="hidden" id="selectedAsiaAmountUSD" value="">
+
                                     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5" id="amountButtonsGrid">
-                                        <button type="button" onclick="selectAsiaAmount(1)" id="amtBtn_1" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center"><span class="font-extrabold text-base">1$</span><span class="text-[11px] opacity-80">1,000 د.ع</span></button>
-                                        <button type="button" onclick="selectAsiaAmount(2)" id="amtBtn_2" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center"><span class="font-extrabold text-base">2$</span><span class="text-[11px] opacity-80">2,000 د.ع</span></button>
-                                        <button type="button" onclick="selectAsiaAmount(3)" id="amtBtn_3" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center"><span class="font-extrabold text-base">3$</span><span class="text-[11px] opacity-80">3,000 د.ع</span></button>
-                                        <button type="button" onclick="selectAsiaAmount(4)" id="amtBtn_4" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center"><span class="font-extrabold text-base">4$</span><span class="text-[11px] opacity-80">4,000 د.ع</span></button>
-                                        <button type="button" onclick="selectAsiaAmount(5)" id="amtBtn_5" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center"><span class="font-extrabold text-base">5$</span><span class="text-[11px] opacity-80">5,000 د.ع</span></button>
-                                        <button type="button" onclick="selectAsiaAmount(6)" id="amtBtn_6" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center"><span class="font-extrabold text-base">6$</span><span class="text-[11px] opacity-80">6,000 د.ع</span></button>
-                                        <button type="button" onclick="selectAsiaAmount(7)" id="amtBtn_7" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center"><span class="font-extrabold text-base">7$</span><span class="text-[11px] opacity-80">7,000 د.ع</span></button>
-                                        <button type="button" onclick="selectAsiaAmount(8)" id="amtBtn_8" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center"><span class="font-extrabold text-base">8$</span><span class="text-[11px] opacity-80">8,000 د.ع</span></button>
-                                        <button type="button" onclick="selectAsiaAmount(9)" id="amtBtn_9" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center"><span class="font-extrabold text-base">9$</span><span class="text-[11px] opacity-80">9,000 د.ع</span></button>
-                                        <button type="button" onclick="selectAsiaAmount(10)" id="amtBtn_10" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center"><span class="font-extrabold text-base">10$</span><span class="text-[11px] opacity-80">10,000 د.ع</span></button>
+                                        <button type="button" onclick="selectAsiaAmount(1)" id="amtBtn_1" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">1$</span>
+                                            <span class="text-[11px] opacity-80">1,000 د.ع</span>
+                                        </button>
+
+                                        <button type="button" onclick="selectAsiaAmount(2)" id="amtBtn_2" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">2$</span>
+                                            <span class="text-[11px] opacity-80">2,000 د.ع</span>
+                                        </button>
+
+                                        <button type="button" onclick="selectAsiaAmount(3)" id="amtBtn_3" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">3$</span>
+                                            <span class="text-[11px] opacity-80">3,000 د.ع</span>
+                                        </button>
+
+                                        <button type="button" onclick="selectAsiaAmount(4)" id="amtBtn_4" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">4$</span>
+                                            <span class="text-[11px] opacity-80">4,000 د.ع</span>
+                                        </button>
+
+                                        <button type="button" onclick="selectAsiaAmount(5)" id="amtBtn_5" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">5$</span>
+                                            <span class="text-[11px] opacity-80">5,000 د.ع</span>
+                                        </button>
+
+                                        <button type="button" onclick="selectAsiaAmount(6)" id="amtBtn_6" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">6$</span>
+                                            <span class="text-[11px] opacity-80">6,000 د.ع</span>
+                                        </button>
+
+                                        <button type="button" onclick="selectAsiaAmount(7)" id="amtBtn_7" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">7$</span>
+                                            <span class="text-[11px] opacity-80">7,000 د.ع</span>
+                                        </button>
+
+                                        <button type="button" onclick="selectAsiaAmount(8)" id="amtBtn_8" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">8$</span>
+                                            <span class="text-[11px] opacity-80">8,000 د.ع</span>
+                                        </button>
+
+                                        <button type="button" onclick="selectAsiaAmount(9)" id="amtBtn_9" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">9$</span>
+                                            <span class="text-[11px] opacity-80">9,000 د.ع</span>
+                                        </button>
+
+                                        <button type="button" onclick="selectAsiaAmount(10)" id="amtBtn_10" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
+                                            <span class="font-extrabold text-base">10$</span>
+                                            <span class="text-[11px] opacity-80">10,000 د.ع</span>
+                                        </button>
                                     </div>
                                 </div>
+
                                 <button type="button" onclick="initiateAsiaTransfer()" id="initiateTransferBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-sm">
                                     شحن الرصيد الآن
                                 </button>
@@ -254,12 +430,16 @@
 
                             <div id="asiaStep4" class="hidden space-y-4">
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-700 mb-1">ضع رمز تأكيد التحويل الذي أرسلته الشركة إليك</label>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">
+                                        ضع رمز تأكيد التحويل الذي أرسلته الشركة إليك
+                                    </label>
                                     <input type="text" id="asiaTransferOtpInput" placeholder="123456" maxlength="6" class="w-full px-4 py-3 border rounded-xl text-center font-mono text-lg font-bold tracking-widest" dir="ltr">
                                 </div>
+
                                 <button type="button" onclick="confirmAsiaFinalTransfer()" id="confirmFinalOtpBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-sm">
                                     تأكيد التحويل وإضافة الرصيد لحسابي
                                 </button>
+
                                 <button type="button" onclick="backToStep3()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 rounded-xl text-xs transition">
                                     تغيير المبلغ المختار
                                 </button>
@@ -268,80 +448,135 @@
                             <div id="asiaMsg" class="hidden text-xs p-3.5 rounded-xl font-bold text-center leading-relaxed"></div>
                         </div>
 
-                        <!-- 📷 2. واجهة الدفع اليدوي بواسطة الإيصالات -->
+                        <!-- الدفع اليدوي -->
                         <form id="manualDepositForm" onsubmit="handleDepositSubmit(event)" class="hidden max-w-xl space-y-4">
                             <div id="depositInfoBox" class="p-4 bg-[#fdf2f4] border border-[#f7d6dd] rounded-xl text-sm text-[#531423] font-medium text-center"></div>
+
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1">المبلغ المراد شحنه ($ USD)</label>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">
+                                    المبلغ المراد شحنه ($ USD)
+                                </label>
                                 <input type="number" step="0.01" id="depAmountInput" placeholder="10" class="w-full px-3 py-2 border rounded-xl bg-white text-sm">
                             </div>
+
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1">رفع لقطة الشاشة (صورة الإيصال)</label>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">
+                                    رفع لقطة الشاشة (صورة الإيصال)
+                                </label>
                                 <input type="file" id="depImageInput" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white">
                             </div>
-                            <button type="submit" class="w-full bg-primary hover:bg-[#531423] text-white font-bold py-3 rounded-xl text-sm transition">إرسال إيصال الشحن للمراجعة</button>
+
+                            <button type="submit" class="w-full bg-primary hover:bg-[#531423] text-white font-bold py-3 rounded-xl text-sm transition">
+                                إرسال إيصال الشحن للمراجعة
+                            </button>
                         </form>
+
                         <div id="depositSuccessMsg" class="hidden max-w-xl text-xs p-3 rounded-xl font-bold text-center"></div>
                     </div>
 
-                    <!-- لوحة المدير (الإحصائيات وإدارة الخدمات) -->
+                    <!-- لوحة المدير -->
                     <div id="admin-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
                         <div class="flex flex-col sm:flex-row justify-between items-center gap-4 border-b pb-4">
-                            <h3 class="text-xl font-bold text-dark"><i class="fa-solid fa-shield-halved text-red-500 me-2"></i> لوحة إدارة النظام (Admin Panel)</h3>
+                            <h3 class="text-xl font-bold text-dark">
+                                <i class="fa-solid fa-shield-halved text-red-500 me-2"></i>
+                                لوحة إدارة النظام (Admin Panel)
+                            </h3>
+
                             <div class="flex gap-3">
-                                <div class="bg-[#fdf2f4] text-primary px-4 py-2 rounded-xl text-sm font-bold">إجمالي المستخدمين: <span id="adminUsersCount">0</span></div>
-                                <div class="bg-green-50 text-green-700 px-4 py-2 rounded-xl text-sm font-bold">إجمالي المبيعات: $<span id="adminTotalSales">0.00</span></div>
+                                <div class="bg-[#fdf2f4] text-primary px-4 py-2 rounded-xl text-sm font-bold">
+                                    إجمالي المستخدمين:
+                                    <span id="adminUsersCount">0</span>
+                                </div>
+
+                                <div class="bg-green-50 text-green-700 px-4 py-2 rounded-xl text-sm font-bold">
+                                    إجمالي المبيعات:
+                                    $<span id="adminTotalSales">0.00</span>
+                                </div>
                             </div>
                         </div>
 
                         <div class="mt-4 bg-gray-50 p-6 rounded-2xl border border-gray-200">
-                            <h4 id="adminFormTitle" class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام</h4>
+                            <h4 id="adminFormTitle" class="font-bold text-lg text-dark mb-4">
+                                <i class="fa-solid fa-plus-circle text-primary me-2"></i>
+                                إضافة خدمة جديدة للنظام
+                            </h4>
+
                             <form id="addServiceForm" class="space-y-4">
                                 <input type="hidden" id="editServiceId" value="">
+
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
-                                        <label class="block text-xs font-bold text-gray-700 mb-1">قسم الخدمة</label>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">
+                                            قسم الخدمة
+                                        </label>
                                         <input type="text" id="servCategory" placeholder="مثلاً: خدمات انستقرام" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
                                     </div>
+
                                     <div>
-                                        <label class="block text-xs font-bold text-gray-700 mb-1">نوع الخدمة</label>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">
+                                            نوع الخدمة
+                                        </label>
                                         <input type="text" id="servName" placeholder="مثلاً: متابعين انستقرام سريع" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
                                     </div>
+
                                     <div>
-                                        <label class="block text-xs font-bold text-gray-700 mb-1">العدد الأساسي (مثلاً 1200 متابع)</label>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">
+                                            العدد الأساسي (مثلاً 1200 متابع)
+                                        </label>
                                         <input type="number" id="servBaseQty" placeholder="1200" value="1000" min="1" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
                                     </div>
                                 </div>
 
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
-                                        <label class="block text-xs font-bold text-gray-700 mb-1">السعر لهذا العدد ($)</label>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">
+                                            السعر لهذا العدد ($)
+                                        </label>
                                         <input type="number" step="0.01" id="servPrice" placeholder="10 أو 0.5" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
                                     </div>
+
                                     <div>
-                                        <label class="block text-xs font-bold text-gray-700 mb-1">الحد الأدنى للطلب</label>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">
+                                            الحد الأدنى للطلب
+                                        </label>
                                         <input type="number" id="servMinQty" placeholder="100" value="100" min="1" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
                                     </div>
+
                                     <div>
-                                        <label class="block text-xs font-bold text-gray-700 mb-1">الحد الأقصى (اتركه فارغاً لعدد مفتوح)</label>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">
+                                            الحد الأقصى (اتركه فارغاً لعدد مفتوح)
+                                        </label>
                                         <input type="number" id="servMaxQty" placeholder="مفتوح (بلا حد أقصى)" min="1" class="w-full px-4 py-2 border rounded-xl bg-white text-sm">
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-700 mb-1">وصف الخدمة (اختياري)</label>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">
+                                        وصف الخدمة (اختياري)
+                                    </label>
                                     <textarea id="servDescription" rows="3" placeholder="اكتب تفاصيل أو تعليمات الخدمة..." class="w-full px-4 py-2 border rounded-xl bg-white text-sm"></textarea>
                                 </div>
+
                                 <div class="flex items-center gap-2">
-                                    <button type="submit" id="saveServiceBtn" class="bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition">إضافة الخدمة للنظام</button>
-                                    <button type="button" id="cancelEditBtn" onclick="resetServiceForm()" class="hidden bg-gray-500 hover:bg-gray-600 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition">إلغاء التعديل</button>
+                                    <button type="submit" id="saveServiceBtn" class="bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition">
+                                        إضافة الخدمة للنظام
+                                    </button>
+
+                                    <button type="button" id="cancelEditBtn" onclick="resetServiceForm()" class="hidden bg-gray-500 hover:bg-gray-600 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition">
+                                        إلغاء التعديل
+                                    </button>
                                 </div>
+
                                 <div id="adminServiceMsg" class="hidden text-xs p-3 rounded-xl font-bold text-center"></div>
                             </form>
                         </div>
 
                         <div class="mt-6 bg-white p-6 rounded-2xl border border-gray-200">
-                            <h4 class="font-bold text-lg text-dark mb-4"><i class="fa-solid fa-list-check text-primary me-2"></i> الخدمات المتاحة في النظام</h4>
+                            <h4 class="font-bold text-lg text-dark mb-4">
+                                <i class="fa-solid fa-list-check text-primary me-2"></i>
+                                الخدمات المتاحة في النظام
+                            </h4>
+
                             <div class="overflow-x-auto">
                                 <table class="w-full text-right border-collapse">
                                     <thead>
@@ -358,35 +593,85 @@
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- نوافذ الدخول والتسجيل -->
+    <!-- إنشاء حساب -->
     <div id="registerModal" class="modal fixed inset-0 z-[100] flex items-center justify-center bg-dark/60 backdrop-blur-sm">
         <div class="modal-content bg-white w-full max-w-md rounded-2xl p-8 relative mx-4">
-            <button onclick="closeModal('registerModal')" class="absolute top-4 left-4 text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
-            <div class="text-center mb-6"><h2 class="text-2xl font-bold text-dark">إنشاء حساب جديد</h2></div>
+            <button onclick="closeModal('registerModal')" class="absolute top-4 left-4 text-gray-400 hover:text-red-500">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-dark">إنشاء حساب جديد</h2>
+            </div>
+
             <form id="registerForm" class="space-y-4">
                 <div id="registerError" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-lg text-center font-bold"></div>
-                <div><label class="block text-sm font-bold text-gray-700 mb-1">اسم المستخدم</label><input type="text" id="regUsername" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required></div>
-                <div><label class="block text-sm font-bold text-gray-700 mb-1">البريد الإلكتروني</label><input type="email" id="regEmail" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required></div>
-                <div><label class="block text-sm font-bold text-gray-700 mb-1">كلمة المرور</label><input type="password" id="regPassword" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required></div>
-                <button type="submit" id="regSubmitBtn" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl">إنشاء الحساب ودخول اللوحة</button>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">
+                        اسم المستخدم
+                    </label>
+                    <input type="text" id="regUsername" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">
+                        البريد الإلكتروني
+                    </label>
+                    <input type="email" id="regEmail" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">
+                        كلمة المرور
+                    </label>
+                    <input type="password" id="regPassword" minlength="12" autocomplete="new-password" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required>
+                </div>
+
+                <button type="submit" id="regSubmitBtn" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl">
+                    إنشاء الحساب ودخول اللوحة
+                </button>
             </form>
         </div>
     </div>
 
+    <!-- تسجيل الدخول -->
     <div id="loginModal" class="modal fixed inset-0 z-[100] flex items-center justify-center bg-dark/60 backdrop-blur-sm">
         <div class="modal-content bg-white w-full max-w-md rounded-2xl p-8 relative mx-4">
-            <button onclick="closeModal('loginModal')" class="absolute top-4 left-4 text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
-            <div class="text-center mb-6"><h2 class="text-2xl font-bold text-dark">تسجيل الدخول</h2></div>
+            <button onclick="closeModal('loginModal')" class="absolute top-4 left-4 text-gray-400 hover:text-red-500">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-dark">تسجيل الدخول</h2>
+            </div>
+
             <form id="loginForm" class="space-y-4">
                 <div id="loginError" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-lg text-center font-bold"></div>
-                <div><label class="block text-sm font-bold text-gray-700 mb-1">البريد الإلكتروني</label><input type="email" id="loginEmail" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required></div>
-                <div><label class="block text-sm font-bold text-gray-700 mb-1">كلمة المرور</label><input type="password" id="loginPassword" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required></div>
-                <button type="submit" id="loginSubmitBtn" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl">دخول لوحة التحكم</button>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">
+                        البريد الإلكتروني
+                    </label>
+                    <input type="email" id="loginEmail" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">
+                        كلمة المرور
+                    </label>
+                    <input type="password" id="loginPassword" autocomplete="current-password" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-gray-50" required>
+                </div>
+
+                <button type="submit" id="loginSubmitBtn" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl">
+                    دخول لوحة التحكم
+                </button>
             </form>
         </div>
     </div>
@@ -394,149 +679,402 @@
     <script>
         let fetchedServices = [];
 
-        function openModal(id) { document.getElementById(id).classList.add('active'); }
-        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        // الهوية تعتمد على جلسة السيرفر، وليس بيانات localStorage.
+        let currentUser = null;
+        let balanceBusy = false;
+        let ordersBusy = false;
+
+        try {
+            localStorage.removeItem('smm_session');
+        } catch (_) {}
+
+        function escapeHTML(value) {
+            return String(value ?? '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[c]));
+        }
+
+        function safeInstagramURL(value) {
+            try {
+                const url = new URL(String(value));
+
+                if (
+                    !['https:', 'http:'].includes(url.protocol) ||
+                    !['instagram.com', 'www.instagram.com']
+                        .includes(url.hostname.toLowerCase()) ||
+                    url.username ||
+                    url.password ||
+                    url.port
+                ) {
+                    return '#';
+                }
+
+                url.protocol = 'https:';
+                return url.href;
+            } catch (_) {
+                return '#';
+            }
+        }
+
+        function updateAdminVisibility() {
+            const allowed = currentUser?.role === 'admin';
+            const link = document.getElementById('adminNavLink');
+
+            link.classList.toggle('hidden', !allowed);
+            link.classList.toggle('flex', allowed);
+        }
+
+        function promptLogin(
+            message = 'سجّل دخولك مرة واحدة لحفظ جلستك على هذا الجهاز.'
+        ) {
+            currentUser = null;
+            hideAllSections();
+            updateAdminVisibility();
+            toggleView('landing-page');
+
+            const box = document.getElementById('loginError');
+            box.textContent = message;
+            box.classList.remove('hidden');
+
+            openModal('loginModal');
+        }
+
+        async function apiFetch(url, options = {}) {
+            const target = new URL(url, window.location.origin);
+
+            if (
+                target.origin !== window.location.origin ||
+                !target.pathname.startsWith('/api/')
+            ) {
+                throw new Error('عنوان الطلب غير مسموح.');
+            }
+
+            const response = await fetch(target.href, {
+                ...options,
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
+
+            if (
+                response.status === 401 &&
+                !['/api/login', '/api/register']
+                    .includes(target.pathname)
+            ) {
+                promptLogin();
+            }
+
+            return response;
+        }
+
+        async function restoreSession(showLogin = false) {
+            try {
+                const response = await apiFetch('/api/me');
+
+                if (!response.ok) {
+                    if (response.status !== 401) {
+                        throw new Error(
+                            'تعذر التحقق من الجلسة الآن. حاول تسجيل الدخول مجدداً.'
+                        );
+                    }
+
+                    return false;
+                }
+
+                const data = await response.json();
+
+                if (
+                    !data.success ||
+                    !data.user ||
+                    typeof data.user.username !== 'string'
+                ) {
+                    throw new Error('تعذر التحقق من بيانات الحساب.');
+                }
+
+                currentUser = data.user;
+
+                showDashboard(
+                    currentUser.username,
+                    currentUser.email,
+                    currentUser.balance
+                );
+
+                return true;
+            } catch (error) {
+                // انقطاع الاتصال لا يمسح جلسة السيرفر.
+                const box = document.getElementById('loginError');
+
+                box.textContent =
+                    'تعذر الاتصال بالخادم للتحقق من الجلسة. حدّث الصفحة أو حاول مجدداً.';
+
+                box.classList.remove('hidden');
+
+                if (showLogin || !currentUser) {
+                    openModal('loginModal');
+                }
+
+                return false;
+            }
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
         function toggleView(id) {
-            document.getElementById('landing-page').classList.add('hidden');
-            document.getElementById('dashboard-page').classList.add('hidden');
-            document.getElementById(id).classList.remove('hidden');
+            document.getElementById('landing-page')
+                .classList.add('hidden');
+
+            document.getElementById('dashboard-page')
+                .classList.add('hidden');
+
+            document.getElementById(id)
+                .classList.remove('hidden');
         }
 
         function showDashboard(username, email, balance) {
-            document.getElementById('displayUsernameText').innerText = username;
-            document.getElementById('displayUsernameIcon').innerText = username.charAt(0).toUpperCase();
-            document.getElementById('displayBalance').innerText = '$' + parseFloat(balance).toFixed(2);
-            
-            const ADMIN_USER = 'mohamed';
-            const ADMIN_EMAIL = 'qhtymhmd@gmail.com';
-            const adminLink = document.getElementById('adminNavLink');
-            if (username === ADMIN_USER && email === ADMIN_EMAIL) {
-                adminLink.classList.remove('hidden'); adminLink.classList.add('flex');
-            } else {
-                adminLink.classList.add('hidden'); adminLink.classList.remove('flex');
-            }
+            document.getElementById('displayUsernameText')
+                .innerText = username;
 
-            closeModal('loginModal'); closeModal('registerModal');
+            document.getElementById('displayUsernameIcon')
+                .innerText = username.charAt(0).toUpperCase();
+
+            document.getElementById('displayBalance')
+                .innerText = '$' + parseFloat(balance).toFixed(2);
+
+            updateAdminVisibility();
+
+            closeModal('loginModal');
+            closeModal('registerModal');
+
             toggleView('dashboard-page');
-            loadServicesForUser();
-            refreshUserBalance();
+            showNewOrderPage();
         }
 
         async function refreshUserBalance() {
-            const sessionStr = localStorage.getItem('smm_session');
-            if (!sessionStr) return;
-            const session = JSON.parse(sessionStr);
+            if (!currentUser || balanceBusy) return;
+
+            balanceBusy = true;
+
             try {
-                const res = await fetch(`/api/user/${session.email}`);
+                const res = await apiFetch('/api/me');
                 const data = await res.json();
-                if (data.success) {
-                    document.getElementById('displayBalance').innerText = '$' + parseFloat(data.user.balance).toFixed(2);
-                    session.balance = data.user.balance;
-                    localStorage.setItem('smm_session', JSON.stringify(session));
+
+                if (
+                    res.ok &&
+                    data.success &&
+                    data.user &&
+                    currentUser
+                ) {
+                    Object.assign(currentUser, data.user);
+
+                    document.getElementById('displayBalance')
+                        .innerText =
+                            '$' + Number(currentUser.balance).toFixed(2);
+
+                    updateAdminVisibility();
                 }
-            } catch (err) {}
+            } catch (_) {
+            } finally {
+                balanceBusy = false;
+            }
         }
-        setInterval(() => { if (localStorage.getItem('smm_session')) refreshUserBalance(); }, 4000);
+
+        setInterval(() => {
+            if (currentUser) {
+                refreshUserBalance();
+            }
+        }, 15000);
 
         function hideAllSections() {
-            document.getElementById('new-order-section').classList.add('hidden');
-            document.getElementById('orders-section').classList.add('hidden');
-            document.getElementById('deposit-section').classList.add('hidden');
-            document.getElementById('admin-section').classList.add('hidden');
-            document.getElementById('navNewOrder').className = 'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
-            document.getElementById('navOrders').className = 'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
-            document.getElementById('navDeposit').className = 'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
+            document.getElementById('new-order-section')
+                .classList.add('hidden');
+
+            document.getElementById('orders-section')
+                .classList.add('hidden');
+
+            document.getElementById('deposit-section')
+                .classList.add('hidden');
+
+            document.getElementById('admin-section')
+                .classList.add('hidden');
+
+            document.getElementById('navNewOrder').className =
+                'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
+
+            document.getElementById('navOrders').className =
+                'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
+
+            document.getElementById('navDeposit').className =
+                'flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-primary rounded-xl font-medium transition cursor-pointer';
         }
 
         function showNewOrderPage() {
             hideAllSections();
-            document.getElementById('new-order-section').classList.remove('hidden');
-            document.getElementById('pageTitle').innerText = 'إنشاء طلب جديد';
-            document.getElementById('navNewOrder').className = 'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
+
+            document.getElementById('new-order-section')
+                .classList.remove('hidden');
+
+            document.getElementById('pageTitle')
+                .innerText = 'إنشاء طلب جديد';
+
+            document.getElementById('navNewOrder').className =
+                'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
+
             loadServicesForUser();
             refreshUserBalance();
         }
 
         async function loadServicesForUser() {
             try {
-                const res = await fetch('/api/services');
+                const res = await apiFetch('/api/services');
                 const data = await res.json();
-                const categorySelect = document.getElementById('categorySelect');
-                categorySelect.innerHTML = '<option value="">-- اختر القسم --</option>';
+
+                const categorySelect =
+                    document.getElementById('categorySelect');
+
+                categorySelect.innerHTML =
+                    '<option value="">-- اختر القسم --</option>';
 
                 if (data.success && data.services.length > 0) {
                     fetchedServices = data.services;
-                    const categories = [...new Set(data.services.map(s => s.category))];
-                    categories.forEach(cat => { categorySelect.innerHTML += `<option value="${cat}">${cat}</option>`; });
+
+                    const categories = [
+                        ...new Set(data.services.map(s => s.category))
+                    ];
+
+                    categories.forEach(cat => {
+                        categorySelect.add(
+                            new Option(String(cat), String(cat))
+                        );
+                    });
                 } else {
                     fetchedServices = [];
                 }
-                document.getElementById('serviceSelectContainer').classList.add('hidden');
-                document.getElementById('serviceDescriptionBox').classList.add('hidden');
-                document.getElementById('orderDetailsContainer').classList.add('hidden');
+
+                document.getElementById('serviceSelectContainer')
+                    .classList.add('hidden');
+
+                document.getElementById('serviceDescriptionBox')
+                    .classList.add('hidden');
+
+                document.getElementById('orderDetailsContainer')
+                    .classList.add('hidden');
             } catch (err) {}
         }
 
         function onCategoryChange() {
-            const selectedCat = document.getElementById('categorySelect').value;
-            const serviceContainer = document.getElementById('serviceSelectContainer');
-            const serviceSelect = document.getElementById('serviceSelect');
-            const descBox = document.getElementById('serviceDescriptionBox');
-            const orderDetailsContainer = document.getElementById('orderDetailsContainer');
+            const selectedCat =
+                document.getElementById('categorySelect').value;
+
+            const serviceContainer =
+                document.getElementById('serviceSelectContainer');
+
+            const serviceSelect =
+                document.getElementById('serviceSelect');
+
+            const descBox =
+                document.getElementById('serviceDescriptionBox');
+
+            const orderDetailsContainer =
+                document.getElementById('orderDetailsContainer');
 
             if (!selectedCat) {
                 serviceContainer.classList.add('hidden');
                 descBox.classList.add('hidden');
                 orderDetailsContainer.classList.add('hidden');
+
                 document.getElementById('charge').value = '';
                 return;
             }
 
-            const filteredServices = fetchedServices.filter(s => s.category === selectedCat);
-            serviceSelect.innerHTML = '<option value="">-- اختر الخدمة --</option>';
+            const filteredServices = fetchedServices.filter(
+                s => s.category === selectedCat
+            );
+
+            serviceSelect.innerHTML =
+                '<option value="">-- اختر الخدمة --</option>';
+
             filteredServices.forEach(serv => {
                 const baseQ = serv.baseQuantity || 1000;
-                serviceSelect.innerHTML += `<option value="${serv.id}">${serv.name} — (${baseQ} بـ $${parseFloat(serv.price).toFixed(2)})</option>`;
+
+                serviceSelect.add(
+                    new Option(
+                        `${serv.name} — (${baseQ} بـ $${parseFloat(serv.price).toFixed(2)})`,
+                        String(serv.id)
+                    )
+                );
             });
 
             serviceContainer.classList.remove('hidden');
             descBox.classList.add('hidden');
             orderDetailsContainer.classList.add('hidden');
+
             document.getElementById('charge').value = '';
         }
 
         function onServiceChange() {
-            const servId = document.getElementById('serviceSelect').value;
-            const descBox = document.getElementById('serviceDescriptionBox');
-            const descText = document.getElementById('serviceDescText');
-            const orderDetailsContainer = document.getElementById('orderDetailsContainer');
-            const qtyInput = document.getElementById('quantity');
-            const qtyLabel = document.getElementById('quantityLabel');
-            document.getElementById('igPreviewBox').classList.add('hidden');
+            const servId =
+                document.getElementById('serviceSelect').value;
+
+            const descBox =
+                document.getElementById('serviceDescriptionBox');
+
+            const descText =
+                document.getElementById('serviceDescText');
+
+            const orderDetailsContainer =
+                document.getElementById('orderDetailsContainer');
+
+            const qtyInput =
+                document.getElementById('quantity');
+
+            const qtyLabel =
+                document.getElementById('quantityLabel');
+
+            document.getElementById('igPreviewBox')
+                .classList.add('hidden');
 
             if (!servId) {
                 descBox.classList.add('hidden');
                 orderDetailsContainer.classList.add('hidden');
+
                 document.getElementById('charge').value = '';
                 return;
             }
 
-            const targetServ = fetchedServices.find(s => s.id == servId);
+            const targetServ = fetchedServices.find(
+                s => s.id == servId
+            );
+
             if (targetServ) {
                 const minQ = targetServ.minQty || 100;
                 const maxQ = targetServ.maxQty || null;
+
                 qtyInput.min = minQ;
                 qtyInput.value = targetServ.baseQuantity || minQ;
 
                 if (maxQ) {
                     qtyInput.max = maxQ;
-                    qtyLabel.innerText = `الكمية (الحد الأدنى: ${minQ} | الحد الأقصى: ${maxQ})`;
+                    qtyLabel.innerText =
+                        `الكمية (الحد الأدنى: ${minQ} | الحد الأقصى: ${maxQ})`;
                 } else {
                     qtyInput.removeAttribute('max');
-                    qtyLabel.innerText = `الكمية (الحد الأدنى: ${minQ} | الحد الأقصى: مفتوح)`;
+                    qtyLabel.innerText =
+                        `الكمية (الحد الأدنى: ${minQ} | الحد الأقصى: مفتوح)`;
                 }
 
-                if (targetServ.description && targetServ.description.trim() !== '') {
+                if (
+                    targetServ.description &&
+                    targetServ.description.trim() !== ''
+                ) {
                     descText.innerText = targetServ.description;
                     descBox.classList.remove('hidden');
                 } else {
@@ -549,27 +1087,47 @@
         }
 
         function calculatePrice() {
-            const servId = document.getElementById('serviceSelect').value;
-            const targetServ = fetchedServices.find(s => s.id == servId);
-            const qty = parseInt(document.getElementById('quantity').value);
+            const servId =
+                document.getElementById('serviceSelect').value;
+
+            const targetServ = fetchedServices.find(
+                s => s.id == servId
+            );
+
+            const qty = parseInt(
+                document.getElementById('quantity').value
+            );
+
             const charge = document.getElementById('charge');
 
             if (targetServ && !isNaN(qty) && qty > 0) {
                 const baseQ = targetServ.baseQuantity || 1000;
-                charge.value = ((qty / baseQ) * parseFloat(targetServ.price)).toFixed(4);
+
+                charge.value = (
+                    (qty / baseQ) * parseFloat(targetServ.price)
+                ).toFixed(4);
             } else {
                 charge.value = '';
             }
         }
 
         async function previewInstagramAccount() {
-            const link = document.getElementById('orderLink').value.trim();
-            const previewBox = document.getElementById('igPreviewBox');
-            const checkBtn = document.getElementById('checkIgBtn');
+            const link =
+                document.getElementById('orderLink').value.trim();
+
+            const previewBox =
+                document.getElementById('igPreviewBox');
+
+            const checkBtn =
+                document.getElementById('checkIgBtn');
 
             if (!link) {
-                previewBox.className = 'mt-2 p-3 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200';
-                previewBox.innerText = '⚠️ يرجى وضع رابط حسابك في انستقرام أولاً.';
+                previewBox.className =
+                    'mt-2 p-3 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200';
+
+                previewBox.innerText =
+                    '⚠️ يرجى وضع رابط حسابك في انستقرام أولاً.';
+
                 previewBox.classList.remove('hidden');
                 return;
             }
@@ -579,24 +1137,39 @@
             previewBox.classList.add('hidden');
 
             try {
-                const res = await fetch('/api/instagram/check', {
+                const res = await apiFetch('/api/instagram/check', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({ link })
                 });
+
                 const data = await res.json();
+
                 previewBox.classList.remove('hidden');
+
                 if (data.success) {
-                    previewBox.className = 'mt-2 p-3 rounded-xl text-xs font-bold bg-green-50 text-green-700 border border-green-200';
-                    previewBox.innerText = `✅ الحساب (@${data.username}) عام وصحيح — عدد حسابك الحالي: ${data.followers} متابع.`;
+                    previewBox.className =
+                        'mt-2 p-3 rounded-xl text-xs font-bold bg-green-50 text-green-700 border border-green-200';
+
+                    previewBox.innerText =
+                        `✅ الحساب (@${data.username}) عام وصحيح — عدد حسابك الحالي: ${data.followers} متابع.`;
                 } else {
-                    previewBox.className = 'mt-2 p-3 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200';
-                    previewBox.innerText = data.message || '❌ الرابط خطأ.';
+                    previewBox.className =
+                        'mt-2 p-3 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200';
+
+                    previewBox.innerText =
+                        data.message || '❌ الرابط خطأ.';
                 }
             } catch (e) {
                 previewBox.classList.remove('hidden');
-                previewBox.className = 'mt-2 p-3 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200';
-                previewBox.innerText = 'حدث خطأ في الاتصال بالخادم أثناء الفحص.';
+
+                previewBox.className =
+                    'mt-2 p-3 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200';
+
+                previewBox.innerText =
+                    'حدث خطأ في الاتصال بالخادم أثناء الفحص.';
             } finally {
                 checkBtn.disabled = false;
                 checkBtn.innerText = 'فحص الرابط';
@@ -605,133 +1178,276 @@
 
         async function showOrdersPage() {
             hideAllSections();
-            document.getElementById('orders-section').classList.remove('hidden');
-            document.getElementById('pageTitle').innerText = 'سجل الطلبات';
-            document.getElementById('navOrders').className = 'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
+
+            document.getElementById('orders-section')
+                .classList.remove('hidden');
+
+            document.getElementById('pageTitle')
+                .innerText = 'سجل الطلبات';
+
+            document.getElementById('navOrders').className =
+                'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
+
             refreshUserBalance();
             await fetchAndRenderOrders();
         }
 
         async function fetchAndRenderOrders() {
-            const sessionStr = localStorage.getItem('smm_session');
-            if (!sessionStr) return;
-            const session = JSON.parse(sessionStr);
+            if (!currentUser || ordersBusy) return;
+
+            ordersBusy = true;
+            const session = currentUser;
 
             try {
-                const res = await fetch(`/api/orders/${session.username}`);
+                const res = await apiFetch(
+                    `/api/orders/${encodeURIComponent(session.username)}`
+                );
+
                 const data = await res.json();
-                const tbody = document.getElementById('ordersTableBody');
+
+                if (
+                    !res.ok ||
+                    !data.success ||
+                    currentUser !== session
+                ) {
+                    return;
+                }
+
+                const tbody =
+                    document.getElementById('ordersTableBody');
+
                 tbody.innerHTML = '';
 
                 if (data.success && data.orders.length > 0) {
                     data.orders.forEach(order => {
-                        let statusColor = 'text-yellow-700 bg-yellow-50';
-                        let statusText = order.status || 'قيد المعالجة';
+                        let statusColor =
+                            'text-yellow-700 bg-yellow-50';
+
+                        let statusText =
+                            order.status || 'قيد المعالجة';
 
                         if (statusText.includes('مكتمل')) {
-                            statusColor = 'text-green-700 bg-green-50';
+                            statusColor =
+                                'text-green-700 bg-green-50';
                             statusText = 'مكتمل';
                         } else if (statusText.includes('ملغي')) {
-                            statusColor = 'text-red-700 bg-red-50';
+                            statusColor =
+                                'text-red-700 bg-red-50';
                             statusText = 'ملغي';
                         } else if (statusText.includes('التنفيذ')) {
-                            statusColor = 'text-blue-700 bg-blue-50';
+                            statusColor =
+                                'text-blue-700 bg-blue-50';
                         }
 
-                        let counterCell = '<span class="text-gray-400">-</span>';
-                        if (order.start_count !== null && order.start_count !== undefined) {
-                            const curr = order.current_count ?? order.start_count;
-                            const targ = order.target_count ?? (Number(order.start_count) + Number(order.quantity));
+                        let counterCell =
+                            '<span class="text-gray-400">-</span>';
+
+                        if (
+                            order.start_count !== null &&
+                            order.start_count !== undefined
+                        ) {
+                            const curr =
+                                order.current_count ?? order.start_count;
+
+                            const targ = order.target_count ??
+                                (
+                                    Number(order.start_count) +
+                                    Number(order.quantity)
+                                );
 
                             if (statusText === 'مكتمل') {
                                 counterCell = `
-                                    <div class="font-mono font-bold text-green-700 text-xs" dir="ltr">${order.start_count}/${curr}</div>
-                                    <div class="text-[11px] font-bold text-green-600">العدد مكتمل ✓</div>
+                                    <div class="font-mono font-bold text-green-700 text-xs" dir="ltr">
+                                        ${escapeHTML(order.start_count)}/${escapeHTML(curr)}
+                                    </div>
+                                    <div class="text-[11px] font-bold text-green-600">
+                                        العدد مكتمل ✓
+                                    </div>
                                 `;
                             } else if (order.account_private) {
                                 counterCell = `
-                                    <div class="font-mono font-bold text-red-600 text-xs" dir="ltr">${order.start_count}/${curr}</div>
-                                    <div class="text-[11px] font-bold text-red-600">⚠️ حسابك خاص!</div>
+                                    <div class="font-mono font-bold text-red-600 text-xs" dir="ltr">
+                                        ${escapeHTML(order.start_count)}/${escapeHTML(curr)}
+                                    </div>
+                                    <div class="text-[11px] font-bold text-red-600">
+                                        ⚠️ حسابك خاص!
+                                    </div>
                                 `;
                             } else {
                                 counterCell = `
-                                    <div class="text-xs font-bold text-primary">عدد حسابك هو <span class="font-mono" dir="ltr">${order.start_count}/${curr}</span></div>
-                                    <div class="text-[10px] text-gray-500">يكتمل عند: ${targ}</div>
+                                    <div class="text-xs font-bold text-primary">
+                                        عدد حسابك هو
+                                        <span class="font-mono" dir="ltr">
+                                            ${escapeHTML(order.start_count)}/${escapeHTML(curr)}
+                                        </span>
+                                    </div>
+                                    <div class="text-[10px] text-gray-500">
+                                        يكتمل عند: ${escapeHTML(targ)}
+                                    </div>
                                 `;
                             }
                         }
 
                         tbody.innerHTML += `
                             <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
-                                <td class="p-3 font-bold text-primary">#${order.id.substring(0, 6)}</td>
-                                <td class="p-3 text-gray-700">${order.service}</td>
-                                <td class="p-3 text-blue-600 truncate max-w-xs"><a href="${order.link}" target="_blank" class="hover:underline" dir="ltr">${order.link}</a></td>
-                                <td class="p-3 font-bold">${order.quantity}</td>
-                                <td class="p-3">${counterCell}</td>
-                                <td class="p-3 font-bold">$${parseFloat(order.charge || 0).toFixed(4)}</td>
-                                <td class="p-3"><span class="${statusColor} px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">${statusText}</span></td>
-                                <td class="p-3 text-gray-400 text-xs whitespace-nowrap" dir="ltr">${order.created_at || '-'}</td>
+                                <td class="p-3 font-bold text-primary">
+                                    #${escapeHTML(order.id.substring(0, 6))}
+                                </td>
+                                <td class="p-3 text-gray-700">
+                                    ${escapeHTML(order.service)}
+                                </td>
+                                <td class="p-3 text-blue-600 truncate max-w-xs">
+                                    <a href="${escapeHTML(safeInstagramURL(order.link))}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       class="hover:underline"
+                                       dir="ltr">${escapeHTML(order.link)}</a>
+                                </td>
+                                <td class="p-3 font-bold">
+                                    ${escapeHTML(order.quantity)}
+                                </td>
+                                <td class="p-3">
+                                    ${counterCell}
+                                </td>
+                                <td class="p-3 font-bold">
+                                    $${parseFloat(order.charge || 0).toFixed(4)}
+                                </td>
+                                <td class="p-3">
+                                    <span class="${statusColor} px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">
+                                        ${escapeHTML(statusText)}
+                                    </span>
+                                </td>
+                                <td class="p-3 text-gray-400 text-xs whitespace-nowrap" dir="ltr">
+                                    ${escapeHTML(order.created_at || '-')}
+                                </td>
                             </tr>
                         `;
                     });
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-gray-400">لا توجد طلبات سابقة.</td></tr>`;
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="text-center p-6 text-gray-400">
+                                لا توجد طلبات سابقة.
+                            </td>
+                        </tr>
+                    `;
                 }
-            } catch (err) {}
+            } catch (err) {
+            } finally {
+                ordersBusy = false;
+            }
         }
 
-        // تحديث مباشر لجدول الطلبات كل 5 ثوانٍ أثناء فتح المستخدم لصفحة الطلبات
         setInterval(() => {
-            const ordSec = document.getElementById('orders-section');
-            if (ordSec && !ordSec.classList.contains('hidden')) {
+            const ordSec =
+                document.getElementById('orders-section');
+
+            if (
+                ordSec &&
+                !ordSec.classList.contains('hidden')
+            ) {
                 fetchAndRenderOrders();
             }
         }, 5000);
 
         function showDepositPage() {
             hideAllSections();
-            document.getElementById('deposit-section').classList.remove('hidden');
-            document.getElementById('pageTitle').innerText = 'شحن الرصيد';
-            document.getElementById('navDeposit').className = 'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
-            
-            if (document.getElementById('manualDepositForm')) document.getElementById('manualDepositForm').reset();
+
+            document.getElementById('deposit-section')
+                .classList.remove('hidden');
+
+            document.getElementById('pageTitle')
+                .innerText = 'شحن الرصيد';
+
+            document.getElementById('navDeposit').className =
+                'flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer';
+
+            if (document.getElementById('manualDepositForm')) {
+                document.getElementById('manualDepositForm').reset();
+            }
+
             resetAsiaFlow();
-            document.getElementById('depositSuccessMsg').classList.add('hidden');
-            
+
+            document.getElementById('depositSuccessMsg')
+                .classList.add('hidden');
+
             toggleDepositMode();
             refreshUserBalance();
         }
 
         function toggleDepositMode() {
-            const gateway = document.getElementById('depositGateway').value;
-            const asiaAutoBox = document.getElementById('asiaAutoBox');
-            const manualForm = document.getElementById('manualDepositForm');
+            const gateway =
+                document.getElementById('depositGateway').value;
+
+            const asiaAutoBox =
+                document.getElementById('asiaAutoBox');
+
+            const manualForm =
+                document.getElementById('manualDepositForm');
 
             if (gateway === 'AsiacellAuto') {
-                asiaAutoBox.classList.remove('hidden'); manualForm.classList.add('hidden');
+                asiaAutoBox.classList.remove('hidden');
+                manualForm.classList.add('hidden');
             } else {
-                asiaAutoBox.classList.add('hidden'); manualForm.classList.remove('hidden'); updateDepositInstructions();
+                asiaAutoBox.classList.add('hidden');
+                manualForm.classList.remove('hidden');
+                updateDepositInstructions();
             }
         }
 
         function updateDepositInstructions() {
-            const gateway = document.getElementById('depositGateway').value;
-            const infoBox = document.getElementById('depositInfoBox');
-            if (gateway === 'ZainCash') { infoBox.innerHTML = `قم بالتحويل عبر مسح الباركود التالي الخاص بزين كاش:<br><img src="/ZAINCASH.jpeg" alt="Zain Cash QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">`; }
-            else if (gateway === 'Mastercard') { infoBox.innerHTML = `قم بتحويل المبلغ إلى الرقم:<br><span class="font-mono font-bold text-primary text-lg" dir="ltr">7111053109</span>`; }
-            else if (gateway === 'Binance') { infoBox.innerHTML = `قم بالتحويل إلى المعرف: <span class="font-mono font-bold text-primary" dir="ltr">1075470705</span> أو عبر مسح الباركود التالي:<br><img src="/BINANCE.jpeg" alt="Binance QR" class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">`; }
+            const gateway =
+                document.getElementById('depositGateway').value;
+
+            const infoBox =
+                document.getElementById('depositInfoBox');
+
+            if (gateway === 'ZainCash') {
+                infoBox.innerHTML = `
+                    قم بالتحويل عبر مسح الباركود التالي الخاص بزين كاش:
+                    <br>
+                    <img src="/ZAINCASH.jpeg"
+                         alt="Zain Cash QR"
+                         class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">
+                `;
+            } else if (gateway === 'Mastercard') {
+                infoBox.innerHTML = `
+                    قم بتحويل المبلغ إلى الرقم:
+                    <br>
+                    <span class="font-mono font-bold text-primary text-lg" dir="ltr">
+                        7111053109
+                    </span>
+                `;
+            } else if (gateway === 'Binance') {
+                infoBox.innerHTML = `
+                    قم بالتحويل إلى المعرف:
+                    <span class="font-mono font-bold text-primary" dir="ltr">
+                        1075470705
+                    </span>
+                    أو عبر مسح الباركود التالي:
+                    <br>
+                    <img src="/BINANCE.jpeg"
+                         alt="Binance QR"
+                         class="mt-3 mx-auto max-h-48 rounded-xl border border-gray-200 shadow-sm">
+                `;
+            }
         }
 
         function showAsiaMessage(text, type = 'info') {
             const msg = document.getElementById('asiaMsg');
             msg.classList.remove('hidden');
+
             if (type === 'success') {
-                msg.className = 'text-xs p-3.5 rounded-xl font-bold text-center bg-green-50 text-green-700 border border-green-200 leading-relaxed';
+                msg.className =
+                    'text-xs p-3.5 rounded-xl font-bold text-center bg-green-50 text-green-700 border border-green-200 leading-relaxed';
             } else if (type === 'error') {
-                msg.className = 'text-xs p-3.5 rounded-xl font-bold text-center bg-red-50 text-red-700 border border-red-200 leading-relaxed';
+                msg.className =
+                    'text-xs p-3.5 rounded-xl font-bold text-center bg-red-50 text-red-700 border border-red-200 leading-relaxed';
             } else {
-                msg.className = 'text-xs p-3.5 rounded-xl font-bold text-center bg-blue-50 text-blue-700 border border-blue-200 leading-relaxed';
+                msg.className =
+                    'text-xs p-3.5 rounded-xl font-bold text-center bg-blue-50 text-blue-700 border border-blue-200 leading-relaxed';
             }
+
             msg.innerText = text;
         }
 
@@ -740,56 +1456,107 @@
             document.getElementById('asiaLoginOtpInput').value = '';
             document.getElementById('selectedAsiaAmountUSD').value = '';
             document.getElementById('asiaTransferOtpInput').value = '';
-            document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('selected'));
 
-            document.getElementById('asiaStep1').classList.remove('hidden');
-            document.getElementById('asiaStep2').classList.add('hidden');
-            document.getElementById('asiaStep3').classList.add('hidden');
-            document.getElementById('asiaStep4').classList.add('hidden');
-            document.getElementById('asiaMsg').classList.add('hidden');
+            document.querySelectorAll('.amount-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+
+            document.getElementById('asiaStep1')
+                .classList.remove('hidden');
+
+            document.getElementById('asiaStep2')
+                .classList.add('hidden');
+
+            document.getElementById('asiaStep3')
+                .classList.add('hidden');
+
+            document.getElementById('asiaStep4')
+                .classList.add('hidden');
+
+            document.getElementById('asiaMsg')
+                .classList.add('hidden');
         }
 
         function backToStep3() {
             document.getElementById('asiaTransferOtpInput').value = '';
-            document.getElementById('asiaStep4').classList.add('hidden');
-            document.getElementById('asiaStep3').classList.remove('hidden');
-            document.getElementById('asiaMsg').classList.add('hidden');
+
+            document.getElementById('asiaStep4')
+                .classList.add('hidden');
+
+            document.getElementById('asiaStep3')
+                .classList.remove('hidden');
+
+            document.getElementById('asiaMsg')
+                .classList.add('hidden');
         }
 
         function selectAsiaAmount(usd) {
             document.getElementById('selectedAsiaAmountUSD').value = usd;
-            document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('selected'));
-            const targetBtn = document.getElementById('amtBtn_' + usd);
-            if (targetBtn) targetBtn.classList.add('selected');
-            showAsiaMessage(`تم اختيار شحن ${usd}$ (سيتم تحويل ${usd * 1000} دينار من رصيدك). اضغط "شحن الرصيد الآن" للمتابعة.`, 'info');
+
+            document.querySelectorAll('.amount-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+
+            const targetBtn =
+                document.getElementById('amtBtn_' + usd);
+
+            if (targetBtn) {
+                targetBtn.classList.add('selected');
+            }
+
+            showAsiaMessage(
+                `تم اختيار شحن ${usd}$ (سيتم تحويل ${usd * 1000} دينار من رصيدك). اضغط "شحن الرصيد الآن" للمتابعة.`,
+                'info'
+            );
         }
 
         async function requestAsiaLoginOTP() {
-            const phone = document.getElementById('asiaPhoneInput').value.trim();
+            const phone =
+                document.getElementById('asiaPhoneInput').value.trim();
+
             if (!/^077\d{8}$/.test(phone)) {
-                return showAsiaMessage('⚠️ يرجى إدخال رقم هاتف آسياسيل صحيح مكون من 11 رقماً ويبدأ بـ 077', 'error');
+                return showAsiaMessage(
+                    '⚠️ يرجى إدخال رقم هاتف آسياسيل صحيح مكون من 11 رقماً ويبدأ بـ 077',
+                    'error'
+                );
             }
 
-            const btn = document.getElementById('sendLoginOtpBtn');
+            const btn =
+                document.getElementById('sendLoginOtpBtn');
+
             btn.disabled = true;
             btn.innerText = 'جاري إرسال رمز تسجيل الدخول...';
 
             try {
-                const res = await fetch('/api/asiacell/send-otp', {
+                const res = await apiFetch('/api/asiacell/send-otp', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({ phone })
                 });
+
                 const data = await res.json();
+
                 if (data.success) {
                     showAsiaMessage(data.message, 'info');
-                    document.getElementById('asiaStep1').classList.add('hidden');
-                    document.getElementById('asiaStep2').classList.remove('hidden');
+
+                    document.getElementById('asiaStep1')
+                        .classList.add('hidden');
+
+                    document.getElementById('asiaStep2')
+                        .classList.remove('hidden');
                 } else {
-                    showAsiaMessage(data.message || 'تعذر إرسال رمز الدخول.', 'error');
+                    showAsiaMessage(
+                        data.message || 'تعذر إرسال رمز الدخول.',
+                        'error'
+                    );
                 }
             } catch (e) {
-                showAsiaMessage('حدث خطأ في الاتصال بالخادم.', 'error');
+                showAsiaMessage(
+                    'حدث خطأ في الاتصال بالخادم.',
+                    'error'
+                );
             } finally {
                 btn.disabled = false;
                 btn.innerText = 'إرسال رمز تسجيل الدخول';
@@ -797,33 +1564,55 @@
         }
 
         async function verifyAsiaLoginOTP() {
-            const phone = document.getElementById('asiaPhoneInput').value.trim();
-            const otp = document.getElementById('asiaLoginOtpInput').value.trim();
+            const phone =
+                document.getElementById('asiaPhoneInput').value.trim();
+
+            const otp =
+                document.getElementById('asiaLoginOtpInput').value.trim();
 
             if (!otp || otp.length < 4) {
-                return showAsiaMessage('⚠️ يرجى إدخال رمز تسجيل الدخول المرسل إلى هاتفك.', 'error');
+                return showAsiaMessage(
+                    '⚠️ يرجى إدخال رمز تسجيل الدخول المرسل إلى هاتفك.',
+                    'error'
+                );
             }
 
-            const btn = document.getElementById('verifyLoginOtpBtn');
+            const btn =
+                document.getElementById('verifyLoginOtpBtn');
+
             btn.disabled = true;
             btn.innerText = 'جاري التحقق من رمز الدخول...';
 
             try {
-                const res = await fetch('/api/asiacell/verify-login', {
+                const res = await apiFetch('/api/asiacell/verify-login', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({ phone, otp })
                 });
+
                 const data = await res.json();
+
                 if (data.success) {
                     showAsiaMessage(data.message, 'success');
-                    document.getElementById('asiaStep2').classList.add('hidden');
-                    document.getElementById('asiaStep3').classList.remove('hidden');
+
+                    document.getElementById('asiaStep2')
+                        .classList.add('hidden');
+
+                    document.getElementById('asiaStep3')
+                        .classList.remove('hidden');
                 } else {
-                    showAsiaMessage(data.message || 'رمز تسجيل الدخول غير صحيح.', 'error');
+                    showAsiaMessage(
+                        data.message || 'رمز تسجيل الدخول غير صحيح.',
+                        'error'
+                    );
                 }
             } catch (e) {
-                showAsiaMessage('حدث خطأ أثناء التحقق من الرمز.', 'error');
+                showAsiaMessage(
+                    'حدث خطأ أثناء التحقق من الرمز.',
+                    'error'
+                );
             } finally {
                 btn.disabled = false;
                 btn.innerText = 'تأكيد رمز الدخول والمتابعة';
@@ -831,33 +1620,60 @@
         }
 
         async function initiateAsiaTransfer() {
-            const phone = document.getElementById('asiaPhoneInput').value.trim();
-            const amountUSD = parseInt(document.getElementById('selectedAsiaAmountUSD').value);
+            const phone =
+                document.getElementById('asiaPhoneInput').value.trim();
+
+            const amountUSD = parseInt(
+                document.getElementById('selectedAsiaAmountUSD').value
+            );
 
             if (!amountUSD || amountUSD < 1 || amountUSD > 10) {
-                return showAsiaMessage('⚠️ يرجى اختيار المبلغ الذي تريد شحنه أولاً (من 1$ إلى 10$).', 'error');
+                return showAsiaMessage(
+                    '⚠️ يرجى اختيار المبلغ الذي تريد شحنه أولاً (من 1$ إلى 10$).',
+                    'error'
+                );
             }
 
-            const btn = document.getElementById('initiateTransferBtn');
+            const btn =
+                document.getElementById('initiateTransferBtn');
+
             btn.disabled = true;
-            btn.innerText = 'جاري فحص الرصيد وطلب رمز تأكيد التحويل...';
+            btn.innerText =
+                'جاري فحص الرصيد وطلب رمز تأكيد التحويل...';
 
             try {
-                const res = await fetch('/api/asiacell/initiate-transfer', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, amountUSD })
-                });
+                const res = await apiFetch(
+                    '/api/asiacell/initiate-transfer',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            phone,
+                            amountUSD
+                        })
+                    }
+                );
+
                 const data = await res.json();
+
                 if (data.success) {
                     showAsiaMessage(data.message, 'info');
-                    document.getElementById('asiaStep3').classList.add('hidden');
-                    document.getElementById('asiaStep4').classList.remove('hidden');
+
+                    document.getElementById('asiaStep3')
+                        .classList.add('hidden');
+
+                    document.getElementById('asiaStep4')
+                        .classList.remove('hidden');
                 } else {
                     showAsiaMessage(data.message, 'error');
                 }
             } catch (e) {
-                showAsiaMessage('حدث خطأ في الاتصال أثناء طلب التحويل.', 'error');
+                showAsiaMessage(
+                    'حدث خطأ في الاتصال أثناء طلب التحويل.',
+                    'error'
+                );
             } finally {
                 btn.disabled = false;
                 btn.innerText = 'شحن الرصيد الآن';
@@ -865,94 +1681,194 @@
         }
 
         async function confirmAsiaFinalTransfer() {
-            const sessionStr = localStorage.getItem('smm_session');
-            if (!sessionStr) return alert('الرجاء تسجيل الدخول أولاً');
-            const session = JSON.parse(sessionStr);
+            if (!currentUser) return promptLogin();
 
-            const phone = document.getElementById('asiaPhoneInput').value.trim();
-            const amount = document.getElementById('selectedAsiaAmountUSD').value;
-            const transferOtp = document.getElementById('asiaTransferOtpInput').value.trim();
+            const session = currentUser;
+
+            const phone =
+                document.getElementById('asiaPhoneInput').value.trim();
+
+            const amount =
+                document.getElementById('selectedAsiaAmountUSD').value;
+
+            const transferOtp =
+                document.getElementById('asiaTransferOtpInput').value.trim();
 
             if (!transferOtp || transferOtp.length < 4) {
-                return showAsiaMessage('⚠️ يرجى إدخال رمز تأكيد التحويل المرسل من آسياسيل.', 'error');
+                return showAsiaMessage(
+                    '⚠️ يرجى إدخال رمز تأكيد التحويل المرسل من آسياسيل.',
+                    'error'
+                );
             }
 
-            const btn = document.getElementById('confirmFinalOtpBtn');
+            const btn =
+                document.getElementById('confirmFinalOtpBtn');
+
             btn.disabled = true;
             btn.innerText = 'جاري تأكيد التحويل وإضافة الرصيد...';
 
             try {
-                const res = await fetch('/api/asiacell/confirm-transfer', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: session.email, phone, transferOtp, amount })
-                });
+                const res = await apiFetch(
+                    '/api/asiacell/confirm-transfer',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            email: session.email,
+                            phone,
+                            transferOtp,
+                            amount
+                        })
+                    }
+                );
+
                 const data = await res.json();
+
                 if (data.success) {
                     showAsiaMessage(data.message, 'success');
+
                     session.balance = data.newBalance;
-                    localStorage.setItem('smm_session', JSON.stringify(session));
-                    document.getElementById('displayBalance').innerText = '$' + parseFloat(data.newBalance).toFixed(2);
-                    setTimeout(() => { resetAsiaFlow(); }, 4000);
+
+                    document.getElementById('displayBalance')
+                        .innerText =
+                            '$' + parseFloat(data.newBalance).toFixed(2);
+
+                    setTimeout(() => {
+                        resetAsiaFlow();
+                    }, 4000);
                 } else {
                     showAsiaMessage(data.message, 'error');
                 }
             } catch (e) {
-                showAsiaMessage('حدث خطأ أثناء تأكيد التحويل النهائي.', 'error');
+                showAsiaMessage(
+                    'حدث خطأ أثناء تأكيد التحويل النهائي.',
+                    'error'
+                );
             } finally {
                 btn.disabled = false;
-                btn.innerText = 'تأكيد التحويل وإضافة الرصيد لحسابي';
+                btn.innerText =
+                    'تأكيد التحويل وإضافة الرصيد لحسابي';
             }
         }
 
         async function handleDepositSubmit(e) {
             e.preventDefault();
-            const sessionStr = localStorage.getItem('smm_session');
-            if (!sessionStr) return alert('الرجاء تسجيل الدخول أولاً');
-            const session = JSON.parse(sessionStr);
-            const imageInput = document.getElementById('depImageInput');
-            if (!imageInput.files[0]) return alert('الرجاء رفع صورة الإيصال.');
 
-            const msgBox = document.getElementById('depositSuccessMsg');
-            msgBox.className = 'hidden mt-4 max-w-xl text-xs p-3 rounded-xl font-bold text-center';
+            if (!currentUser) return promptLogin();
+
+            const session = currentUser;
+
+            const imageInput =
+                document.getElementById('depImageInput');
+
+            if (!imageInput.files[0]) {
+                return alert('الرجاء رفع صورة الإيصال.');
+            }
+
+            const msgBox =
+                document.getElementById('depositSuccessMsg');
+
+            msgBox.className =
+                'hidden mt-4 max-w-xl text-xs p-3 rounded-xl font-bold text-center';
 
             const formData = new FormData();
+
             formData.append('email', session.email);
-            formData.append('gateway', document.getElementById('depositGateway').value);
-            formData.append('amount', document.getElementById('depAmountInput').value);
-            formData.append('receiptImage', imageInput.files[0]);
+
+            formData.append(
+                'gateway',
+                document.getElementById('depositGateway').value
+            );
+
+            formData.append(
+                'amount',
+                document.getElementById('depAmountInput').value
+            );
+
+            formData.append(
+                'receiptImage',
+                imageInput.files[0]
+            );
 
             try {
-                const res = await fetch('/api/deposit/submit', { method: 'POST', body: formData });
+                const res = await apiFetch('/api/deposit/submit', {
+                    method: 'POST',
+                    body: formData
+                });
+
                 const data = await res.json();
+
                 if (data.success) {
-                    msgBox.classList.remove('hidden'); msgBox.classList.add('bg-green-50', 'text-green-700'); msgBox.innerText = 'تم إرسال طلب الشحن بنجاح! بانتظار مراجعة الإدارة عبر التليجرام.';
-                    document.getElementById('manualDepositForm').reset(); updateDepositInstructions();
+                    msgBox.classList.remove('hidden');
+                    msgBox.classList.add(
+                        'bg-green-50',
+                        'text-green-700'
+                    );
+
+                    msgBox.innerText =
+                        'تم إرسال طلب الشحن بنجاح! بانتظار مراجعة الإدارة عبر التليجرام.';
+
+                    document.getElementById('manualDepositForm')
+                        .reset();
+
+                    updateDepositInstructions();
                 } else {
-                    msgBox.classList.remove('hidden'); msgBox.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200'); msgBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i> ${data.message}`;
+                    msgBox.classList.remove('hidden');
+
+                    msgBox.classList.add(
+                        'bg-red-50',
+                        'text-red-700',
+                        'border',
+                        'border-red-200'
+                    );
+
+                    msgBox.textContent =
+                        '⚠️ ' + (data.message || 'تعذر إرسال طلب الشحن.');
                 }
-            } catch (err) { alert('خطأ في الاتصال بالخادم'); }
+            } catch (err) {
+                alert('خطأ في الاتصال بالخادم');
+            }
         }
 
-        // ============================================================
-        // 🛡️ وظائف لوحة المدير (إضافة وتعديل وحذف الخدمات)
-        // ============================================================
+        // لوحة المدير
         async function showAdminPanel() {
+            if (!currentUser) return promptLogin();
+
+            if (currentUser.role !== 'admin') {
+                return alert('ليس لديك صلاحية الإدارة.');
+            }
+
             hideAllSections();
-            document.getElementById('admin-section').classList.remove('hidden');
-            document.getElementById('pageTitle').innerText = 'لوحة تحكم المدير';
-            document.getElementById('adminNavLink').className = 'flex items-center px-4 py-3 bg-red-50 text-red-600 rounded-xl font-medium transition cursor-pointer';
+
+            document.getElementById('admin-section')
+                .classList.remove('hidden');
+
+            document.getElementById('pageTitle')
+                .innerText = 'لوحة تحكم المدير';
+
+            document.getElementById('adminNavLink').className =
+                'flex items-center px-4 py-3 bg-red-50 text-red-600 rounded-xl font-medium transition cursor-pointer';
+
             refreshUserBalance();
 
             try {
-                const dataRes = await fetch('/api/admin/data');
+                const dataRes = await apiFetch('/api/admin/data');
                 const data = await dataRes.json();
-                const servRes = await fetch('/api/services');
+
+                const servRes = await apiFetch('/api/services');
                 const servData = await servRes.json();
+
                 if (data.success) {
-                    document.getElementById('adminUsersCount').innerText = data.usersCount;
-                    document.getElementById('adminTotalSales').innerText = parseFloat(data.totalSales).toFixed(2);
+                    document.getElementById('adminUsersCount')
+                        .innerText = data.usersCount;
+
+                    document.getElementById('adminTotalSales')
+                        .innerText =
+                            parseFloat(data.totalSales).toFixed(2);
                 }
+
                 if (servData.success) {
                     fetchedServices = servData.services;
                     renderAdminServicesTable(servData.services);
@@ -961,73 +1877,169 @@
         }
 
         function renderAdminServicesTable(services) {
-            const servTbody = document.getElementById('adminServicesTableBody');
+            const servTbody =
+                document.getElementById('adminServicesTableBody');
+
             servTbody.innerHTML = '';
+
             if (services && services.length > 0) {
                 services.forEach(serv => {
                     const baseQ = serv.baseQuantity || 1000;
                     const minQ = serv.minQty || 100;
-                    const maxLabel = serv.maxQty ? serv.maxQty : 'مفتوح ∞';
+                    const maxLabel = serv.maxQty
+                        ? serv.maxQty
+                        : 'مفتوح ∞';
+
                     servTbody.innerHTML += `
                         <tr class="border-b hover:bg-gray-50">
-                            <td class="p-3 font-bold text-primary">${serv.category}</td>
-                            <td class="p-3 font-bold text-dark">${serv.name}</td>
-                            <td class="p-3 font-bold">${baseQ} مقابل $${parseFloat(serv.price).toFixed(2)}</td>
-                            <td class="p-3 text-xs font-bold text-gray-600">أدنى: ${minQ} | أقصى: ${maxLabel}</td>
+                            <td class="p-3 font-bold text-primary">
+                                ${escapeHTML(serv.category)}
+                            </td>
+                            <td class="p-3 font-bold text-dark">
+                                ${escapeHTML(serv.name)}
+                            </td>
+                            <td class="p-3 font-bold">
+                                ${escapeHTML(baseQ)}
+                                مقابل $${parseFloat(serv.price).toFixed(2)}
+                            </td>
+                            <td class="p-3 text-xs font-bold text-gray-600">
+                                أدنى: ${escapeHTML(minQ)}
+                                | أقصى: ${escapeHTML(maxLabel)}
+                            </td>
                             <td class="p-3 space-x-2 space-x-reverse">
-                                <button onclick="editServiceById('${serv.id}')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-lg text-xs font-bold transition">تعديل</button>
-                                <button onclick="deleteService('${serv.id}')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-bold transition">حذف</button>
+                                <button type="button"
+                                        data-service-action="edit"
+                                        data-service-id="${escapeHTML(serv.id)}"
+                                        class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-lg text-xs font-bold transition">
+                                    تعديل
+                                </button>
+                                <button type="button"
+                                        data-service-action="delete"
+                                        data-service-id="${escapeHTML(serv.id)}"
+                                        class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-bold transition">
+                                    حذف
+                                </button>
                             </td>
                         </tr>
                     `;
                 });
             } else {
-                servTbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-400">لا توجد خدمات مضافة بعد.</td></tr>`;
+                servTbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center p-4 text-gray-400">
+                            لا توجد خدمات مضافة بعد.
+                        </td>
+                    </tr>
+                `;
             }
         }
 
+        document.getElementById('adminServicesTableBody')
+            .addEventListener('click', event => {
+                const button = event.target.closest(
+                    'button[data-service-action]'
+                );
+
+                if (
+                    !button ||
+                    currentUser?.role !== 'admin'
+                ) {
+                    return;
+                }
+
+                const id = button.dataset.serviceId;
+
+                if (button.dataset.serviceAction === 'edit') {
+                    editServiceById(id);
+                }
+
+                if (button.dataset.serviceAction === 'delete') {
+                    deleteService(id);
+                }
+            });
+
         function editServiceById(id) {
             const serv = fetchedServices.find(s => s.id === id);
-            if (!serv) return;
-            document.getElementById('editServiceId').value = serv.id;
-            document.getElementById('servCategory').value = serv.category || '';
-            document.getElementById('servName').value = serv.name || '';
-            document.getElementById('servBaseQty').value = serv.baseQuantity || 1000;
-            document.getElementById('servPrice').value = serv.price || '';
-            document.getElementById('servMinQty').value = serv.minQty || 100;
-            document.getElementById('servMaxQty').value = serv.maxQty ? serv.maxQty : '';
-            document.getElementById('servDescription').value = serv.description || '';
 
-            document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-500 me-2"></i> تعديل الخدمة الحالية`;
-            const saveBtn = document.getElementById('saveServiceBtn');
+            if (!serv) return;
+
+            document.getElementById('editServiceId').value = serv.id;
+            document.getElementById('servCategory').value =
+                serv.category || '';
+            document.getElementById('servName').value =
+                serv.name || '';
+            document.getElementById('servBaseQty').value =
+                serv.baseQuantity || 1000;
+            document.getElementById('servPrice').value =
+                serv.price || '';
+            document.getElementById('servMinQty').value =
+                serv.minQty || 100;
+            document.getElementById('servMaxQty').value =
+                serv.maxQty ? serv.maxQty : '';
+            document.getElementById('servDescription').value =
+                serv.description || '';
+
+            document.getElementById('adminFormTitle').innerHTML = `
+                <i class="fa-solid fa-pen-to-square text-amber-500 me-2"></i>
+                تعديل الخدمة الحالية
+            `;
+
+            const saveBtn =
+                document.getElementById('saveServiceBtn');
+
             saveBtn.innerText = 'حفظ التعديلات';
-            saveBtn.className = 'bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
-            document.getElementById('cancelEditBtn').classList.remove('hidden');
-            document.getElementById('addServiceForm').scrollIntoView({ behavior: 'smooth' });
+
+            saveBtn.className =
+                'bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+
+            document.getElementById('cancelEditBtn')
+                .classList.remove('hidden');
+
+            document.getElementById('addServiceForm')
+                .scrollIntoView({ behavior: 'smooth' });
         }
 
         function resetServiceForm() {
             document.getElementById('addServiceForm').reset();
+
             document.getElementById('editServiceId').value = '';
             document.getElementById('servBaseQty').value = 1000;
             document.getElementById('servMinQty').value = 100;
             document.getElementById('servMaxQty').value = '';
-            document.getElementById('adminFormTitle').innerHTML = `<i class="fa-solid fa-plus-circle text-primary me-2"></i> إضافة خدمة جديدة للنظام`;
-            const saveBtn = document.getElementById('saveServiceBtn');
+
+            document.getElementById('adminFormTitle').innerHTML = `
+                <i class="fa-solid fa-plus-circle text-primary me-2"></i>
+                إضافة خدمة جديدة للنظام
+            `;
+
+            const saveBtn =
+                document.getElementById('saveServiceBtn');
+
             saveBtn.innerText = 'إضافة الخدمة للنظام';
-            saveBtn.className = 'bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
-            document.getElementById('cancelEditBtn').classList.add('hidden');
+
+            saveBtn.className =
+                'bg-primary hover:bg-[#531423] text-white font-bold py-2.5 px-6 rounded-xl text-sm transition';
+
+            document.getElementById('cancelEditBtn')
+                .classList.add('hidden');
         }
 
         async function deleteService(id) {
-            if (!confirm('هل أنت متأكد من رغبتك في حذف هذه الخدمة؟')) return;
+            if (!confirm('هل أنت متأكد من رغبتك في حذف هذه الخدمة؟')) {
+                return;
+            }
+
             try {
-                const res = await fetch('/api/admin/delete-service', {
+                const res = await apiFetch('/api/admin/delete-service', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({ id })
                 });
+
                 const data = await res.json();
+
                 if (data.success) {
                     showAdminPanel();
                 } else {
@@ -1038,188 +2050,319 @@
             }
         }
 
-        document.getElementById('addServiceForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const editId = document.getElementById('editServiceId').value;
-            const saveBtn = document.getElementById('saveServiceBtn');
-            const msgBox = document.getElementById('adminServiceMsg');
-            msgBox.classList.add('hidden');
+        document.getElementById('addServiceForm')
+            .addEventListener('submit', async function(e) {
+                e.preventDefault();
 
-            const rawMax = document.getElementById('servMaxQty').value.trim();
-            const payload = {
-                category: document.getElementById('servCategory').value.trim(),
-                name: document.getElementById('servName').value.trim(),
-                baseQuantity: parseInt(document.getElementById('servBaseQty').value) || 1000,
-                price: parseFloat(document.getElementById('servPrice').value),
-                minQty: parseInt(document.getElementById('servMinQty').value) || 100,
-                maxQty: rawMax !== '' ? parseInt(rawMax) : null,
-                description: document.getElementById('servDescription').value.trim()
-            };
-            if (editId) payload.id = editId;
+                const editId =
+                    document.getElementById('editServiceId').value;
 
-            const endpoint = editId ? '/api/admin/update-service' : '/api/admin/add-service';
-            saveBtn.disabled = true;
-            saveBtn.innerText = 'جاري الحفظ...';
+                const saveBtn =
+                    document.getElementById('saveServiceBtn');
 
-            try {
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (data.success) {
-                    resetServiceForm();
-                    msgBox.classList.remove('hidden');
-                    msgBox.className = 'text-xs p-3 rounded-xl font-bold text-center bg-green-50 text-green-700 border border-green-200';
-                    msgBox.innerText = data.message || 'تم حفظ الخدمة بنجاح!';
-                    setTimeout(() => msgBox.classList.add('hidden'), 3000);
-                    await showAdminPanel();
-                } else {
-                    msgBox.classList.remove('hidden');
-                    msgBox.className = 'text-xs p-3 rounded-xl font-bold text-center bg-red-50 text-red-700 border border-red-200';
-                    msgBox.innerText = data.message || 'حدث خطأ أثناء حفظ الخدمة.';
+                const msgBox =
+                    document.getElementById('adminServiceMsg');
+
+                msgBox.classList.add('hidden');
+
+                const rawMax =
+                    document.getElementById('servMaxQty').value.trim();
+
+                const payload = {
+                    category:
+                        document.getElementById('servCategory').value.trim(),
+                    name:
+                        document.getElementById('servName').value.trim(),
+                    baseQuantity:
+                        parseInt(document.getElementById('servBaseQty').value) || 1000,
+                    price:
+                        parseFloat(document.getElementById('servPrice').value),
+                    minQty:
+                        parseInt(document.getElementById('servMinQty').value) || 100,
+                    maxQty:
+                        rawMax !== '' ? parseInt(rawMax) : null,
+                    description:
+                        document.getElementById('servDescription').value.trim()
+                };
+
+                if (editId) {
+                    payload.id = editId;
                 }
-            } catch (err) {
-                alert('خطأ في الاتصال بالخادم أثناء حفظ الخدمة.');
-            } finally {
-                saveBtn.disabled = false;
-                saveBtn.innerText = document.getElementById('editServiceId').value ? 'حفظ التعديلات' : 'إضافة الخدمة للنظام';
-            }
-        });
+
+                const endpoint = editId
+                    ? '/api/admin/update-service'
+                    : '/api/admin/add-service';
+
+                saveBtn.disabled = true;
+                saveBtn.innerText = 'جاري الحفظ...';
+
+                try {
+                    const res = await apiFetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        resetServiceForm();
+
+                        msgBox.classList.remove('hidden');
+
+                        msgBox.className =
+                            'text-xs p-3 rounded-xl font-bold text-center bg-green-50 text-green-700 border border-green-200';
+
+                        msgBox.innerText =
+                            data.message || 'تم حفظ الخدمة بنجاح!';
+
+                        setTimeout(() => {
+                            msgBox.classList.add('hidden');
+                        }, 3000);
+
+                        await showAdminPanel();
+                    } else {
+                        msgBox.classList.remove('hidden');
+
+                        msgBox.className =
+                            'text-xs p-3 rounded-xl font-bold text-center bg-red-50 text-red-700 border border-red-200';
+
+                        msgBox.innerText =
+                            data.message || 'حدث خطأ أثناء حفظ الخدمة.';
+                    }
+                } catch (err) {
+                    alert('خطأ في الاتصال بالخادم أثناء حفظ الخدمة.');
+                } finally {
+                    saveBtn.disabled = false;
+
+                    saveBtn.innerText =
+                        document.getElementById('editServiceId').value
+                            ? 'حفظ التعديلات'
+                            : 'إضافة الخدمة للنظام';
+                }
+            });
 
         window.addEventListener('DOMContentLoaded', () => {
-            const session = localStorage.getItem('smm_session');
-            if (session) { const user = JSON.parse(session); showDashboard(user.username, user.email, user.balance); }
+            restoreSession();
         });
 
-        document.getElementById('orderForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const sessionStr = localStorage.getItem('smm_session');
-            if (!sessionStr) return alert('الرجاء تسجيل الدخول أولاً');
-            const session = JSON.parse(sessionStr);
+        document.getElementById('orderForm')
+            .addEventListener('submit', async function(e) {
+                e.preventDefault();
 
-            const okMsg = document.getElementById('successOrderMsg');
-            const errMsg = document.getElementById('errorOrderMsg');
-            const submitBtn = document.getElementById('submitOrderBtn');
-            okMsg.classList.add('hidden');
-            errMsg.classList.add('hidden');
+                if (!currentUser) return promptLogin();
 
-            const targetServ = fetchedServices.find(s => s.id == document.getElementById('serviceSelect').value);
-            if (!targetServ) return alert('اختر الخدمة أولاً.');
+                const session = currentUser;
 
-            const quantity = parseInt(document.getElementById('quantity').value);
-            const minQ = targetServ.minQty || 100;
-            const maxQ = targetServ.maxQty || null;
+                const okMsg =
+                    document.getElementById('successOrderMsg');
 
-            if (isNaN(quantity) || quantity < minQ) {
-                errMsg.innerText = `⚠️ الحد الأدنى للطلب هو ${minQ}.`;
-                errMsg.classList.remove('hidden');
-                return;
-            }
-            if (maxQ !== null && quantity > maxQ) {
-                errMsg.innerText = `⚠️ الحد الأقصى للطلب هو ${maxQ}.`;
-                errMsg.classList.remove('hidden');
-                return;
-            }
+                const errMsg =
+                    document.getElementById('errorOrderMsg');
 
-            const link = document.getElementById('orderLink').value.trim();
-            const charge = parseFloat(document.getElementById('charge').value);
+                const submitBtn =
+                    document.getElementById('submitOrderBtn');
 
-            if (session.balance < charge) {
-                errMsg.innerText = '⚠️ رصيدك غير كافٍ لإتمام هذا الطلب.';
-                errMsg.classList.remove('hidden');
-                return;
-            }
+                okMsg.classList.add('hidden');
+                errMsg.classList.add('hidden');
 
-            submitBtn.disabled = true;
-            submitBtn.innerText = 'جاري فحص رابط انستقرام وإنشاء الطلب...';
+                const targetServ = fetchedServices.find(
+                    s => s.id ==
+                        document.getElementById('serviceSelect').value
+                );
 
-            try {
-                const res = await fetch('/api/order', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: session.username,
-                        serviceId: targetServ.id,
-                        link,
-                        quantity
-                    })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    session.balance = data.newBalance;
-                    localStorage.setItem('smm_session', JSON.stringify(session));
-                    document.getElementById('displayBalance').innerText = '$' + data.newBalance.toFixed(2);
+                if (!targetServ) {
+                    return alert('اختر الخدمة أولاً.');
+                }
 
-                    okMsg.innerText = `✅ تم إنشاء الطلب #${data.orderId.substring(0, 6)} بنجاح! عدد حسابك هو ${data.startCount}/${data.currentCount} (يكتمل عند: ${data.targetCount})`;
-                    okMsg.classList.remove('hidden');
+                const quantity = parseInt(
+                    document.getElementById('quantity').value
+                );
 
-                    this.reset();
-                    document.getElementById('igPreviewBox').classList.add('hidden');
-                    document.getElementById('serviceSelectContainer').classList.add('hidden');
-                    document.getElementById('serviceDescriptionBox').classList.add('hidden');
-                    document.getElementById('orderDetailsContainer').classList.add('hidden');
-                    document.getElementById('charge').value = '';
-                } else {
-                    errMsg.innerText = data.message || 'تعذر إنشاء الطلب.';
+                const minQ = targetServ.minQty || 100;
+                const maxQ = targetServ.maxQty || null;
+
+                if (isNaN(quantity) || quantity < minQ) {
+                    errMsg.innerText =
+                        `⚠️ الحد الأدنى للطلب هو ${minQ}.`;
+
                     errMsg.classList.remove('hidden');
+                    return;
                 }
-            } catch (err) {
-                errMsg.innerText = 'حدث خطأ في الاتصال بالخادم.';
-                errMsg.classList.remove('hidden');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerText = 'فحص الحساب وتأكيد الطلب';
-            }
-        });
 
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const errorBox = document.getElementById('registerError'); errorBox.classList.add('hidden');
-            try {
-                const res = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: document.getElementById('regUsername').value,
-                        email: document.getElementById('regEmail').value,
-                        password: document.getElementById('regPassword').value
-                    })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    localStorage.setItem('smm_session', JSON.stringify({ username: data.username, email: data.email, balance: data.balance }));
-                    showDashboard(data.username, data.email, data.balance);
-                    document.getElementById('registerForm').reset();
-                } else {
-                    errorBox.innerText = data.message; errorBox.classList.remove('hidden');
-                }
-            } catch (err) {}
-        });
+                if (maxQ !== null && quantity > maxQ) {
+                    errMsg.innerText =
+                        `⚠️ الحد الأقصى للطلب هو ${maxQ}.`;
 
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const errorBox = document.getElementById('loginError'); errorBox.classList.add('hidden');
-            try {
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: document.getElementById('loginEmail').value,
-                        password: document.getElementById('loginPassword').value
-                    })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    localStorage.setItem('smm_session', JSON.stringify({ username: data.username, email: data.email, balance: data.balance }));
-                    showDashboard(data.username, data.email, data.balance);
-                    document.getElementById('loginForm').reset();
-                } else {
-                    errorBox.innerText = data.message; errorBox.classList.remove('hidden');
+                    errMsg.classList.remove('hidden');
+                    return;
                 }
-            } catch (err) {}
-        });
+
+                const link =
+                    document.getElementById('orderLink').value.trim();
+
+                const charge = parseFloat(
+                    document.getElementById('charge').value
+                );
+
+                if (session.balance < charge) {
+                    errMsg.innerText =
+                        '⚠️ رصيدك غير كافٍ لإتمام هذا الطلب.';
+
+                    errMsg.classList.remove('hidden');
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                submitBtn.innerText =
+                    'جاري فحص رابط انستقرام وإنشاء الطلب...';
+
+                try {
+                    const res = await apiFetch('/api/order', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            username: session.username,
+                            serviceId: targetServ.id,
+                            link,
+                            quantity
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        session.balance = data.newBalance;
+
+                        document.getElementById('displayBalance')
+                            .innerText =
+                                '$' + data.newBalance.toFixed(2);
+
+                        okMsg.innerText =
+                            `✅ تم إنشاء الطلب #${data.orderId.substring(0, 6)} بنجاح! عدد حسابك هو ${data.startCount}/${data.currentCount} (يكتمل عند: ${data.targetCount})`;
+
+                        okMsg.classList.remove('hidden');
+
+                        this.reset();
+
+                        document.getElementById('igPreviewBox')
+                            .classList.add('hidden');
+
+                        document.getElementById('serviceSelectContainer')
+                            .classList.add('hidden');
+
+                        document.getElementById('serviceDescriptionBox')
+                            .classList.add('hidden');
+
+                        document.getElementById('orderDetailsContainer')
+                            .classList.add('hidden');
+
+                        document.getElementById('charge').value = '';
+                    } else {
+                        errMsg.innerText =
+                            data.message || 'تعذر إنشاء الطلب.';
+
+                        errMsg.classList.remove('hidden');
+                    }
+                } catch (err) {
+                    errMsg.innerText =
+                        'حدث خطأ في الاتصال بالخادم.';
+
+                    errMsg.classList.remove('hidden');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText =
+                        'فحص الحساب وتأكيد الطلب';
+                }
+            });
+
+        document.getElementById('registerForm')
+            .addEventListener('submit', async e => {
+                e.preventDefault();
+
+                const errorBox =
+                    document.getElementById('registerError');
+
+                errorBox.classList.add('hidden');
+
+                try {
+                    const res = await apiFetch('/api/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            username:
+                                document.getElementById('regUsername').value,
+                            email:
+                                document.getElementById('regEmail').value,
+                            password:
+                                document.getElementById('regPassword').value
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        if (!await restoreSession(true)) return;
+
+                        document.getElementById('registerForm').reset();
+                    } else {
+                        errorBox.innerText = data.message;
+                        errorBox.classList.remove('hidden');
+                    }
+                } catch (err) {
+                    errorBox.textContent =
+                        'تعذر الاتصال بالخادم. حاول مجدداً.';
+
+                    errorBox.classList.remove('hidden');
+                }
+            });
+
+        document.getElementById('loginForm')
+            .addEventListener('submit', async e => {
+                e.preventDefault();
+
+                const errorBox =
+                    document.getElementById('loginError');
+
+                errorBox.classList.add('hidden');
+
+                try {
+                    const res = await apiFetch('/api/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            email:
+                                document.getElementById('loginEmail').value,
+                            password:
+                                document.getElementById('loginPassword').value
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        if (!await restoreSession(true)) return;
+
+                        document.getElementById('loginForm').reset();
+                    } else {
+                        errorBox.innerText = data.message;
+                        errorBox.classList.remove('hidden');
+                    }
+                } catch (err) {
+                    errorBox.textContent =
+                        'تعذر الاتصال بالخادم. حاول مجدداً.';
+
+                    errorBox.classList.remove('hidden');
+                }
+            });
     </script>
 </body>
 </html>
