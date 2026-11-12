@@ -294,7 +294,10 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// 3. بدء عملية التحويل وطلب رمز التأكيد
+// ==========================================================
+// 📓 Notebook: استبدل دالة initiate-transfer فقط في server.js بهذا الكود
+// ==========================================================
+
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const selectedUsd = parseInt(req.body.amountUSD) || 1;
@@ -313,17 +316,44 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 
         const s = doc.data();
 
-        const homeRes = await callAsiacellAPI('api/v1/home?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies);
-        const allUrls = (homeRes.rawText || '').match(/[a-zA-Z0-9_\/-]+(?:transfer|me2u|credit|balance|send)[a-zA-Z0-9_\/?-]*/gi) || [];
+        // 1. مسح شامل لقوائم التطبيق لاستخراج المسار الديناميكي الحقيقي للتحويل
+        const discoveryPages = [
+            'api/v1/home?lang=ar',
+            'api/v1/more?lang=ar',
+            'api/v1/services?lang=ar',
+            'api/v1/profile?lang=ar'
+        ];
 
+        let discoveredUrls = [];
+        for (const page of discoveryPages) {
+            const pageRes = await callAsiacellAPI(page, 'GET', null, s.accessToken, s.deviceId, s.cookies);
+            // استخراج جميع الروابط والمسارات الموجودة داخل استجابة JSON
+            const matches = (pageRes.rawText || '').match(/https?:\/\/odpapp\.asiacell\.com\/[^\s"']+|api\/v[12]\/[a-zA-Z0-9_\/-]+/gi) || [];
+            discoveredUrls.push(...matches);
+        }
+
+        const uniqueDiscovered = [...new Set(discoveredUrls)];
+        console.log('DISCOVERED_APP_LINKS:', uniqueDiscovered);
+
+        // تصفية الروابط التي لها علاقة بالتحويل أو الرصيد
+        const transferRelatedUrls = uniqueDiscovered.filter(u =>
+            /transfer|me2u|credit|share|gift|send|balance|action|vas/i.test(u) &&
+            !/home|profile|login|history/i.test(u)
+        );
+
+        // 2. قائمة المسارات المحتملة في إصدارات ODP المختلفة
         const candidateEndpoints = [
-            ...allUrls,
-            'api/v1/credit-transfer/initiate?lang=ar',
-            'api/v1/credit-transfer?lang=ar',
-            'api/v1/me2u/transfer?lang=ar',
-            'api/v1/me2u?lang=ar',
-            'api/v1/balance-transfer?lang=ar',
-            'api/v1/services/me2u?lang=ar'
+            ...transferRelatedUrls,
+            'api/v1/transfer-credit?lang=ar',
+            'api/v1/credittransfer?lang=ar',
+            'api/v1/share-credit?lang=ar',
+            'api/v1/credit-share?lang=ar',
+            'api/v1/me2u-transfer?lang=ar',
+            'api/v1/vas/me2u?lang=ar',
+            'api/v1/account/transfer?lang=ar',
+            'api/v1/balance/transfer?lang=ar',
+            'api/v2/credit-transfer?lang=ar',
+            'api/v2/me2u?lang=ar'
         ];
 
         const payload = {
@@ -332,6 +362,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             msisdn: TARGET_ASIACELL_NUMBER,
             destMsisdn: TARGET_ASIACELL_NUMBER,
             targetMsisdn: TARGET_ASIACELL_NUMBER,
+            recipient: TARGET_ASIACELL_NUMBER,
             amount: amountIQD,
             transferAmount: amountDecimal
         };
@@ -357,7 +388,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             });
 
             if (attempt.data?.message && attempt.data.message !== 'Resource not found') {
-                lastServerMsg = attempt.data.message;
+                lastServerMsg = `${ep} -> ${attempt.data.message}`;
             }
 
             const isAccepted = !attempt.isWafBlocked && (
@@ -378,7 +409,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: lastServerMsg || 'لم يتم تأكيد إرسال رمز التحويل من خادم آسياسيل. راجع سجل السيرفر (Console) لمعرفة تفاصيل الرد.'
+                message: lastServerMsg || 'لم يتم العثور على مسار التحويل، راجع قائمة DISCOVERED_APP_LINKS في سجل الخادم.'
             });
         }
 
