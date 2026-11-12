@@ -318,59 +318,72 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 
         const s = doc.data();
 
-        // 1. جلب الشاشتين اللتين عملتا بنجاح في الإصدار 5.8.0
-        const homeV2 = await callAsiacellAPI('api/v2/home?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies, '5.8.0');
-        const profileV1 = await callAsiacellAPI('api/v1/profile?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies, '5.8.0');
+        // 1. فحص الشاشات الفرعية بالحروف الصغيرة حصراً لتجنب حظر WAF
+        const subScreens = [
+            'api/v1/accountoverview?lang=ar',
+            'api/v2/accountoverview?lang=ar',
+            'api/v1/managelines?lang=ar',
+            'api/v1/shukran?lang=ar',
+            'api/v1/paymentselection?for=recharge&lang=ar',
+            'api/v1/addon?lang=ar',
+            'api/v1/mysubscriptions?lang=ar'
+        ];
 
-        // استخراج كل الأزرار والاختصارات (title + action + link + target) بدون قطع النص
-        let extractedActions = [];
-        function scanShortcuts(obj) {
+        let subActions = [];
+        function scanSub(obj, sourceScreen) {
             if (!obj || typeof obj !== 'object') return;
-            if (obj.action || obj.url || obj.link || obj.endpoint || obj.route) {
-                extractedActions.push({
-                    title: obj.title || obj.name || obj.label || '',
-                    action: obj.action || obj.url || obj.link || obj.endpoint || obj.route
+            if (obj.action || obj.url || obj.endpoint) {
+                subActions.push({
+                    screen: sourceScreen,
+                    title: obj.title || obj.name || '',
+                    action: obj.action || obj.url || obj.endpoint
                 });
             }
             for (const val of Object.values(obj)) {
-                if (val && typeof val === 'object') scanShortcuts(val);
+                if (val && typeof val === 'object') scanSub(val, sourceScreen);
             }
         }
 
-        scanShortcuts(homeV2.data);
-        scanShortcuts(profileV1.data);
+        for (const screen of subScreens) {
+            const r = await callAsiacellAPI(screen, 'GET', null, s.accessToken, s.deviceId, s.cookies, '5.8.0');
+            console.log(`SUB_SCREEN [${screen.split('?')[0]}] -> Status:${r.status} | WAF:${r.isWafBlocked} | Sample:${(r.rawText || '').substring(0, 180)}`);
+            if (!r.isWafBlocked && r.data) {
+                scanSub(r.data, screen.split('?')[0]);
+            }
+        }
 
-        console.log('ALL_SHORTCUT_ACTIONS:', JSON.stringify(extractedActions, null, 2));
+        console.log('SUB_SCREEN_ACTIONS:', JSON.stringify(subActions, null, 2));
 
-        // 2. استخلاص المسارات من خاصية action (مثل navigate/xxx أو open/xxx أو api/...)
-        let dynamicEndpoints = [];
-        for (const item of extractedActions) {
+        // 2. استخراج أي مسار ظهر داخل الشاشات الفرعية (مع تحويله لحروف صغيرة لتفادي WAF)
+        let dynamicEps = [];
+        for (const item of subActions) {
             const act = String(item.action || '');
-            if (/transfer|credit|me2u|share|balance|send|topup|gift|تحويل|رصيد/i.test(act + ' ' + item.title)) {
-                const cleanAct = act.replace(/^(navigate|open|browse)\//i, '');
-                dynamicEndpoints.push(`api/v1/${cleanAct}?lang=ar`);
-                dynamicEndpoints.push(`api/v2/${cleanAct}?lang=ar`);
-                dynamicEndpoints.push(`api/v1/profile/${cleanAct}?lang=ar`);
+            if (act.startsWith('post/')) {
+                dynamicEps.push(`${act.replace(/^post\//i, '').toLowerCase()}?lang=ar`);
+            } else if (/transfer|credit|me2u|share|balance|send|تحويل|رصيد/i.test(act + ' ' + item.title)) {
+                const cleanAct = act.replace(/^(navigate|open|browse|post)\//i, '').toLowerCase();
+                dynamicEps.push(`api/v1/${cleanAct}?lang=ar`);
             }
         }
 
+        // مسارات بحروف صغيرة (lowercase) مطابقة لنمط profileupdate و lineinfo في آسياسيل
         const candidateEndpoints = [
-            ...dynamicEndpoints,
-            'api/v1/credittransfer?lang=ar',
-            'api/v2/credittransfer?lang=ar',
-            'api/v1/me2u/init?lang=ar',
-            'api/v1/transfer/init?lang=ar'
+            ...dynamicEps,
+            'api/v1/balancetransfer?lang=ar',
+            'api/v1/sharecredit?lang=ar',
+            'api/v1/sharebalance?lang=ar',
+            'api/v1/sendcredit?lang=ar',
+            'api/v1/profile/balancetransfer?lang=ar',
+            'api/v1/profile/credittransfer?lang=ar',
+            'api/v1/managelines/transfer?lang=ar',
+            'api/v1/accountoverview/transfer?lang=ar'
         ];
 
+        // حقل نظيف ومختصر لتجنب إثارة قواعد WAF
         const payload = {
-            senderMsisdn: cleanPhone,
-            receiverMsisdn: TARGET_ASIACELL_NUMBER,
             msisdn: TARGET_ASIACELL_NUMBER,
-            destMsisdn: TARGET_ASIACELL_NUMBER,
-            targetMsisdn: TARGET_ASIACELL_NUMBER,
-            recipient: TARGET_ASIACELL_NUMBER,
-            amount: amountIQD,
-            transferAmount: amountDecimal
+            receiverMsisdn: TARGET_ASIACELL_NUMBER,
+            amount: amountIQD
         };
 
         let tr = null;
@@ -385,11 +398,12 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             console.log('ASIACELL_TRANSFER_DEBUG', {
                 endpoint: ep.split('?')[0],
                 httpStatus: attempt.status,
+                wafBlocked: attempt.isWafBlocked,
                 success: attempt.data?.success,
                 message: attempt.data?.message
             });
 
-            if (attempt.data?.message && attempt.data.message !== 'Resource not found') {
+            if (attempt.data?.message && attempt.data.message !== 'Resource not found' && !attempt.isWafBlocked) {
                 lastServerMsg = `${ep.split('?')[0]} -> ${attempt.data.message}`;
             }
 
@@ -411,7 +425,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: lastServerMsg || 'راجع قائمة ALL_SHORTCUT_ACTIONS في السجل لرؤية مسار زر التحويل.'
+                message: lastServerMsg || 'راجع سطور SUB_SCREEN و SUB_SCREEN_ACTIONS في سجل الخادم.'
             });
         }
 
