@@ -295,7 +295,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
 });
 
 // ==========================================================
-// 📓 Notebook: استبدل دالة initiate-transfer فقط في server.js بهذا الكود
+// 📓 Notebook: استبدل دالة initiate-transfer فقط في server.js
 // ==========================================================
 
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
@@ -316,52 +316,30 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 
         const s = doc.data();
 
-        // 1. فحص عميق لاستخراج جميع قيم action / target / route / url المخفية داخل JSON
-        const discoveryPages = [
-            'api/v1/home?lang=ar',
-            'api/v1/more?lang=ar',
-            'api/v1/topup?lang=ar'
-        ];
+        // 1. فحص المسارين الحقيقيين اللذين ظهرا في حسابك سابقاً بدون أي فلترة
+        const lineInfoRes = await callAsiacellAPI('api/v1/profile/lineinfo?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies);
+        const homeRes = await callAsiacellAPI('api/v1/home?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies);
 
-        let deepStrings = [];
-        function collectStrings(obj) {
-            if (!obj || typeof obj !== 'object') return;
-            for (const [k, v] of Object.entries(obj)) {
-                if (typeof v === 'string') {
-                    // التقاط أي نص يشير إلى مسار أو إجراء برمجي
-                    if (
-                        /transfer|me2u|credit|balance|topup|share|send|gift|vas|action/i.test(v) ||
-                        /action|url|link|route|endpoint|target|code|id|type/i.test(k)
-                    ) {
-                        if (v.length < 120 && !v.endsWith('.png') && !v.endsWith('.jpg')) {
-                            deepStrings.push(`${k}: ${v}`);
-                        }
-                    }
-                } else if (typeof v === 'object') {
-                    collectStrings(v);
-                }
-            }
-        }
+        console.log('RAW_LINEINFO_ sample:', (lineInfoRes.rawText || '').substring(0, 800));
+        console.log('RAW_HOME_ sample:', (homeRes.rawText || '').substring(0, 800));
 
-        for (const page of discoveryPages) {
-            const pageRes = await callAsiacellAPI(page, 'GET', null, s.accessToken, s.deviceId, s.cookies);
-            collectStrings(pageRes.data);
-        }
+        // استخراج كل قيمة نصية تبدأ بـ api/ أو تحتوي على شرطة مائلة /
+        const rawCombined = `${lineInfoRes.rawText || ''} ${homeRes.rawText || ''}`;
+        const allSlashedStrings = rawCombined.match(/"([a-zA-Z0-9_.-]+\/[a-zA-Z0-9_\/.-]+)"/g) || [];
+        console.log('ALL_SLASHED_PATHS:', [...new Set(allSlashedStrings)]);
 
-        console.log('DISCOVERED_ACTIONS_AND_CODES:', [...new Set(deepStrings)].slice(0, 60));
-
-        // 2. قائمة مسارات ODP الخاصة بتحويل الرصيد وإدارة الرصيد
+        // 2. تجربة المسارات المبنية على البادئات الحقيقية المكتشفة في حسابك (profile / cdr / mps)
         const candidateEndpoints = [
-            'api/v1/transfer?lang=ar',
-            'api/v1/topup/transfer?lang=ar',
-            'api/v1/topup/me2u?lang=ar',
-            'api/v1/credit/transfer?lang=ar',
-            'api/v1/balance/share?lang=ar',
-            'api/v1/line/transfer?lang=ar',
             'api/v1/profile/transfer?lang=ar',
+            'api/v1/profile/credit-transfer?lang=ar',
+            'api/v1/profile/me2u?lang=ar',
+            'api/v1/profile/share-credit?lang=ar',
+            'api/v1/mps/transfer?lang=ar',
+            'api/v1/mps/credit-transfer?lang=ar',
+            'api/v1/mps/me2u?lang=ar',
             'api/v1/cdr/transfer?lang=ar',
-            'api/v1/action/transfer?lang=ar',
-            'api/v1/ussd/execute?lang=ar'
+            'api/v1/lineinfo/transfer?lang=ar',
+            'api/v1/transfercredit?lang=ar'
         ];
 
         const payload = {
@@ -387,12 +365,8 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             console.log('ASIACELL_TRANSFER_DEBUG', {
                 endpoint: ep.split('?')[0],
                 httpStatus: attempt.status,
-                wafBlocked: attempt.isWafBlocked,
                 success: attempt.data?.success,
-                message: attempt.data?.message,
-                nextStep: nextStep,
-                hasProcessId: Boolean(info.pid),
-                hasValidationUrl: Boolean(info.validationUrl)
+                message: attempt.data?.message
             });
 
             if (attempt.data?.message && attempt.data.message !== 'Resource not found') {
@@ -417,7 +391,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: lastServerMsg || 'راجع قائمة DISCOVERED_ACTIONS_AND_CODES في السجل لمعرفة اسم خدمة التحويل.'
+                message: lastServerMsg || 'راجع RAW_LINEINFO_ و RAW_HOME_ في سجل الخادم.'
             });
         }
 
