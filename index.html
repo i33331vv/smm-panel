@@ -160,9 +160,11 @@
 
                     <!-- سجل الطلبات -->
                     <div id="orders-section" class="hidden bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                        <div class="flex justify-between items-center mb-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
                             <h3 class="text-xl font-bold text-dark">سجل الطلبات السابقة</h3>
-                            <span class="text-xs text-gray-400">يتم تحديث عداد المتابعين تلقائياً كل 10 دقائق</span>
+                            <span class="text-xs text-green-600 font-bold bg-green-50 border border-green-200 px-3 py-1 rounded-full">
+                                <i class="fa-solid fa-rotate fa-spin me-1"></i> مراقبة وتحديث مباشر لعداد المتابعين
+                            </span>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-right border-collapse">
@@ -678,13 +680,13 @@
             } catch (err) {}
         }
 
-        // تحديث جدول الطلبات تلقائياً في حال كان المستخدم فاتحاً لصفحة الطلبات
+        // تحديث مباشر لجدول الطلبات كل 5 ثوانٍ أثناء فتح المستخدم لصفحة الطلبات
         setInterval(() => {
             const ordSec = document.getElementById('orders-section');
             if (ordSec && !ordSec.classList.contains('hidden')) {
                 fetchAndRenderOrders();
             }
-        }, 30000);
+        }, 5000);
 
         function showDepositPage() {
             hideAllSections();
