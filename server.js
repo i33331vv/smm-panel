@@ -296,6 +296,10 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
+// ==========================================================
+// 📓 Notebook: استبدل دالة initiate-transfer فقط في server.js
+// ==========================================================
+
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const selectedUsd = parseInt(req.body.amountUSD) || 1;
@@ -314,38 +318,48 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 
         const s = doc.data();
 
-        // 1. اختبار استجابات الشاشات الرئيسية بالإصدار الجديد (5.8.0) عبر GET و POST
-        const probes = [
-            { ep: 'api/v1/home?lang=ar', m: 'GET' },
-            { ep: 'api/v2/home?lang=ar', m: 'GET' },
-            { ep: 'api/v1/profile?lang=ar', m: 'GET' },
-            { ep: 'api/v1/profile/lineinfo?lang=ar', m: 'POST', b: { msisdn: cleanPhone } },
-            { ep: 'api/v1/more?lang=ar', m: 'GET' }
-        ];
+        // 1. جلب الشاشتين اللتين عملتا بنجاح في الإصدار 5.8.0
+        const homeV2 = await callAsiacellAPI('api/v2/home?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies, '5.8.0');
+        const profileV1 = await callAsiacellAPI('api/v1/profile?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies, '5.8.0');
 
-        let rawCombined = '';
-        for (const p of probes) {
-            const r = await callAsiacellAPI(p.ep, p.m, p.b || null, s.accessToken, s.deviceId, s.cookies, '5.8.0');
-            console.log(`PROBE [${p.m} ${p.ep}]:`, (r.rawText || '').substring(0, 350));
-            rawCombined += ' ' + (r.rawText || '');
+        // استخراج كل الأزرار والاختصارات (title + action + link + target) بدون قطع النص
+        let extractedActions = [];
+        function scanShortcuts(obj) {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj.action || obj.url || obj.link || obj.endpoint || obj.route) {
+                extractedActions.push({
+                    title: obj.title || obj.name || obj.label || '',
+                    action: obj.action || obj.url || obj.link || obj.endpoint || obj.route
+                });
+            }
+            for (const val of Object.values(obj)) {
+                if (val && typeof val === 'object') scanShortcuts(val);
+            }
         }
 
-        // استخراج أي مسارات موجودة داخل الردود الجديدة
-        const foundPaths = rawCombined.match(/api\/v[123]\/[a-zA-Z0-9_\/-]+/gi) || [];
-        console.log('DISCOVERED_PATHS_V5:', [...new Set(foundPaths)]);
+        scanShortcuts(homeV2.data);
+        scanShortcuts(profileV1.data);
 
-        // تصفية مسارات التحويل المكتشفة + المسارات المرشحة
-        const dynamicTransferEps = [...new Set(foundPaths)].filter(u =>
-            !/login|home|lineinfo|cdr\/check|avatar|update-profile/i.test(u)
-        );
+        console.log('ALL_SHORTCUT_ACTIONS:', JSON.stringify(extractedActions, null, 2));
+
+        // 2. استخلاص المسارات من خاصية action (مثل navigate/xxx أو open/xxx أو api/...)
+        let dynamicEndpoints = [];
+        for (const item of extractedActions) {
+            const act = String(item.action || '');
+            if (/transfer|credit|me2u|share|balance|send|topup|gift|تحويل|رصيد/i.test(act + ' ' + item.title)) {
+                const cleanAct = act.replace(/^(navigate|open|browse)\//i, '');
+                dynamicEndpoints.push(`api/v1/${cleanAct}?lang=ar`);
+                dynamicEndpoints.push(`api/v2/${cleanAct}?lang=ar`);
+                dynamicEndpoints.push(`api/v1/profile/${cleanAct}?lang=ar`);
+            }
+        }
 
         const candidateEndpoints = [
-            ...dynamicTransferEps.map(u => `${u}?lang=ar`),
-            'api/v2/credit-transfer?lang=ar',
-            'api/v2/transfer?lang=ar',
-            'api/v1/credit-transfer?lang=ar',
-            'api/v1/me2u?lang=ar',
-            'api/v1/balance-transfer?lang=ar'
+            ...dynamicEndpoints,
+            'api/v1/credittransfer?lang=ar',
+            'api/v2/credittransfer?lang=ar',
+            'api/v1/me2u/init?lang=ar',
+            'api/v1/transfer/init?lang=ar'
         ];
 
         const payload = {
@@ -397,7 +411,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: lastServerMsg || 'راجع سطور PROBE في سجل الخادم لمعرفة رد الإصدار الجديد.'
+                message: lastServerMsg || 'راجع قائمة ALL_SHORTCUT_ACTIONS في السجل لرؤية مسار زر التحويل.'
             });
         }
 
