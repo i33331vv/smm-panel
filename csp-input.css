@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .hero-bg {
+            background-image:
+                radial-gradient(circle at top right, #fce4e8 0%, transparent 40%),
+                radial-gradient(circle at bottom left, #f7d6dd 0%, transparent 40%);
+        }
+
+        .modal {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            transform: scale(0.95) translateY(-20px);
+            transition: all 0.3s ease;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .amount-btn.selected {
+            background-color: #dc2626;
+            color: white;
+            border-color: #dc2626;
+            transform: scale(1.03);
+        }
+    
