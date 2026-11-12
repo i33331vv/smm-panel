@@ -346,6 +346,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
                 httpStatus: attempt.status,
                 wafBlocked: attempt.isWafBlocked,
                 success: attempt.data?.success,
+                message: attempt.data?.message,
                 status: attempt.data?.status,
                 nextStep:
                     attempt.data?.nextStep ??
