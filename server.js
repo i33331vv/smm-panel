@@ -233,7 +233,12 @@ function startTelegramPolling(token) {
                                             const completedCount = (ordData.target_count !== null && ordData.target_count !== undefined)
                                                 ? ordData.target_count
                                                 : (ordData.current_count ?? null);
-                                            const updatePayload = { status: 'مكتمل', account_private: false, tg_message_id: messageId };
+                                            const updatePayload = {
+                                                status: 'مكتمل',
+                                                account_private: false,
+                                                completion_notified: true,
+                                                tg_message_id: messageId
+                                            };
                                             if (completedCount !== null) updatePayload.current_count = completedCount;
                                             await ordRef.update(updatePayload);
                                             const updatedSnap = await ordRef.get();
@@ -278,7 +283,7 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================================
-// 📸 فحص حساب انستقرام والمراقبة التلقائية كل 10 دقائق
+// 📸 فحص حساب انستقرام والمراقبة المباشرة الفورية للعداد
 // ==========================================================
 
 function extractInstagramUsername(input) {
@@ -320,14 +325,18 @@ async function checkInstagramProfile(link) {
         return { valid: false, message: '❌ الرابط خطأ! يرجى وضع رابط حساب انستقرام صحيح (مثال: https://instagram.com/username).' };
     }
 
-    // المحاولة 1: واجهة الويب المباشرة لانستقرام
+    const cacheBuster = Date.now();
+
+    // المحاولة 1: واجهة الويب المباشرة لانستقرام مع منع الكاش لقراءة الرقم اللحظي
     try {
-        const res = await axios.get(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(igUser)}`, {
+        const res = await axios.get(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(igUser)}&_=${cacheBuster}`, {
             headers: {
                 'x-ig-app-id': '936619743392459',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept': '*/*',
                 'Accept-Language': 'en-US,en;q=0.9',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
                 'Referer': `https://www.instagram.com/${igUser}/`
             },
             timeout: 10000,
@@ -351,10 +360,11 @@ async function checkInstagramProfile(link) {
 
     // المحاولة 2: واجهة الهاتف البديلة
     try {
-        const mobileRes = await axios.get(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(igUser)}`, {
+        const mobileRes = await axios.get(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(igUser)}&_=${cacheBuster}`, {
             headers: {
                 'x-ig-app-id': '936619743392459',
-                'User-Agent': 'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 458229237)'
+                'User-Agent': 'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 458229237)',
+                'Cache-Control': 'no-cache'
             },
             timeout: 10000,
             validateStatus: () => true
@@ -375,12 +385,13 @@ async function checkInstagramProfile(link) {
         }
     } catch (e) {}
 
-    // المحاولة 3: فحص صفحة الحساب العامة والوصف الوصفي (Meta Tags)
+    // المحاولة 3: فحص صفحة الحساب العامة
     try {
-        const pageRes = await axios.get(`https://www.instagram.com/${encodeURIComponent(igUser)}/`, {
+        const pageRes = await axios.get(`https://www.instagram.com/${encodeURIComponent(igUser)}/?_=${cacheBuster}`, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-                'Accept-Language': 'en-US,en;q=0.9'
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Cache-Control': 'no-cache'
             },
             timeout: 10000,
             validateStatus: () => true
@@ -429,80 +440,122 @@ app.post('/api/instagram/check', async (req, res) => {
     });
 });
 
+let isMonitoringOrders = false;
+
+async function syncSingleOrderCount(doc) {
+    const ord = doc.data();
+    if (!ord.ig_username || ord.start_count === null || ord.start_count === undefined) return;
+    if (ord.status === 'مكتمل' || ord.status === 'ملغي') return;
+
+    // فاصل 15 ثانية لكل طلب لحماية السيرفر من حظر انستقرام مع بقاء التحديث فورياً
+    const now = Date.now();
+    if (ord.last_checked_ms && (now - ord.last_checked_ms) < 15000) return;
+
+    const check = await checkInstagramProfile(`https://www.instagram.com/${ord.ig_username}/`);
+    await doc.ref.update({ last_checked_ms: now }).catch(() => {});
+
+    if (!check.valid) return;
+
+    // 1. إذا قام المستخدم بتحويل حسابه إلى خاص أثناء المراقبة
+    if (check.isPrivate) {
+        if (!ord.account_private || !ord.private_notified) {
+            await doc.ref.update({ account_private: true, private_notified: true });
+            await sendTelegramTextMessage(
+                ORDERS_BOT_TOKEN,
+                ADMIN_CHAT_ID,
+                `⚠️ <b>تنبيه مراقبة الحساب!</b>\n\nالمستخدم <b>${ord.username}</b> قام بتحويل حسابه (<code>@${ord.ig_username}</code>) إلى <b>خاص (Private)</b> أثناء تنفيذ الطلب <code>#${doc.id.substring(0, 6)}</code>!\n🔗 الرابط: ${ord.link}`
+            );
+            if (ord.tg_message_id) {
+                editTelegramTextMessage(
+                    ORDERS_BOT_TOKEN,
+                    ADMIN_CHAT_ID,
+                    ord.tg_message_id,
+                    buildOrderTelegramMessage(doc.id, { ...ord, account_private: true }),
+                    getOrderMarkup(doc.id, ord.status)
+                );
+            }
+        }
+        return;
+    }
+
+    // 2. تحديث العداد مباشرة عند تغير عدد المتابعين (مثلاً 73/73 -> 73/74)
+    const newCurrent = check.followers;
+    const target = ord.target_count ?? (Number(ord.start_count) + Number(ord.quantity));
+    const isCompletedNow = newCurrent >= target;
+    const nextStatus = isCompletedNow ? 'مكتمل' : ord.status;
+    const hasChanged = (newCurrent !== ord.current_count) || (ord.account_private === true) || isCompletedNow;
+
+    if (!hasChanged) return;
+
+    let sendCompletionAlert = false;
+    await db.runTransaction(async (tx) => {
+        const freshDoc = await tx.get(doc.ref);
+        if (!freshDoc.exists) return;
+        const freshData = freshDoc.data();
+        if (freshData.status === 'مكتمل' || freshData.status === 'ملغي') return;
+
+        const updates = {
+            current_count: newCurrent,
+            account_private: false,
+            private_notified: false,
+            status: nextStatus
+        };
+
+        if (isCompletedNow && !freshData.completion_notified) {
+            updates.completion_notified = true;
+            sendCompletionAlert = true;
+        }
+
+        tx.update(doc.ref, updates);
+    });
+
+    // تحديث رسالة الطلب الأصلية داخل البوت بالرقم الجديد مباشرة
+    if (ord.tg_message_id) {
+        const updatedView = {
+            ...ord,
+            current_count: newCurrent,
+            account_private: false,
+            status: nextStatus
+        };
+        editTelegramTextMessage(
+            ORDERS_BOT_TOKEN,
+            ADMIN_CHAT_ID,
+            ord.tg_message_id,
+            buildOrderTelegramMessage(doc.id, updatedView),
+            getOrderMarkup(doc.id, nextStatus)
+        );
+    }
+
+    // إرسال إشعار فوري لبوت التليجرام يخبرك بوصول الحساب إلى العدد المطلوب
+    if (sendCompletionAlert) {
+        await sendTelegramTextMessage(
+            ORDERS_BOT_TOKEN,
+            ADMIN_CHAT_ID,
+            `🎉 <b>إشعار اكتمال العدد المطلوب!</b>\n\nحساب انستقرام (<code>@${ord.ig_username}</code>) وصل إلى العدد المطلوب بنجاح.\n👤 <b>المستخدم:</b> ${ord.username}\n🆔 <b>رقم الطلب:</b> #${doc.id.substring(0, 6)}\n📊 <b>العداد النهائي:</b> ${ord.start_count}/${newCurrent} (المطلوب: ${target})\n✅ <b>الحالة الآن:</b> مكتمل`
+        );
+    }
+}
+
 async function monitorActiveInstagramOrders() {
+    if (isMonitoringOrders) return;
+    isMonitoringOrders = true;
     try {
         const snap = await db.collection('orders')
             .where('status', 'in', ['قيد المعالجة', 'قيد التنفيذ'])
             .get();
 
         for (const doc of snap.docs) {
-            const ord = doc.data();
-            if (!ord.ig_username || ord.start_count === null || ord.start_count === undefined) continue;
-
-            const check = await checkInstagramProfile(`https://instagram.com/${ord.ig_username}`);
-            if (!check.valid) continue;
-
-            // إذا تحول الحساب إلى خاص أثناء المراقبة
-            if (check.isPrivate) {
-                if (!ord.account_private || !ord.private_notified) {
-                    await doc.ref.update({ account_private: true, private_notified: true });
-                    await sendTelegramTextMessage(
-                        ORDERS_BOT_TOKEN,
-                        ADMIN_CHAT_ID,
-                        `⚠️ <b>تنبيه مراقبة الحساب!</b>\n\nالمستخدم <b>${ord.username}</b> قام بتحويل حسابه (<code>@${ord.ig_username}</code>) إلى <b>خاص (Private)</b> أثناء تنفيذ الطلب <code>#${doc.id}</code>!\n🔗 الرابط: ${ord.link}`
-                    );
-                    if (ord.tg_message_id) {
-                        const updatedView = { ...ord, account_private: true };
-                        editTelegramTextMessage(ORDERS_BOT_TOKEN, ADMIN_CHAT_ID, ord.tg_message_id, buildOrderTelegramMessage(doc.id, updatedView), getOrderMarkup(doc.id, ord.status));
-                    }
-                }
-                continue;
-            }
-
-            // إذا كان الحساب عاماً: تحديث العداد وفحص اكتمال العدد
-            const newCurrent = check.followers;
-            const target = ord.target_count ?? (Number(ord.start_count) + Number(ord.quantity));
-            const isCompletedNow = newCurrent >= target;
-            const nextStatus = isCompletedNow ? 'مكتمل' : ord.status;
-
-            await doc.ref.update({
-                current_count: newCurrent,
-                account_private: false,
-                private_notified: false,
-                status: nextStatus
-            });
-
-            if (ord.tg_message_id) {
-                const updatedView = {
-                    ...ord,
-                    current_count: newCurrent,
-                    account_private: false,
-                    status: nextStatus
-                };
-                editTelegramTextMessage(
-                    ORDERS_BOT_TOKEN,
-                    ADMIN_CHAT_ID,
-                    ord.tg_message_id,
-                    buildOrderTelegramMessage(doc.id, updatedView),
-                    getOrderMarkup(doc.id, nextStatus)
-                );
-            }
-
-            if (isCompletedNow) {
-                await sendTelegramTextMessage(
-                    ORDERS_BOT_TOKEN,
-                    ADMIN_CHAT_ID,
-                    `🎉 <b>اكتمل العدد تلقائياً!</b>\n\n🆔 الطلب: <code>#${doc.id}</code>\n👤 المستخدم: ${ord.username}\n📸 الحساب: <code>@${ord.ig_username}</code>\n📊 العداد: <b>${ord.start_count}/${newCurrent}</b> (العدد مكتمل)`
-                );
-            }
+            await syncSingleOrderCount(doc);
         }
     } catch (err) {
-        console.error('خطأ في المراقبة الدورية:', err.message);
+        console.error('خطأ في المراقبة المباشرة:', err.message);
+    } finally {
+        isMonitoringOrders = false;
     }
 }
 
-// فحص وتحديث كل 10 دقائق تلقائياً
-setInterval(monitorActiveInstagramOrders, 10 * 60 * 1000);
+// مراقبة مستمرة ومباشرة في الخلفية كل 20 ثانية
+setInterval(monitorActiveInstagramOrders, 20 * 1000);
 
 // ==========================================================
 // ⚡ مسارات شحن آسياسيل المتسلسلة (OTP) المتوافقة مع الواجهة
@@ -1145,6 +1198,8 @@ app.post('/api/order', async (req, res) => {
                 target_count: targetCount,
                 account_private: false,
                 private_notified: false,
+                completion_notified: false,
+                last_checked_ms: Date.now(),
                 status: 'قيد المعالجة',
                 created_at: dateTime,
                 created_ms: Date.now()
@@ -1195,8 +1250,16 @@ app.post('/api/order', async (req, res) => {
 app.get('/api/orders/:username', async (req, res) => {
     try {
         const snapshot = await db.collection('orders').where('username', '==', req.params.username).get();
+
+        // فحص لحظي للطلبات النشطة لتحديث العداد أمام المستخدم مباشرة
+        const activeDocs = snapshot.docs.filter(d => ['قيد المعالجة', 'قيد التنفيذ'].includes(d.data().status));
+        if (activeDocs.length > 0) {
+            await Promise.all(activeDocs.map(d => syncSingleOrderCount(d)));
+        }
+
+        const freshSnapshot = await db.collection('orders').where('username', '==', req.params.username).get();
         const orders = [];
-        snapshot.forEach(doc => {
+        freshSnapshot.forEach(doc => {
             const d = doc.data();
             orders.push({
                 id: doc.id,
