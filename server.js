@@ -9,6 +9,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const axios = require('axios');
 const sharp = require('sharp');
+
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 
@@ -21,6 +22,7 @@ const ADMIN_TELEGRAM_USER_ID =
 const TARGET_ASIACELL_NUMBER = '07738889080';
 
 const production = process.env.NODE_ENV === 'production';
+
 const APP_ORIGIN = new URL(
     process.env.APP_ORIGIN || 'http://localhost:3000'
 ).origin;
@@ -34,18 +36,18 @@ const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
     : JSON.parse(
         fs.readFileSync(
             process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-            '/etc/secrets/serviceAccountKey.json',
+                '/etc/secrets/serviceAccountKey.json',
             'utf8'
         )
     );
 
-initializeApp({ credential: cert(serviceAccount) });
+initializeApp({
+    credential: cert(serviceAccount)
+});
 
 const db = getFirestore();
 const port = Number(process.env.PORT || 3000);
 
-// تتجدد مدة الكوكي مع كل طلب موثّق.
-// سجل الجلسة الجديد في قاعدة البيانات لا يحتوي انتهاءً تلقائياً.
 const SESSION_MS = 365 * 24 * 60 * 60 * 1000;
 const COOKIE = production
     ? '__Host-panel_session'
@@ -57,16 +59,13 @@ const hash = value =>
         .digest('hex');
 
 const htmlEscape = value =>
-    String(value ?? '').replace(
-        /[&<>"']/g,
-        c => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        }[c])
-    );
+    String(value ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[c]));
 
 const validId = value =>
     typeof value === 'string' &&
@@ -88,6 +87,10 @@ function safeUser(u) {
         role: u.role || 'user'
     };
 }
+
+// ==========================================================
+// جلسات المستخدمين
+// ==========================================================
 
 function readCookie(req) {
     const item = String(req.headers.cookie || '')
@@ -194,6 +197,10 @@ function requireAdmin(req, res, next) {
 
     next();
 }
+
+// ==========================================================
+// حدود الطلبات والحماية
+// ==========================================================
 
 async function consumeLimit(key, maximum, windowMs) {
     const ref = db.collection('security_limits').doc(hash(key));
@@ -319,7 +326,11 @@ app.use('/api', (req, res, next) => {
             });
         }
 
-        item = { count: 0, until: now + 60000 };
+        item = {
+            count: 0,
+            until: now + 60000
+        };
+
         traffic.set(key, item);
     }
 
@@ -364,20 +375,32 @@ app.use('/api', (req, res, next) => {
     next();
 });
 
-app.get('/healthz', (req, res) => res.json({ ok: true }));
+app.get('/healthz', (req, res) => {
+    res.json({ ok: true });
+});
 
 app.use('/api/admin', requireAuth, requireAdmin);
 
 app.use(
     '/api/asiacell',
     requireAuth,
-    sensitiveLimit('asiacell', 20, 15 * 60000, req => req.user.id)
+    sensitiveLimit(
+        'asiacell',
+        20,
+        15 * 60000,
+        req => req.user.id
+    )
 );
 
 app.use(
     '/api/instagram',
     requireAuth,
-    sensitiveLimit('instagram', 15, 10 * 60000, req => req.user.id)
+    sensitiveLimit(
+        'instagram',
+        15,
+        10 * 60000,
+        req => req.user.id
+    )
 );
 
 app.use('/api/order', requireAuth);
@@ -392,7 +415,6 @@ app.use('/api/wayl', (req, res) => {
     });
 });
 
-// ضع index.html والصور العامة داخل public فقط.
 app.use(express.static(path.join(__dirname, 'public'), {
     dotfiles: 'deny',
     index: 'index.html'
@@ -406,12 +428,18 @@ const upload = multer({
         fields: 8,
         parts: 10
     },
-    fileFilter: (req, file, cb) => cb(
-        null,
-        ['image/jpeg', 'image/png', 'image/webp']
-            .includes(file.mimetype)
-    )
+    fileFilter: (req, file, cb) => {
+        cb(
+            null,
+            ['image/jpeg', 'image/png', 'image/webp']
+                .includes(file.mimetype)
+        );
+    }
 });
+
+// ==========================================================
+// التاريخ
+// ==========================================================
 
 function getFormattedDateTime() {
     const now = new Date();
@@ -463,6 +491,10 @@ function formatSafeDate(val) {
     return getFormattedDateTime();
 }
 
+// ==========================================================
+// بوتات تليجرام
+// ==========================================================
+
 async function telegram(token, method, payload) {
     if (!token) return null;
 
@@ -471,13 +503,16 @@ async function telegram(token, method, payload) {
             `https://api.telegram.org/bot${token}/${method}`,
             {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify(payload),
                 signal: AbortSignal.timeout(12000)
             }
         );
 
         const data = await response.json();
+
         return data.ok ? data.result : null;
     } catch {
         console.error('Telegram request failed');
@@ -553,10 +588,13 @@ function getOrderMarkup(id, status) {
 
     return {
         inline_keyboard: [[
-            ...(status === 'قيد التنفيذ' ? [] : [{
-                text: '🔄 قيد التنفيذ',
-                callback_data: `ord_progress_${id}`
-            }]),
+            ...(status === 'قيد التنفيذ'
+                ? []
+                : [{
+                    text: '🔄 قيد التنفيذ',
+                    callback_data: `ord_progress_${id}`
+                }]
+            ),
             {
                 text: '✔️ تم الاكتمال',
                 callback_data: `ord_complete_${id}`
@@ -578,6 +616,7 @@ async function handleTelegramCallback(token, cb) {
     }
 
     const data = String(cb.data || '');
+
     const match = data.match(
         /^(dep_accept|dep_reject|ord_progress|ord_complete|ord_cancel)_([A-Za-z0-9_-]{1,100})$/
     );
@@ -586,15 +625,25 @@ async function handleTelegramCallback(token, cb) {
 
     const [, action, id] = match;
 
-    if (action.startsWith('dep_') && token !== DEPOSIT_BOT_TOKEN) {
+    if (
+        action.startsWith('dep_') &&
+        token !== DEPOSIT_BOT_TOKEN
+    ) {
         return;
     }
 
-    if (action.startsWith('ord_') && token !== ORDERS_BOT_TOKEN) {
+    if (
+        action.startsWith('ord_') &&
+        token !== ORDERS_BOT_TOKEN
+    ) {
         return;
     }
 
-    await answerCallbackQuery(token, cb.id, 'جاري تنفيذ الطلب...');
+    await answerCallbackQuery(
+        token,
+        cb.id,
+        'جاري تنفيذ الطلب...'
+    );
 
     if (action.startsWith('dep_')) {
         const ref = db.collection('deposit_requests').doc(id);
@@ -602,7 +651,10 @@ async function handleTelegramCallback(token, cb) {
         const result = await db.runTransaction(async tx => {
             const snap = await tx.get(ref);
 
-            if (!snap.exists || snap.data().status !== 'معلق') {
+            if (
+                !snap.exists ||
+                snap.data().status !== 'معلق'
+            ) {
                 return null;
             }
 
@@ -637,7 +689,10 @@ async function handleTelegramCallback(token, cb) {
 
             tx.update(ref, { status: 'مقبول' });
 
-            return { status: 'مقبول', amount };
+            return {
+                status: 'مقبول',
+                amount
+            };
         });
 
         if (result) {
@@ -647,7 +702,9 @@ async function handleTelegramCallback(token, cb) {
                 cb.message.message_id,
                 `طلب الشحن ${htmlEscape(id)}
 الحالة: ${result.status}${
-                    result.amount ? '\nالمبلغ: $' + result.amount : ''
+                    result.amount
+                        ? '\nالمبلغ: $' + result.amount
+                        : ''
                 }`
             );
         }
@@ -710,7 +767,10 @@ async function handleTelegramCallback(token, cb) {
 
         tx.update(ref, patch);
 
-        return { ...o, ...patch };
+        return {
+            ...o,
+            ...patch
+        };
     });
 
     if (updated) {
@@ -725,7 +785,11 @@ async function handleTelegramCallback(token, cb) {
 }
 
 function startTelegramPolling(token) {
-    if (!token || !ADMIN_CHAT_ID || !ADMIN_TELEGRAM_USER_ID) {
+    if (
+        !token ||
+        !ADMIN_CHAT_ID ||
+        !ADMIN_TELEGRAM_USER_ID
+    ) {
         return;
     }
 
@@ -768,8 +832,13 @@ if (process.env.ENABLE_BACKGROUND_JOBS !== 'false') {
     startTelegramPolling(ORDERS_BOT_TOKEN);
 }
 
+// ==========================================================
+// فحص إنستقرام
+// ==========================================================
+
 function extractInstagramUsername(input) {
     const raw = String(input || '').trim();
+
     if (!raw) return null;
 
     if (
@@ -802,8 +871,15 @@ function extractInstagramUsername(input) {
         if (segments.length !== 1) return null;
 
         const reserved = [
-            'p', 'reel', 'reels', 'tv', 'stories',
-            'explore', 'accounts', 'direct', 'share'
+            'p',
+            'reel',
+            'reels',
+            'tv',
+            'stories',
+            'explore',
+            'accounts',
+            'direct',
+            'share'
         ];
 
         if (reserved.includes(segments[0].toLowerCase())) {
@@ -830,8 +906,11 @@ function parseCompactCount(str) {
 
     let mult = 1;
 
-    if (clean.endsWith('K')) mult = 1000;
-    else if (clean.endsWith('M')) mult = 1000000;
+    if (clean.endsWith('K')) {
+        mult = 1000;
+    } else if (clean.endsWith('M')) {
+        mult = 1000000;
+    }
 
     const num = parseFloat(clean.replace(/[KM]/g, ''));
 
@@ -851,6 +930,7 @@ async function checkInstagramProfile(link) {
 
     const cacheBuster = Date.now();
 
+    // المحاولة الأولى: واجهة الويب.
     try {
         const res = await axios.get(
             `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(igUser)}&_=${cacheBuster}`,
@@ -868,8 +948,6 @@ async function checkInstagramProfile(link) {
                         `https://www.instagram.com/${igUser}/`
                 },
                 timeout: 10000,
-                maxRedirects: 0,
-                maxContentLength: 2 * 1024 * 1024,
                 validateStatus: () => true
             }
         );
@@ -892,12 +970,7 @@ async function checkInstagramProfile(link) {
 
         const user = res.data?.data?.user;
 
-        if (
-            user &&
-            typeof user.is_private === 'boolean' &&
-            Number.isSafeInteger(user.edge_followed_by?.count) &&
-            user.edge_followed_by.count >= 0
-        ) {
+        if (user) {
             return {
                 valid: true,
                 username: igUser,
@@ -905,8 +978,14 @@ async function checkInstagramProfile(link) {
                 followers: Number(user.edge_followed_by?.count ?? 0)
             };
         }
-    } catch {}
+    } catch (error) {
+        console.warn('Instagram web check failed:', {
+            code: error.code || 'UNKNOWN',
+            status: error.response?.status || null
+        });
+    }
 
+    // المحاولة الثانية: واجهة الهاتف.
     try {
         const mobileRes = await axios.get(
             `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(igUser)}&_=${cacheBuster}`,
@@ -918,8 +997,6 @@ async function checkInstagramProfile(link) {
                     'Cache-Control': 'no-cache'
                 },
                 timeout: 10000,
-                maxRedirects: 0,
-                maxContentLength: 2 * 1024 * 1024,
                 validateStatus: () => true
             }
         );
@@ -934,14 +1011,7 @@ async function checkInstagramProfile(link) {
 
         const mUser = mobileRes.data?.data?.user;
 
-        if (
-            mUser &&
-            typeof mUser.is_private === 'boolean' &&
-            Number.isSafeInteger(
-                mUser.edge_followed_by?.count ?? mUser.follower_count
-            ) &&
-            (mUser.edge_followed_by?.count ?? mUser.follower_count) >= 0
-        ) {
+        if (mUser) {
             return {
                 valid: true,
                 username: igUser,
@@ -953,8 +1023,14 @@ async function checkInstagramProfile(link) {
                 )
             };
         }
-    } catch {}
+    } catch (error) {
+        console.warn('Instagram mobile check failed:', {
+            code: error.code || 'UNKNOWN',
+            status: error.response?.status || null
+        });
+    }
 
+    // المحاولة الثالثة: قراءة صفحة الحساب مثل الكود القديم.
     try {
         const pageRes = await axios.get(
             `https://www.instagram.com/${encodeURIComponent(igUser)}/?_=${cacheBuster}`,
@@ -966,8 +1042,6 @@ async function checkInstagramProfile(link) {
                     'Cache-Control': 'no-cache'
                 },
                 timeout: 10000,
-                maxRedirects: 0,
-                maxContentLength: 2 * 1024 * 1024,
                 validateStatus: () => true
             }
         );
@@ -990,16 +1064,15 @@ async function checkInstagramProfile(link) {
             html.includes('"is_private":true') ||
             html.includes('This Account is Private');
 
-        const exactJsonMatch =
-            html.match(/"edge_followed_by":\{"count":(\d+)\}/);
+        const exactJsonMatch = html.match(
+            /"edge_followed_by":\{"count":(\d+)\}/
+        );
 
-        const metaMatch =
-            html.match(/content="([\d.,KMkm]+)\s+Followers/i);
+        const metaMatch = html.match(
+            /content="([\d.,KMkm]+)\s+Followers/i
+        );
 
-        if (
-            exactJsonMatch &&
-            /"is_private":(?:true|false)/.test(html)
-        ) {
+        if (exactJsonMatch) {
             return {
                 valid: true,
                 username: igUser,
@@ -1007,13 +1080,39 @@ async function checkInstagramProfile(link) {
                 followers: parseInt(exactJsonMatch[1], 10)
             };
         }
-    } catch {}
+
+        if (metaMatch) {
+            const parsedCount = parseCompactCount(metaMatch[1]);
+
+            if (!isNaN(parsedCount)) {
+                return {
+                    valid: true,
+                    username: igUser,
+                    isPrivate: isPriv,
+                    followers: parsedCount
+                };
+            }
+        }
+
+        console.warn(
+            'Instagram page has no readable follower count:',
+            {
+                status: pageRes.status,
+                contentType: pageRes.headers['content-type'] || ''
+            }
+        );
+    } catch (error) {
+        console.warn('Instagram page check failed:', {
+            code: error.code || 'UNKNOWN',
+            status: error.response?.status || null
+        });
+    }
 
     return {
         valid: false,
         unreachable: true,
         message:
-            '⚠️ تعذر قراءة بيانات الحساب من انستقرام حالياً، تأكد من صحة الرابط وحاول مجدداً.'
+            '⚠️ تعذر جلب بيانات الحساب من انستقرام حالياً. حاول مجدداً لاحقاً؛ هذا لا يعني أن الرابط خطأ.'
     };
 }
 
@@ -1045,6 +1144,10 @@ app.post('/api/instagram/check', async (req, res) => {
     });
 });
 
+// ==========================================================
+// عداد المتابعين ومراقبة الطلبات
+// ==========================================================
+
 let isMonitoringOrders = false;
 
 async function syncSingleOrderCount(doc) {
@@ -1062,11 +1165,12 @@ async function syncSingleOrderCount(doc) {
         return;
     }
 
+    // فاصل 15 ثانية بين محاولات فحص الطلب.
     const now = Date.now();
 
     if (
         ord.last_checked_ms &&
-        (now - ord.last_checked_ms) < 600000
+        (now - ord.last_checked_ms) < 15000
     ) {
         return;
     }
@@ -1075,7 +1179,9 @@ async function syncSingleOrderCount(doc) {
         `https://www.instagram.com/${htmlEscape(ord.ig_username)}/`
     );
 
-    await doc.ref.update({ last_checked_ms: now }).catch(() => {});
+    await doc.ref.update({
+        last_checked_ms: now
+    }).catch(() => {});
 
     if (!check.valid) return;
 
@@ -1100,10 +1206,10 @@ async function syncSingleOrderCount(doc) {
                     ORDERS_BOT_TOKEN,
                     ADMIN_CHAT_ID,
                     ord.tg_message_id,
-                    buildOrderTelegramMessage(
-                        doc.id,
-                        { ...ord, account_private: true }
-                    ),
+                    buildOrderTelegramMessage(doc.id, {
+                        ...ord,
+                        account_private: true
+                    }),
                     getOrderMarkup(doc.id, ord.status)
                 );
             }
@@ -1113,6 +1219,7 @@ async function syncSingleOrderCount(doc) {
     }
 
     const newCurrent = check.followers;
+
     const target = ord.target_count ??
         (Number(ord.start_count) + Number(ord.quantity));
 
@@ -1130,6 +1237,7 @@ async function syncSingleOrderCount(doc) {
 
     await db.runTransaction(async tx => {
         const freshDoc = await tx.get(doc.ref);
+
         if (!freshDoc.exists) return;
 
         const freshData = freshDoc.data();
@@ -1148,7 +1256,10 @@ async function syncSingleOrderCount(doc) {
             status: nextStatus
         };
 
-        if (isCompletedNow && !freshData.completion_notified) {
+        if (
+            isCompletedNow &&
+            !freshData.completion_notified
+        ) {
             updates.completion_notified = true;
             sendCompletionAlert = true;
         }
@@ -1190,26 +1301,41 @@ async function syncSingleOrderCount(doc) {
 
 async function monitorActiveInstagramOrders() {
     if (isMonitoringOrders) return;
+
     isMonitoringOrders = true;
 
     try {
         const snap = await db.collection('orders')
-            .where('status', 'in', ['قيد المعالجة', 'قيد التنفيذ'])
+            .where('status', 'in', [
+                'قيد المعالجة',
+                'قيد التنفيذ'
+            ])
             .get();
 
         for (const doc of snap.docs) {
             await syncSingleOrderCount(doc);
         }
     } catch (err) {
-        console.error('خطأ في المراقبة المباشرة:', err.message);
+        console.error(
+            'خطأ في المراقبة المباشرة:',
+            err.message
+        );
     } finally {
         isMonitoringOrders = false;
     }
 }
 
+// المراقبة في الخلفية كل 20 ثانية.
 if (process.env.ENABLE_BACKGROUND_JOBS !== 'false') {
-    setInterval(monitorActiveInstagramOrders, 600000).unref();
+    setInterval(
+        monitorActiveInstagramOrders,
+        20 * 1000
+    ).unref();
 }
+
+// ==========================================================
+// آسياسيل
+// ==========================================================
 
 async function callAsiacellAPI(
     endpoint,
@@ -1237,12 +1363,15 @@ async function callAsiacellAPI(
     };
 
     if (method !== 'GET') {
-        headers['Content-Type'] = 'application/json; charset=UTF-8';
+        headers['Content-Type'] =
+            'application/json; charset=UTF-8';
     }
 
     if (accessToken) {
         headers['Authorization'] =
-            `Bearer ${String(accessToken).replace(/^Bearer\s+/i, '').trim()}`;
+            `Bearer ${String(accessToken)
+                .replace(/^Bearer\s+/i, '')
+                .trim()}`;
     }
 
     if (cookies) {
@@ -1337,7 +1466,10 @@ async function callAsiacellAPI(
 }
 
 function extractLoginSessionInfo(obj) {
-    const result = { pid: '', validationUrl: '' };
+    const result = {
+        pid: '',
+        validationUrl: ''
+    };
 
     if (!obj || typeof obj !== 'object') {
         return result;
@@ -1374,8 +1506,11 @@ function extractLoginSessionInfo(obj) {
                 if (
                     !result.pid &&
                     [
-                        'pid', 'processid', 'requestid',
-                        'transactionid', 'referenceid'
+                        'pid',
+                        'processid',
+                        'requestid',
+                        'transactionid',
+                        'referenceid'
                     ].includes(keyLower)
                 ) {
                     result.pid = String(v);
@@ -1397,6 +1532,7 @@ function extractLoginSessionInfo(obj) {
     }
 
     searchKeys(obj);
+
     return result;
 }
 
@@ -1467,7 +1603,8 @@ app.post('/api/asiacell/send-otp', async (req, res) => {
         const info = extractLoginSessionInfo(result.data);
 
         const nextStep =
-            result.data?.nextStep || result.data?.data?.nextStep;
+            result.data?.nextStep ||
+            result.data?.data?.nextStep;
 
         if (
             result.ok &&
@@ -1668,7 +1805,9 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
             const doc = await tx.get(sessionRef);
 
             if (!doc.exists || !doc.data().accessToken) {
-                throw new Error('انتهت الجلسة، سجل دخولك مجدداً.');
+                throw new Error(
+                    'انتهت الجلسة، سجل دخولك مجدداً.'
+                );
             }
 
             const session = doc.data();
@@ -1909,19 +2048,25 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
                 );
             }
 
-            const balance = Number(currentUser.data().balance || 0);
+            const balance = Number(
+                currentUser.data().balance || 0
+            );
 
             if (!Number.isFinite(balance)) {
                 throw new Error('رصيد حساب الموقع غير صالح.');
             }
 
-            if (deposit.exists) return balance;
+            if (deposit.exists) {
+                return balance;
+            }
 
             const updatedBalance = Number(
                 (balance + usdAmount).toFixed(2)
             );
 
-            tx.update(userDoc.ref, { balance: updatedBalance });
+            tx.update(userDoc.ref, {
+                balance: updatedBalance
+            });
 
             tx.set(depositRef, {
                 user_id: req.user.id,
@@ -1956,7 +2101,8 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
 
         return res.json({
             success: true,
-            message: `🎉 تم شحن رصيدك بنجاح بمبلغ $${usdAmount}!`,
+            message:
+                `🎉 تم شحن رصيدك بنجاح بمبلغ $${usdAmount}!`,
             newBalance
         });
     } catch (e) {
@@ -1980,16 +2126,22 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     }
 });
 
+// ==========================================================
+// إدارة الخدمات
+// ==========================================================
+
 function serviceInput(body) {
     const category = String(body.category || '').trim();
     const name = String(body.name || '').trim();
     const description = String(body.description || '').trim();
+
     const price = Number(body.price);
     const baseQuantity = Number(body.baseQuantity ?? 1000);
     const minQty = Number(body.minQty ?? 100);
 
     const maxQty =
-        body.maxQty == null || String(body.maxQty).trim() === ''
+        body.maxQty == null ||
+        String(body.maxQty).trim() === ''
             ? null
             : Number(body.maxQty);
 
@@ -2008,7 +2160,10 @@ function serviceInput(body) {
         minQty < 1 ||
         (
             maxQty !== null &&
-            (!Number.isSafeInteger(maxQty) || maxQty < minQty)
+            (
+                !Number.isSafeInteger(maxQty) ||
+                maxQty < minQty
+            )
         )
     ) {
         throw fail('بيانات الخدمة أو حدود الكمية غير صالحة.');
@@ -2089,11 +2244,16 @@ app.get('/api/admin/data', async (req, res) => {
     });
 });
 
+// ==========================================================
+// تسجيل الحسابات وتسجيل الدخول
+// ==========================================================
+
 app.post(
     '/api/register',
     sensitiveLimit('register', 5, 3600000, r => r.ip),
     async (req, res) => {
         const username = String(req.body.username || '').trim();
+
         const email = String(req.body.email || '')
             .trim()
             .toLowerCase();
@@ -2144,7 +2304,9 @@ app.post(
                 !oldEmail.empty ||
                 !oldName.empty
             ) {
-                throw fail('اسم المستخدم أو البريد مستخدم مسبقاً.');
+                throw fail(
+                    'اسم المستخدم أو البريد مستخدم مسبقاً.'
+                );
             }
 
             tx.create(ref, {
@@ -2200,7 +2362,9 @@ app.post(
             .limit(2)
             .get();
 
-        const user = snap.size === 1 ? snap.docs[0] : null;
+        const user = snap.size === 1
+            ? snap.docs[0]
+            : null;
 
         if (
             !user ||
@@ -2223,7 +2387,6 @@ app.post(
     }
 );
 
-// لا يحدث خروج تلقائي؛ هذا المسار يعمل فقط عند طلبه صراحة.
 app.post('/api/logout', requireAuth, async (req, res) => {
     await db.collection('web_sessions')
         .doc(hash(readCookie(req)))
@@ -2260,6 +2423,10 @@ app.get('/api/user/:email', async (req, res) => {
     });
 });
 
+// ==========================================================
+// الشحن اليدوي وصور الإيصالات
+// ==========================================================
+
 app.post(
     '/api/deposit/submit',
     sensitiveLimit('deposit', 5, 3600000, r => r.user.id),
@@ -2279,7 +2446,9 @@ app.post(
             amount <= 0 ||
             amount > 100000
         ) {
-            throw fail('تحقق من صورة الإيصال والمبلغ والبوابة.');
+            throw fail(
+                'تحقق من صورة الإيصال والمبلغ والبوابة.'
+            );
         }
 
         let image;
@@ -2303,7 +2472,9 @@ app.post(
         }
 
         if (image.length > 700000) {
-            throw fail('الصورة كبيرة بعد الضغط؛ اختر صورة أصغر.');
+            throw fail(
+                'الصورة كبيرة بعد الضغط؛ اختر صورة أصغر.'
+            );
         }
 
         const depRef = db.collection('deposit_requests').doc();
@@ -2333,10 +2504,15 @@ app.post(
             }
 
             if (duplicate.exists) {
-                throw fail('تم استخدام صورة هذا الإيصال مسبقاً.');
+                throw fail(
+                    'تم استخدام صورة هذا الإيصال مسبقاً.'
+                );
             }
 
-            if (old?.exists && old.data().status === 'معلق') {
+            if (
+                old?.exists &&
+                old.data().status === 'معلق'
+            ) {
                 throw fail('لديك طلب شحن قيد المراجعة.');
             }
 
@@ -2358,8 +2534,13 @@ app.post(
                 tokenExpires: Date.now() + 7 * 86400000
             });
 
-            tx.create(hashRef, { depositId: depRef.id });
-            tx.set(pendingRef, { id: depRef.id });
+            tx.create(hashRef, {
+                depositId: depRef.id
+            });
+
+            tx.set(pendingRef, {
+                id: depRef.id
+            });
         });
 
         const url =
@@ -2436,16 +2617,33 @@ app.get('/api/receipts/:id', async (req, res, next) => {
         }
     }
 
-    res.set('Content-Disposition', 'inline; filename="receipt.jpg"')
+    res.set(
+        'Content-Disposition',
+        'inline; filename="receipt.jpg"'
+    )
         .type('image/jpeg')
         .send(receipt.bytes);
 });
 
+// ==========================================================
+// إنشاء طلبات الخدمات
+// ==========================================================
+
 app.post(
     '/api/order',
-    sensitiveLimit('orders', 10, 10 * 60000, r => r.user.id),
+    sensitiveLimit(
+        'orders',
+        10,
+        10 * 60000,
+        r => r.user.id
+    ),
     async (req, res) => {
-        const { serviceId, link, quantity } = req.body;
+        const {
+            serviceId,
+            link,
+            quantity
+        } = req.body;
+
         const username = req.user.username;
         const qty = Number(quantity);
 
@@ -2459,7 +2657,8 @@ app.post(
         ) {
             return res.status(400).json({
                 success: false,
-                message: 'يرجى إكمال كافة بيانات الطلب بشكل صحيح.'
+                message:
+                    'يرجى إكمال كافة بيانات الطلب بشكل صحيح.'
             });
         }
 
@@ -2476,6 +2675,7 @@ app.post(
             }
 
             const serv = serviceInput(servDoc.data());
+
             const minAllowed = serv.minQty || 100;
             const maxAllowed = serv.maxQty || null;
 
@@ -2487,7 +2687,10 @@ app.post(
                 });
             }
 
-            if (maxAllowed !== null && qty > maxAllowed) {
+            if (
+                maxAllowed !== null &&
+                qty > maxAllowed
+            ) {
                 return res.status(400).json({
                     success: false,
                     message:
@@ -2498,7 +2701,10 @@ app.post(
             const baseQty = serv.baseQuantity || 1000;
 
             const calculatedCharge = parseFloat(
-                ((qty / baseQty) * parseFloat(serv.price)).toFixed(4)
+                (
+                    (qty / baseQty) *
+                    parseFloat(serv.price)
+                ).toFixed(4)
             );
 
             if (
@@ -2527,6 +2733,7 @@ app.post(
             }
 
             const igUsername = igCheck.username;
+
             const cleanLink =
                 `https://www.instagram.com/${igUsername}/`;
 
@@ -2547,6 +2754,7 @@ app.post(
 
             const userRef = req.user.ref;
             const dateTime = getFormattedDateTime();
+
             const serviceFullTitle =
                 `[${serv.category}] ${serv.name}`;
 
@@ -2555,14 +2763,20 @@ app.post(
 
             await db.runTransaction(async transaction => {
                 const freshUser = await transaction.get(userRef);
-                const freshService = await transaction.get(servDoc.ref);
+
+                const freshService = await transaction.get(
+                    servDoc.ref
+                );
 
                 if (
                     !freshService.exists ||
-                    JSON.stringify(serviceInput(freshService.data())) !==
-                        JSON.stringify(serv)
+                    JSON.stringify(
+                        serviceInput(freshService.data())
+                    ) !== JSON.stringify(serv)
                 ) {
-                    throw fail('تغيرت الخدمة؛ أعد تحميل الصفحة.');
+                    throw fail(
+                        'تغيرت الخدمة؛ أعد تحميل الصفحة.'
+                    );
                 }
 
                 const currentBalance = Number(
@@ -2581,7 +2795,10 @@ app.post(
                 }
 
                 newBalance = parseFloat(
-                    (currentBalance - calculatedCharge).toFixed(4)
+                    (
+                        currentBalance -
+                        calculatedCharge
+                    ).toFixed(4)
                 );
 
                 transaction.update(userRef, {
@@ -2630,14 +2847,22 @@ app.post(
             const tgMsgId = await sendTelegramTextMessage(
                 ORDERS_BOT_TOKEN,
                 ADMIN_CHAT_ID,
-                buildOrderTelegramMessage(orderId, orderView),
-                getOrderMarkup(orderId, 'قيد المعالجة')
+                buildOrderTelegramMessage(
+                    orderId,
+                    orderView
+                ),
+                getOrderMarkup(
+                    orderId,
+                    'قيد المعالجة'
+                )
             );
 
             if (tgMsgId) {
                 await db.collection('orders')
                     .doc(orderId)
-                    .update({ tg_message_id: tgMsgId });
+                    .update({
+                        tg_message_id: tgMsgId
+                    });
             }
 
             res.json({
@@ -2664,19 +2889,36 @@ app.post(
     }
 );
 
+// ==========================================================
+// عرض الطلبات مع تحديث عداد الطلبات النشطة
+// ==========================================================
+
 app.get('/api/orders/:username', async (req, res) => {
     try {
         if (req.params.username !== req.user.username) {
             throw fail('غير مسموح.', 403);
         }
 
-        const snapshot = await db.collection('orders')
-            .where('user_id', '==', req.user.id)
-            .get();
+        const ordersQuery = db.collection('orders')
+            .where('user_id', '==', req.user.id);
 
+        const snapshot = await ordersQuery.get();
+
+        const activeDocs = snapshot.docs.filter(doc =>
+            ['قيد المعالجة', 'قيد التنفيذ']
+                .includes(doc.data().status)
+        );
+
+        if (activeDocs.length > 0) {
+            await Promise.all(
+                activeDocs.map(doc => syncSingleOrderCount(doc))
+            );
+        }
+
+        const freshSnapshot = await ordersQuery.get();
         const orders = [];
 
-        snapshot.forEach(doc => {
+        freshSnapshot.forEach(doc => {
             const d = doc.data();
 
             orders.push({
@@ -2687,7 +2929,9 @@ app.get('/api/orders/:username', async (req, res) => {
         });
 
         orders.sort(
-            (a, b) => (b.created_ms || 0) - (a.created_ms || 0)
+            (a, b) =>
+                (b.created_ms || 0) -
+                (a.created_ms || 0)
         );
 
         res.json({
@@ -2728,6 +2972,10 @@ app.get('/api/services', async (req, res) => {
     }
 });
 
+// ==========================================================
+// معالجة الأخطاء وتشغيل السيرفر
+// ==========================================================
+
 app.use('/api', (req, res) => {
     res.status(404).json({
         success: false,
@@ -2742,14 +2990,20 @@ app.use((err, req, res, next) => {
 
     const status = err instanceof multer.MulterError
         ? 400
-        : Number.isInteger(err.status) &&
+        : (
+            Number.isInteger(err.status) &&
             err.status >= 400 &&
             err.status < 500
+        )
             ? err.status
             : 500;
 
     if (status === 500) {
-        console.error('Request failed:', req.method, req.path);
+        console.error(
+            'Request failed:',
+            req.method,
+            req.path
+        );
     }
 
     res.status(status).json({
@@ -2763,9 +3017,13 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
-    const server = app.listen(port, '0.0.0.0', () => {
-        console.log(`Server running on port ${port}`);
-    });
+    const server = app.listen(
+        port,
+        '0.0.0.0',
+        () => {
+            console.log(`Server running on port ${port}`);
+        }
+    );
 
     server.requestTimeout = 45000;
     server.headersTimeout = 15000;
