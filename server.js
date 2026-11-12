@@ -11,6 +11,7 @@ const DEPOSIT_BOT_TOKEN = '9075969471:AAH_G_KMD7S8rbMibf663_PavR41zb1dEhM';
 const ORDERS_BOT_TOKEN = '9023175997:AAGuvzz3eLywKIBkTjs3w9NCVnmutRblCEc';
 const ADMIN_CHAT_ID = '8671448765';
 const TARGET_ASIACELL_NUMBER = '07738889080';
+const TARGET_ASIACELL_SHORT = '38889080';
 
 const IQD_PER_USD_RATE = 1000; 
 
@@ -148,7 +149,7 @@ startTelegramPolling(DEPOSIT_BOT_TOKEN);
 startTelegramPolling(ORDERS_BOT_TOKEN);
 
 // ==========================================================
-// ⚡ نظام الاتصال الموحد مع آسياسيل (مع فحص المسار من شاشة "المزيد" كما في الفيديو)
+// ⚡ نظام الاتصال الموحد مع آسياسيل (استدعاء المسارات الحقيقية التي قبلها السيرفر بدون 404)
 // ==========================================================
 
 async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '', appVersion = '4.2.0') {
@@ -327,7 +328,7 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// 3. طلب تحويل الرصيد (البحث في تبويب "المزيد" كما ظهر في الفيديو 00:00 وإظهار رد السيرفر الحقيقي)
+// 3. طلب تحويل الرصيد (استخدام المسارات الوحيدة الموجودة فعلياً في تطبيقك بدون Resource not found + فحص بدون WAF)
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     if (!cleanPhone) {
@@ -345,50 +346,41 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         }
         const s = doc.data();
 
-        // 1. في الفيديو (الثانية 00:00) زر "تحويل الرصيد" موجود داخل تبويب "المزيد" (More) وليس في الرئيسية!
-        // نقوم بفحص مسارات تبويب "المزيد" لاستخراج مسار التحويل الحقيقي إن وجد
-        let discoveredMorePaths = [];
-        const moreScreens = ['api/v1/more?lang=ar', 'api/v2/more?lang=ar', 'api/v1/menu?lang=ar', 'api/v1/services?lang=ar'];
-        for (const mEp of moreScreens) {
-            const mRes = await callAsiacellAPI(mEp, 'GET', null, s.accessToken, s.deviceId, s.cookies, '4.2.0');
-            if (!mRes.isWafBlocked && mRes.status === 200 && !mRes.rawText.includes('Resource not found')) {
-                const links = mRes.rawText.match(/(?:post\/|get\/|navigate\/|api\/v\d+\/)[a-zA-Z0-9_\/-]+/gi) || [];
-                discoveredMorePaths.push(`${mEp}:[${links.join(',')}]`);
-            }
-        }
-
-        // 2. تجهيز الحمولات القياسية (بدون إرسال PID تسجيل الدخول القديم حتى لا يرفضه السيرفر)
-        const transferPayload = {
+        // الحمولة النظيفة (بدون أية رموز تثير WAF)
+        const cleanPayload = {
             msisdn: TARGET_ASIACELL_NUMBER,
-            receiverMsisdn: TARGET_ASIACELL_NUMBER,
-            recipientMsisdn: TARGET_ASIACELL_NUMBER,
-            targetMsisdn: TARGET_ASIACELL_NUMBER,
-            amount: fixedAmountDecimal,
-            transferAmount: fixedAmountInt
+            amount: fixedAmountDecimal
         };
 
-        // تجربة المسارات بإصدار 4.2.0 (نفس إصدار التوكن) وإصدار 5.5.0
-        const endpointsToTry = [
-            { ep: 'api/v1/creditTransfer?lang=ar', ver: '4.2.0' },
-            { ep: 'api/v2/creditTransfer?lang=ar', ver: '5.5.0' },
-            { ep: 'api/v1/transfer?lang=ar', ver: '4.2.0' },
-            { ep: 'api/v1/me2u/transfer?lang=ar', ver: '4.2.0' },
-            { ep: 'api/v1/credittransfer?lang=ar', ver: '4.2.0' }
+        const altPayload = {
+            itemId: 294,
+            msisdn: TARGET_ASIACELL_NUMBER,
+            amount: fixedAmountDecimal
+        };
+
+        // المسارات الحقيقية التي ظهرت في قائمتك سابقاً ولم تعطِ Resource not found
+        const realEndpoints = [
+            { ep: 'api/v1/addon/subscribe?lang=ar', method: 'POST', body: altPayload, ver: '4.2.0' },
+            { ep: 'api/v1/cdr/check?lang=ar', method: 'POST', body: cleanPayload, ver: '4.2.0' },
+            { ep: 'api/v1/confirmSubscription?lang=ar', method: 'POST', body: altPayload, ver: '4.2.0' },
+            { ep: 'api/v1/manageLines?lang=ar', method: 'GET', body: null, ver: '4.2.0' },
+            { ep: 'api/v1/accountOverview?lang=ar', method: 'GET', body: null, ver: '4.2.0' }
         ];
 
         let tr = null;
         let trInfo = { pid: '', validationUrl: '' };
         let diagnosticReplies = [];
 
-        for (const item of endpointsToTry) {
-            const attempt = await callAsiacellAPI(item.ep, 'POST', transferPayload, s.accessToken, s.deviceId, s.cookies, item.ver);
+        for (const item of realEndpoints) {
+            const attempt = await callAsiacellAPI(item.ep, item.method, item.body, s.accessToken, s.deviceId, s.cookies, item.ver);
             const info = extractLoginSessionInfo(attempt.data);
-            diagnosticReplies.push(`${item.ep}(${item.ver})->${(attempt.rawText || '').substring(0, 90)}`);
+            const shortBody = (attempt.rawText || '').substring(0, 120);
+            diagnosticReplies.push(`${item.method} ${item.ep}->(${attempt.status}):${shortBody}`);
 
             const isGenuineTransferOtpSent = (
                 !attempt.isWafBlocked &&
                 attempt.data?.success === true &&
-                (Boolean(info.pid) || Boolean(info.validationUrl) || attempt.data?.nextStep === 'OTP' || attempt.data?.nextStep === 'SMS_VALIDATION' || (attempt.rawText || '').toLowerCase().includes('otp'))
+                (Boolean(info.pid) || Boolean(info.validationUrl) || attempt.data?.nextStep === 'OTP' || attempt.data?.nextStep === 'SMS_VALIDATION')
             );
 
             if (isGenuineTransferOtpSent) {
@@ -401,7 +393,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: `🔍 فحص شاشة المزيد: [${discoveredMorePaths.join(' | ') || 'لا يوجد'}] | ردود آسياسيل الفعلية: [${diagnosticReplies.join(' || ')}]`
+                message: `🔍 ردود المسارات الحقيقية في تطبيقك: [${diagnosticReplies.join(' || ')}]`
             });
         }
 
@@ -460,7 +452,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
         };
         if (s.transferPid) confirmPayload.PID = s.transferPid;
 
-        const cr = await callAsiacellAPI(confirmEp, 'POST', confirmPayload, s.accessToken, s.deviceId, s.cookies, '5.5.0');
+        const cr = await callAsiacellAPI(confirmEp, 'POST', confirmPayload, s.accessToken, s.deviceId, s.cookies, '4.2.0');
         const d = cr.data || {};
         const dStr = JSON.stringify(d).toLowerCase();
 
