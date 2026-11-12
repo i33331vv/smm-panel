@@ -153,7 +153,7 @@ startTelegramPolling(ORDERS_BOT_TOKEN);
 // ⚡ مسارات شحن آسياسيل المتسلسلة (OTP) المتوافقة مع الواجهة
 // ==========================================================
 
-async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '', appVersion = '4.2.0') {
+async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, accessToken = null, deviceId = null, cookies = '', appVersion = '5.8.0') {
     const currentDeviceId = deviceId || crypto.randomUUID();
     const headers = {
         'Accept': 'application/json, text/plain, */*',
@@ -174,7 +174,9 @@ async function callAsiacellAPI(endpoint, method = 'POST', bodyData = null, acces
     if (cookies) headers['Cookie'] = cookies;
 
     const cleanEp = endpoint.replace(/^\/+/, '');
-    let url = cleanEp.startsWith('http') ? cleanEp : (cleanEp.startsWith('api/') ? `https://odpapp.asiacell.com/${cleanEp}` : `https://odpapp.asiacell.com/api/v1/${cleanEp}`);
+    let url = cleanEp.startsWith('http')
+        ? cleanEp
+        : (cleanEp.startsWith('api/') ? `https://odpapp.asiacell.com/${cleanEp}` : `https://odpapp.asiacell.com/api/v1/${cleanEp}`);
 
     const response = await fetch(url, {
         method,
@@ -294,10 +296,6 @@ app.post('/api/asiacell/verify-login', async (req, res) => {
     }
 });
 
-// ==========================================================
-// 📓 Notebook: استبدل دالة initiate-transfer فقط في server.js
-// ==========================================================
-
 app.post('/api/asiacell/initiate-transfer', async (req, res) => {
     const cleanPhone = (req.body.phone || '').trim();
     const selectedUsd = parseInt(req.body.amountUSD) || 1;
@@ -316,30 +314,38 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 
         const s = doc.data();
 
-        // 1. فحص المسارين الحقيقيين اللذين ظهرا في حسابك سابقاً بدون أي فلترة
-        const lineInfoRes = await callAsiacellAPI('api/v1/profile/lineinfo?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies);
-        const homeRes = await callAsiacellAPI('api/v1/home?lang=ar', 'GET', null, s.accessToken, s.deviceId, s.cookies);
+        // 1. اختبار استجابات الشاشات الرئيسية بالإصدار الجديد (5.8.0) عبر GET و POST
+        const probes = [
+            { ep: 'api/v1/home?lang=ar', m: 'GET' },
+            { ep: 'api/v2/home?lang=ar', m: 'GET' },
+            { ep: 'api/v1/profile?lang=ar', m: 'GET' },
+            { ep: 'api/v1/profile/lineinfo?lang=ar', m: 'POST', b: { msisdn: cleanPhone } },
+            { ep: 'api/v1/more?lang=ar', m: 'GET' }
+        ];
 
-        console.log('RAW_LINEINFO_ sample:', (lineInfoRes.rawText || '').substring(0, 800));
-        console.log('RAW_HOME_ sample:', (homeRes.rawText || '').substring(0, 800));
+        let rawCombined = '';
+        for (const p of probes) {
+            const r = await callAsiacellAPI(p.ep, p.m, p.b || null, s.accessToken, s.deviceId, s.cookies, '5.8.0');
+            console.log(`PROBE [${p.m} ${p.ep}]:`, (r.rawText || '').substring(0, 350));
+            rawCombined += ' ' + (r.rawText || '');
+        }
 
-        // استخراج كل قيمة نصية تبدأ بـ api/ أو تحتوي على شرطة مائلة /
-        const rawCombined = `${lineInfoRes.rawText || ''} ${homeRes.rawText || ''}`;
-        const allSlashedStrings = rawCombined.match(/"([a-zA-Z0-9_.-]+\/[a-zA-Z0-9_\/.-]+)"/g) || [];
-        console.log('ALL_SLASHED_PATHS:', [...new Set(allSlashedStrings)]);
+        // استخراج أي مسارات موجودة داخل الردود الجديدة
+        const foundPaths = rawCombined.match(/api\/v[123]\/[a-zA-Z0-9_\/-]+/gi) || [];
+        console.log('DISCOVERED_PATHS_V5:', [...new Set(foundPaths)]);
 
-        // 2. تجربة المسارات المبنية على البادئات الحقيقية المكتشفة في حسابك (profile / cdr / mps)
+        // تصفية مسارات التحويل المكتشفة + المسارات المرشحة
+        const dynamicTransferEps = [...new Set(foundPaths)].filter(u =>
+            !/login|home|lineinfo|cdr\/check|avatar|update-profile/i.test(u)
+        );
+
         const candidateEndpoints = [
-            'api/v1/profile/transfer?lang=ar',
-            'api/v1/profile/credit-transfer?lang=ar',
-            'api/v1/profile/me2u?lang=ar',
-            'api/v1/profile/share-credit?lang=ar',
-            'api/v1/mps/transfer?lang=ar',
-            'api/v1/mps/credit-transfer?lang=ar',
-            'api/v1/mps/me2u?lang=ar',
-            'api/v1/cdr/transfer?lang=ar',
-            'api/v1/lineinfo/transfer?lang=ar',
-            'api/v1/transfercredit?lang=ar'
+            ...dynamicTransferEps.map(u => `${u}?lang=ar`),
+            'api/v2/credit-transfer?lang=ar',
+            'api/v2/transfer?lang=ar',
+            'api/v1/credit-transfer?lang=ar',
+            'api/v1/me2u?lang=ar',
+            'api/v1/balance-transfer?lang=ar'
         ];
 
         const payload = {
@@ -357,8 +363,8 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         let trInfo = { pid: '', validationUrl: '' };
         let lastServerMsg = '';
 
-        for (const ep of candidateEndpoints) {
-            const attempt = await callAsiacellAPI(ep, 'POST', payload, s.accessToken, s.deviceId, s.cookies);
+        for (const ep of [...new Set(candidateEndpoints)]) {
+            const attempt = await callAsiacellAPI(ep, 'POST', payload, s.accessToken, s.deviceId, s.cookies, '5.8.0');
             const info = extractLoginSessionInfo(attempt.data);
             const nextStep = attempt.data?.nextStep ?? attempt.data?.data?.nextStep;
 
@@ -391,7 +397,7 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
         if (!tr) {
             return res.status(400).json({
                 success: false,
-                message: lastServerMsg || 'راجع RAW_LINEINFO_ و RAW_HOME_ في سجل الخادم.'
+                message: lastServerMsg || 'راجع سطور PROBE في سجل الخادم لمعرفة رد الإصدار الجديد.'
             });
         }
 
