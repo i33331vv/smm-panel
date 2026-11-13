@@ -40,3 +40,46 @@
             transform: scale(1.03);
         }
     
+/* Reserve room for the persistent support control. */
+#landing-page > main { padding-bottom: 96px; }
+#dashboard-page > main > .overflow-y-auto { padding-bottom: 108px; }
+.modal { padding-top: 16px; padding-bottom: 96px; }
+.modal-content { max-height: calc(100vh - 112px); max-height: calc(100dvh - 112px); overflow-y: auto; }
+.support-widget {
+    position: fixed;
+    left: max(16px, env(safe-area-inset-left));
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 120; direction: rtl; font-family: 'Tajawal', sans-serif;
+}
+.support-toggle {
+    display: flex; align-items: center; gap: 10px;
+    min-height: 52px; padding: 13px 20px;
+    border: 1px solid #8a253d; border-radius: 999px;
+    background: #6b1d2f; color: #fff;
+    font-size: 15px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 8px 24px #6b1d2f30;
+}
+.support-toggle:hover { background: #531423; }
+.support-toggle > i { font-size: 20px; }
+.support-panel {
+    position: absolute; left: 0; bottom: calc(100% + 12px);
+    width: min(340px, calc(100vw - 32px));
+    max-height: calc(100vh - 112px); max-height: calc(100dvh - 112px); overflow-y: auto;
+    background: #fff; border: 1px solid #eadde0; border-radius: 20px; padding: 18px;
+    box-shadow: 0 12px 40px #1e293b26; color: #1e293b;
+}
+.support-panel[hidden] { display: none; }
+.support-panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.support-panel-header h2 { font-size: 19px; font-weight: 800; }
+.support-panel-header p { font-size: 13px; color: #64748b; margin-top: 4px; }
+.support-close { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; background: #f8fafc; color: #64748b; font-size: 28px; cursor: pointer; }
+.support-channel { display: flex; align-items: center; gap: 10px; padding: 13px 12px; border: 1px solid; border-radius: 14px; margin-top: 10px; text-decoration: none; }
+.support-channel > i { font-size: 28px; }
+.support-channel strong { display: block; font-size: 15px; }
+.support-channel span[dir] { display: block; font-size: 13px; margin-top: 2px; }
+.support-open-label { font-size: 11px; margin-right: auto; white-space: nowrap; }
+.support-whatsapp { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
+.support-whatsapp:hover { background: #dcfce7; }
+.support-telegram { color: #075985; background: #f0f9ff; border-color: #bae6fd; }
+.support-telegram:hover { background: #e0f2fe; }
+.support-widget button:focus-visible, .support-widget a:focus-visible { outline: 3px solid #6b1d2f; outline-offset: 3px; }
