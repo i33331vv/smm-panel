@@ -11,7 +11,7 @@
 
     
 
-    <link rel="stylesheet" href="/styles.csp.css">
+    <link rel="stylesheet" href="/styles.csp.css?v=support-1">
 </head>
 
 <body class="text-gray-800 antialiased selection:bg-primary selection:text-white">
@@ -624,6 +624,32 @@
     </div>
 
     
-<script src="/app.csp.js" defer></script>
+    <!-- الدعم متاح خارج أقسام الموقع حتى يبقى ظاهراً في جميع الصفحات -->
+    <aside id="support-widget" class="support-widget" aria-label="المساعدة والدعم">
+        <section id="support-panel" class="support-panel" aria-labelledby="support-title" hidden>
+            <div class="support-panel-header">
+                <div>
+                    <h2 id="support-title">المساعدة والدعم</h2>
+                    <p>اختر طريقة التواصل المناسبة إلك</p>
+                </div>
+                <button id="support-close" type="button" class="support-close" aria-label="إغلاق المساعدة والدعم">×</button>
+            </div>
+            <a class="support-channel support-whatsapp" href="https://wa.me/9647783826405" target="_blank" rel="noopener noreferrer">
+                <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+                <span><strong>واتساب</strong><span dir="ltr">07783826405</span></span>
+                <span class="support-open-label">فتح المحادثة ↗</span>
+            </a>
+            <a class="support-channel support-telegram" href="https://t.me/+9647783826405" target="_blank" rel="noopener noreferrer">
+                <i class="fa-brands fa-telegram" aria-hidden="true"></i>
+                <span><strong>تليكرام</strong><span dir="ltr">07783826405</span></span>
+                <span class="support-open-label">فتح المحادثة ↗</span>
+            </a>
+        </section>
+        <button id="support-toggle" class="support-toggle" type="button" aria-expanded="false" aria-controls="support-panel">
+            <i class="fa-solid fa-headset" aria-hidden="true"></i>
+            <span>المساعدة والدعم</span>
+        </button>
+    </aside>
+<script src="/app.csp.js?v=support-1" defer></script>
 </body>
 </html>
