@@ -65,7 +65,7 @@
             openModal('loginModal');
         }
 
-        async function apiFetch(url, options = {}) {
+        async function apiFetch(url, options = {}, { promptOnUnauthorized = true } = {}) {
             const target = new URL(url, window.location.origin);
 
             if (
@@ -83,6 +83,7 @@
 
             if (
                 response.status === 401 &&
+                promptOnUnauthorized &&
                 !['/api/login', '/api/register']
                     .includes(target.pathname)
             ) {
@@ -94,7 +95,11 @@
 
         async function restoreSession(showLogin = false) {
             try {
-                const response = await apiFetch('/api/me');
+                // A first visit without a cookie is normal: show the landing page.
+                // Protected actions and an expired active session still prompt login.
+                const response = await apiFetch('/api/me', {}, {
+                    promptOnUnauthorized: showLogin || Boolean(currentUser)
+                });
 
                 if (!response.ok) {
                     if (response.status !== 401) {
@@ -134,7 +139,7 @@
 
                 box.classList.remove('hidden');
 
-                if (showLogin || !currentUser) {
+                if (showLogin) {
                     openModal('loginModal');
                 }
 
@@ -1720,3 +1725,31 @@ document.querySelector('[data-csp-bind="csp-29"]').addEventListener('submit', fu
 document.querySelector('[data-csp-bind="csp-30"]').addEventListener('click', function(event) { resetServiceForm(); });
 document.querySelector('[data-csp-bind="csp-31"]').addEventListener('click', function(event) { closeModal('registerModal'); });
 document.querySelector('[data-csp-bind="csp-32"]').addEventListener('click', function(event) { closeModal('loginModal'); });
+
+// Persistent support launcher, compatible with the existing CSP.
+(() => {
+    const widget = document.getElementById('support-widget');
+    const panel = document.getElementById('support-panel');
+    const toggle = document.getElementById('support-toggle');
+    const close = document.getElementById('support-close');
+    function setSupportOpen(open, restoreFocus = false) {
+        panel.hidden = !open;
+        toggle.setAttribute('aria-expanded', String(open));
+        if (open) close.focus();
+        else if (restoreFocus) toggle.focus();
+    }
+    toggle.addEventListener('click', () => setSupportOpen(panel.hidden));
+    close.addEventListener('click', () => setSupportOpen(false, true));
+    document.addEventListener('click', event => {
+        if (!panel.hidden && !widget.contains(event.target)) setSupportOpen(false);
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !panel.hidden) {
+            event.preventDefault();
+            setSupportOpen(false, true);
+        }
+    });
+    widget.addEventListener('focusout', event => {
+        if (!panel.hidden && event.relatedTarget && !widget.contains(event.relatedTarget)) setSupportOpen(false);
+    });
+})();
