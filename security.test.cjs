@@ -26,10 +26,10 @@ let authError;await evaluate('requireAuth')({headers:{}},response(),e=>authError
 let adminError;evaluate('requireAdmin')({user:{role:'user'}},response(),e=>adminError=e);assert.equal(adminError.status,403);
 const csrf=uses.find(x=>x[0]==='/api' && String(x[1]).includes('sec-fetch-site'))[1];let csrfError;csrf({method:'POST',headers:{origin:'https://attacker.test'},body:{}},response(),e=>csrfError=e);assert.equal(csrfError.status,403);
 const wayl=uses.find(x=>x[0]==='/api/wayl')[1],wr=response();wayl({},wr);assert.equal(wr.code,410);
-await assert.rejects(()=>call('GET /api/user/:email',{params:{email:'other@test.com'},user:{email:'self@test.com'}}),e=>e.status===403);
-const profile=await call('GET /api/user/:email',{params:{email:'self@test.com'},user:{email:'self@test.com',username:'self',password:'secret',balance:1}});assert(!('password' in profile.body.user));
+await assert.rejects(()=>call('GET /api/user/:username',{params:{username:'other'},user:{username:'self'}}),e=>e.status===403);
+const profile=await call('GET /api/user/:username',{params:{username:'self'},user:{username:'self',password:'secret',balance:1}});assert(!('password' in profile.body.user));
 await evaluate('consumeLimit')('test',1,60000);await assert.rejects(()=>evaluate('consumeLimit')('test',1,60000),e=>e.status===429);
-store.set('users/u1',{username:'owner',email:'owner@test.com',balance:5});
+store.set('users/u1',{username:'owner',balance:5});
 store.set('deposit_requests/d1',{user_id:'u1',status:'معلق',amount:2});
 const cb={from:{id:456},message:{chat:{id:123},message_id:1},data:'dep_accept_d1',id:'callback'};
 await evaluate('handleTelegramCallback')('dep',{...cb,from:{id:999}});assert.equal(fetches,0);assert.equal(store.get('users/u1').balance,5);
@@ -49,7 +49,7 @@ evaluate("callAsiacellAPI = async (...args) => { asiacellCalls.push(args); retur
 store.set('asiacell_sessions/u1_07712345678',{ownerId:'u1',step:'SELECT_AMOUNT',updatedAt:Date.now(),accessToken:'test'});
 const start=await call('POST /api/asiacell/initiate-transfer',{body:{phone:'07712345678',amountUSD:1,receiverMsisdn:'07700000000'},user:{id:'u1',email:'owner@test.com'}});assert.equal(start.body.success,true);
 assert.equal(context.asiacellCalls[0][2].receiverMsisdn,'07738889080');
-const confirmReq={body:{phone:'07712345678',transferOtp:'123456',email:'attacker@test.com',amount:999},user:{id:'u1',email:'owner@test.com'}};
+const confirmReq={body:{phone:'07712345678',transferOtp:'123456',amount:999},user:{id:'u1',email:'owner@test.com'}};
 const before=store.get('users/u1').balance;
 const confirm=await call('POST /api/asiacell/confirm-transfer',confirmReq);assert.equal(confirm.body.success,true);assert.equal(confirm.body.newBalance,before+1);
 const again=await call('POST /api/asiacell/confirm-transfer',confirmReq);assert.equal(again.body.success,false);assert.equal(store.get('users/u1').balance,before+1);
@@ -69,8 +69,8 @@ let revokedError;await evaluate('requireAuth')(authenticated,response(),e=>revok
 const {rewardFor,toIQD}=require('./rewards.cjs');
 assert.equal(toIQD(10),10000);
 assert.equal(rewardFor(9),0);assert.equal(rewardFor(10),500);assert.equal(rewardFor(20),1000);assert.equal(rewardFor(25),1000);
-store.set('users/ref',{username:'referrer',email:'ref@test.com',balance:0,profitIQD:0,spent:0});
-store.set('users/payer',{username:'payer',email:'payer@test.com',balance:0,spent:0,profitIQD:0});
+store.set('users/ref',{username:'referrer',balance:0,profitIQD:0,spent:0});
+store.set('users/payer',{username:'payer',balance:0,spent:0,profitIQD:0});
 function user(id){return {id,ref:doc('users',id),...store.get('users/'+id)}}
 async function api(route,id,body={},extra={}){return call(route,{body,user:user(id),...extra})}
 const active=await api('POST /api/profits/activate','ref');
@@ -107,7 +107,7 @@ await evaluate('handleTelegramCallback')('ord',{...cb,data:'ord_cancel_h3'});
 await evaluate('handleTelegramCallback')('ord',{...cb,data:'ord_cancel_h3'});
 assert.equal(store.get('users/history').spent,2);
 // Service orders increment spent, and cancellation reverses the exact charge.
-store.set('users/buyer',{username:'buyer',email:'buyer@test.com',balance:20,spent:0});
+store.set('users/buyer',{username:'buyer',balance:20,spent:0});
 store.set('services/svc',{category:'Instagram',name:'Followers',price:10,baseQuantity:1000,minQty:100,maxQty:null,description:''});
 evaluate("checkInstagramProfile = async () => ({valid:true,username:'buyer',followers:10,isPrivate:false});");
 const placed=await api('POST /api/order','buyer',{serviceId:'svc',link:'https://instagram.com/buyer',quantity:1000},{ip:'test'});
@@ -144,7 +144,7 @@ const cases=[
 ];
 for(let i=0;i<cases.length;i++) {
  const [service,link]=cases[i],id='social'+i,sid='socialsvc'+i;
- store.set('users/'+id,{username:id,email:id+'@test.com',balance:20,spent:0});
+ store.set('users/'+id,{username:id,balance:20,spent:0});
  store.set('services/'+sid,{...service,price:1,baseQuantity:1000,minQty:100,maxQty:null});
  const preview=await api('POST /api/links/check',id,{serviceId:sid,link});
  assert.equal(preview.body.success,true);assert.equal(preview.body.followers,null);
@@ -165,7 +165,7 @@ const privateOrder=await api('POST /api/order','buyer',{serviceId:'svc',link:'ht
 assert.equal(privateOrder.code,400);assert.equal(store.get('users/buyer').balance,20);
 // Provider outage accepts valid syntax, marks unknown, debits once and never invents a baseline.
 evaluate("checkInstagramProfile = async () => ({valid:false,unreachable:true,message:'temporary'});");
-store.set('users/unknown',{username:'unknown',email:'unknown@test.com',balance:20,spent:0});
+store.set('users/unknown',{username:'unknown',balance:20,spent:0});
 const unknownPreview=await api('POST /api/links/check','unknown',{serviceId:'svc',link:'https://instagram.com/unknown'});
 assert.equal(unknownPreview.body.success,true);assert.equal(unknownPreview.body.verificationStatus,'unverified');assert.equal(unknownPreview.body.followers,null);
 const unknownOrder=await api('POST /api/order','unknown',{serviceId:'svc',link:'https://instagram.com/unknown',quantity:1000},{ip:'test'});
@@ -181,7 +181,7 @@ evaluate("checkInstagramProfile = async () => { throw new Error('Must not monito
 await evaluate('syncSingleOrderCount')(snapshot(doc('orders',unknownOrder.body.orderId)));
 assert.equal(store.get('orders/'+unknownOrder.body.orderId).status,'قيد المعالجة');
 evaluate("checkInstagramProfile = async () => ({valid:true,username:'approx',followers:556000,isPrivate:null,approximate:true});");
-store.set('users/approx',{username:'approx',email:'approx@test.com',balance:20,spent:0});
+store.set('users/approx',{username:'approx',balance:20,spent:0});
 const approxPreview=await api('POST /api/links/check','approx',{serviceId:'svc',link:'https://instagram.com/approx'});
 assert.equal(approxPreview.body.followers,null);assert.equal(approxPreview.body.approximateFollowers,556000);
 const approxOrder=await api('POST /api/order','approx',{serviceId:'svc',link:'https://instagram.com/approx',quantity:1000});
@@ -196,7 +196,7 @@ console.log('PASS: approximate preview/order preserves estimate separately from 
 console.log('PASS: unverified preview/order accepted, real debit once, duplicate blocked, unknown privacy/count, Telegram warning, no automatic completion without baseline.');
 console.log('PASS: Instagram media, TikTok profiles/video/photo/short links, host/type rejection, preview/order agreement, real debit, no wrong follower monitoring.');
 // Same user + service + target: reject active duplicates atomically, including aliases.
-store.set('users/double',{username:'double',email:'double@test.com',balance:100,spent:0});
+store.set('users/double',{username:'double',balance:100,spent:0});
 store.set('services/ttf',{category:'تيك توك',name:'متابعين',price:1,baseQuantity:1000,minQty:1,maxQty:null});
 const dupeRequest={serviceId:'ttf',link:'https://www.tiktok.com/@Same_User?tracking=1',quantity:1000};
 const results=await Promise.all([api('POST /api/order','double',dupeRequest),api('POST /api/order','double',{...dupeRequest,link:'http://tiktok.com/@same_user/'})]);
@@ -212,7 +212,7 @@ await evaluate('handleTelegramCallback')('ord',{...cb,data:'ord_cancel_'+afterCo
 assert.equal((await api('POST /api/order','double',dupeRequest)).body.success,true);
 assert.equal(store.get('users/double').balance,97);assert.equal(store.get('users/double').spent,3);
 // Old rows have no target_key; the same matching rule applies without a migration.
-store.set('users/legacydup',{username:'legacydup',email:'legacydup@test.com',balance:50,spent:0});
+store.set('users/legacydup',{username:'legacydup',balance:50,spent:0});
 store.set('orders/legacydup',{username:'legacydup',service:'[تيك توك] متابعين',link:'https://www.tiktok.com/@Same_User/',status:'قيد المعالجة'});
 assert.equal((await api('POST /api/order','legacydup',dupeRequest)).code,409);assert.equal(store.get('users/legacydup').balance,50);
 assert.equal(evaluate("orderTargetKey('https://instagram.com/Some_User/?igsh=1', {category:'Instagram',name:'Followers'})"),evaluate("orderTargetKey('http://www.instagram.com/some_user', {category:'Instagram',name:'Followers'})"));
@@ -245,7 +245,7 @@ assert.equal(store.get('users/ref').profitIQD,15000);
 assert.equal(store.get('profit_withdrawals/'+w2.body.id).status,'تم سحب الأرباح');
 await assert.rejects(()=>api('POST /api/profits/withdraw','ref',{...withdrawal,amountIQD:9999,requestId:crypto.randomUUID()},{file}));
 // Admin adjustments are journaled and replay protected. Ban blocks existing sessions.
-store.set('users/admin',{username:'admin',email:'admin@test.com',role:'admin',balance:0,spent:0});
+store.set('users/admin',{username:'admin',role:'admin',balance:0,spent:0});
 const adjustment={action:'add',amountIQD:5000,requestId:crypto.randomUUID()};
 await Promise.all([api('POST /api/admin/users/:id/action','admin',adjustment,{params:{id:'payer'}}),api('POST /api/admin/users/:id/action','admin',adjustment,{params:{id:'payer'}})]);
 assert.equal(store.get('users/payer').balance,35);assert.equal(store.get('users/ref').profitIQD,15000);
@@ -261,12 +261,12 @@ assert.equal(gateError.code,'ACCOUNT_BANNED');
 assert(uses.some(x=>x[0]==='/api/register' && x[1]===evaluate('rejectBannedSession')));
 assert(uses.some(x=>x[0]==='/api/login' && x[1]===evaluate('rejectBannedSession')));
 let guestError;await evaluate('rejectBannedSession')({headers:{}},response(),e=>guestError=e);assert.equal(guestError,undefined);
-store.set('users/bannedlogin',{username:'bannedlogin',email:'bannedlogin@test.com',password:'hashed',disabled:true});
-await assert.rejects(()=>call('POST /api/login',{body:{email:'bannedlogin@test.com',password:'wrong'},headers:{}}),e=>e.status===401 && !e.code);
+store.set('users/bannedlogin',{username:'bannedlogin',password:'hashed',disabled:true});
+await assert.rejects(()=>call('POST /api/login',{body:{username:'bannedlogin',password:'wrong'},headers:{}}),e=>e.status===401 && !e.code);
 let bannedLoginCookie;
 const lr=response();lr.cookie=(name,value)=>bannedLoginCookie=name+'='+value;
 const loginHandler=routes['POST /api/login'].at(-1);
-await assert.rejects(()=>loginHandler({body:{email:'bannedlogin@test.com',password:'correct-password'},headers:{}},lr),e=>e.code==='ACCOUNT_BANNED');
+await assert.rejects(()=>loginHandler({body:{username:'bannedlogin',password:'correct-password'},headers:{}},lr),e=>e.code==='ACCOUNT_BANNED');
 assert(bannedLoginCookie);
 let renewedBan;await evaluate('requireAuth')({headers:{cookie:bannedLoginCookie}},response(),e=>renewedBan=e);assert.equal(renewedBan.code,'ACCOUNT_BANNED');
 const errorHandler=uses.find(u=>u.length===1 && u[0].length===4)[0];
@@ -285,27 +285,58 @@ vm.runInContext(js.slice(js.indexOf('        let accountBanned'),js.indexOf('   
 await vm.runInContext("apiFetch('/api/me')",browser);
 assert(classes.has('account-banned'));assert.equal(node('banned-page').hidden,false);assert.equal(prompts,0);
 await vm.runInContext('restoreSession(true)',browser);assert.equal(prompts,0);
-reply={status:200,ok:true,json:async()=>({success:true,user:{username:'payer',email:'payer@test.com',balance:35}})};
+reply={status:200,ok:true,json:async()=>({success:true,user:{username:'payer',balance:35}})};
 await vm.runInContext('restoreSession()',browser);assert(!classes.has('account-banned'));assert.equal(node('banned-page').hidden,true);assert.equal(dashboards,1);
 reply={status:403,ok:false,clone(){return {json:async()=>({message:'غير مسموح'})}}};
 await vm.runInContext("apiFetch('/api/me')",browser);assert(!classes.has('account-banned'));
 console.log('PASS: ban screen for authenticated ban and valid banned login; no login prompt, wrong-password privacy, registration gate, unban recovery, ordinary 403 unaffected.');
-const list=await api('GET /api/admin/users','admin',{}, {query:{q:'payer@test.com',page:0}});
+const list=await api('GET /api/admin/users','admin',{}, {query:{q:'PAYER',page:0}});
 assert.equal(list.body.users.length,1);assert.equal(list.body.users[0].balanceIQD,35000);assert(!('password' in list.body.users[0]));
 assert(uses.some(u=>u[0]==='/api/profits'));
 // Registration boundary check: 7 rejected, 8 letters/digits and longer accepted.
 const registerHandler=routes['POST /api/register'].at(-1);
-await assert.rejects(()=>registerHandler({body:{username:'shortpass',email:'shortpass@test.com',password:'1234567'},headers:{}},response()),e=>e.status===400);
+await assert.rejects(()=>registerHandler({body:{username:'shortpass',password:'1234567'},headers:{}},response()),e=>e.status===400);
 for(const [name,password] of [['eightdigits','12345678'],['eightletters','abcdefgh'],['longpassword','abcdefgh123456789']]) {
- const r=response();await registerHandler({body:{username:name,email:name+'@test.com',password},headers:{}},r);assert.equal(r.body.success,true);
+ const r=response();await registerHandler({body:{username:name,password},headers:{}},r);assert.equal(r.body.success,true);
 }
+// Username-only registration, legacy login and uniqueness regression.
+const createName = async name => { const r=response(); await registerHandler({body:{username:name,password:'correct-password'},headers:{}},r); return r; };
+const registration = await createName('New_Account');
+assert.equal(registration.body.success,true);assert(!('email' in registration.body));
+const newRecord=[...store.entries()].find(([k,v])=>k.startsWith('users/')&&v.username==='New_Account');
+assert(newRecord);assert(!('email' in newRecord[1]));assert.notEqual(newRecord[1].password,'correct-password');
+const logged=response();await loginHandler({body:{username:'new_account',password:'correct-password'},headers:{}},logged);
+assert.equal(logged.body.username,'New_Account');assert(!('email' in logged.body));
+await assert.rejects(()=>loginHandler({body:{username:'New_Account',password:'wrong'},headers:{}},response()),e=>e.status===401);
+await assert.rejects(()=>loginHandler({body:{email:'anything@test.com',password:'correct-password'},headers:{}},response()),e=>e.status===401);
+await assert.rejects(()=>createName('NEW_ACCOUNT'),e=>e.status===400);
+const parallel=await Promise.allSettled([createName('TwinName'),createName('twinname')]);
+assert.equal(parallel.filter(x=>x.status==='fulfilled').length,1);
+assert.equal(parallel.filter(x=>x.status==='rejected').length,1);
+await createName('محمد_جديد');
+await assert.rejects(()=>createName('bad name'),e=>e.status===400);
+await assert.rejects(()=>registerHandler({body:{username:'toolongpassword',password:'x'.repeat(73)},headers:{}},response()),e=>e.status===400);
+const legacy={username:'Old_User',email:'old@test.com',password:'hashed',balance:77,spent:23,profitIQD:1234,role:'admin'};
+store.set('users/old-auth',clone(legacy));
+const oldLogged=response();await loginHandler({body:{username:'old_user',password:'correct-password'},headers:{}},oldLogged);
+assert.equal(oldLogged.body.balance,77);assert.equal(oldLogged.body.role,'admin');assert(!('email' in oldLogged.body));
+assert.deepEqual(store.get('users/old-auth'),legacy,'No account or balance migration');
+await assert.rejects(()=>createName('OLD_USER'),e=>e.status===400);
+const oldSearch=await api('GET /api/admin/users','admin',{}, {query:{q:'old_user',page:0}});
+assert.equal(oldSearch.body.users[0].id,'old-auth');assert(!('email' in oldSearch.body.users[0]));
+for (const [key,value] of store) if (['deposit_requests/','profit_withdrawals/'].some(prefix=>key.startsWith(prefix))) assert(!('email' in value),'Financial operations must work without email');
+const html=fs.readFileSync(__dirname+'/public/index.html','utf8');
+const appJs=fs.readFileSync(__dirname+'/public/app.csp.js','utf8');
+assert(!/regEmail|loginEmail|type="email"/.test(html+appJs));
+assert(html.includes('id="loginUsername"'));assert(html.includes('autocomplete="username"'));
+console.log('PASS: no-email registration/login/financial flows, old accounts preserved, case-insensitive names, concurrent duplicate rejection, Arabic names, password limits, username admin search, safe response fields and frontend identifiers.');
 console.log('PASS: password lengths 7 rejected; 8 digits, 8 letters, and longer accepted.');
 // Flexible deposit units: raw user input is normalized on the SERVER.
 const normalizeDeposit=evaluate('depositInputIQD');
 for(const [raw,expected] of [['1',1000],['10',10000],['10000',10000],['100',100000],['100000',100000],['500',500000],['1000',1000],['1.5',1500]])assert.equal(normalizeDeposit(raw),expected);
 for(const raw of ['',0,'0.5',-1,'NaN','1e4','abc','1000.5','100000001'])assert.throws(()=>normalizeDeposit(raw));
 for(const [i,gateway,raw,expected] of [[0,'Binance','10',10000],[1,'ZainCash','10000',10000],[2,'Mastercard','1',1000],[3,'Mastercard','500',500000]]) {
- const uid='flex'+i;store.set('users/'+uid,{username:uid,email:uid+'@test.com',balance:0,spent:0});
+ const uid='flex'+i;store.set('users/'+uid,{username:uid,balance:0,spent:0});
  // Mock sharp produces identical bytes for all images; reset its fixture hash only.
  for(const key of [...store.keys()])if(key.startsWith('receipt_hashes/'))store.delete(key);
  const result=await api('POST /api/deposit/submit',uid,{gateway,amountInput:raw,amount:99999},{file:{buffer:Buffer.from('receipt'+i)}});
