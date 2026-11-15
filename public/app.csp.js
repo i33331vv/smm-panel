@@ -163,7 +163,6 @@ function depositInputIQD(value) {
 
                 showDashboard(
                     currentUser.username,
-                    currentUser.email,
                     currentUser.balance
                 );
 
@@ -206,7 +205,7 @@ function depositInputIQD(value) {
                 .classList.remove('hidden');
         }
 
-        function showDashboard(username, email, balance) {
+        function showDashboard(username, balance) {
             document.getElementById('displayUsernameText')
                 .innerText = username;
 
@@ -1091,7 +1090,6 @@ function depositInputIQD(value) {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            email: session.email,
                             phone,
                             transferOtp,
                             amount
@@ -1156,7 +1154,6 @@ function depositInputIQD(value) {
             if (!confirm('تأكيد إرسال طلب شحن بقيمة ' + actualIQD.toLocaleString('en-US') + ' دينار عراقي؟')) return;
             const formData = new FormData();
 
-            formData.append('email', session.email);
 
             formData.append(
                 'gateway',
@@ -1680,8 +1677,6 @@ function depositInputIQD(value) {
                         body: JSON.stringify({
                             username:
                                 document.getElementById('regUsername').value,
-                            email:
-                                document.getElementById('regEmail').value,
                             password:
                                 document.getElementById('regPassword').value
                         })
@@ -1721,8 +1716,8 @@ function depositInputIQD(value) {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            email:
-                                document.getElementById('loginEmail').value,
+                            username:
+                                document.getElementById('loginUsername').value,
                             password:
                                 document.getElementById('loginPassword').value
                         })
