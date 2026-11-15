@@ -1,44 +1,96 @@
 'use strict';
-const assert = require('node:assert/strict');
-const {createInstagramProvider} = require('./instagram-provider.cjs');
-const publicUser = {username:'buyer',is_private:false,edge_followed_by:{count:100}};
-const apifyUser = {username:'buyer',private:false,followersCount:100};
-function setup(steps, token='test-token') {
-    let clock = 10000;
-    const calls = [];
-    const request = async (method,url,body,config) => {
-        calls.push({method,url,config});
-        assert(config.timeout <= 7000);
-        assert(config.signal);
-        assert(!url.includes('test-token'));
-        const step = steps.shift();
-        if (step instanceof Error) throw step;
-        return {status:200,data:step};
+
+// Three attempts, shared per-profile cache, and no invented privacy/count values.
+function createInstagramProvider({ axios, token, now = Date.now, logger = console }) {
+    const cache = new Map(), pending = new Map(), cooldown = new Map();
+    let active = 0;
+    const unavailable = () => ({valid:false, unreachable:true,
+        message:'تعذر التحقق آلياً من الحساب. يمكن إرسال الطلب دون عداد متابعين بعد التأكد من أن الحساب عام.'});
+    function normalized(user, username, source, apify = false) {
+        if (!user || user.error || typeof user.username !== 'string' || user.username.toLowerCase() !== username) return null;
+        const privacy = apify ? user.private : user.is_private;
+        const count = apify ? user.followersCount : (user.edge_followed_by?.count ?? user.follower_count);
+        if (typeof privacy !== 'boolean') return null;
+        if (!privacy && (!Number.isSafeInteger(count) || count < 0)) return null;
+        return {valid:true, username, isPrivate:privacy,
+            followers:Number.isSafeInteger(count) && count >= 0 ? count : null,
+            checkedAt:now(), source};
+    }
+    function pageProfile(html, username) {
+        // Only a matching profile object with explicit fields counts as evidence.
+        // Login/challenge HTML and abbreviated meta counts are not verification.
+        const scripts = String(html || '').matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi);
+        for (const match of scripts) {
+            let root;
+            try { root = JSON.parse(match[1]); } catch { continue; }
+            const stack = [root]; let visited = 0;
+            while (stack.length && visited++ < 20000) {
+                const obj = stack.pop();
+                if (!obj || typeof obj !== 'object') continue;
+                const result = normalized(obj, username, 'instagram-page');
+                if (result) return result;
+                for (const value of Object.values(obj)) if (value && typeof value === 'object') stack.push(value);
+            }
+        }
+        return null;
+    }
+    async function attempt(source, ms, request, parse) {
+        if ((cooldown.get(source) || 0) > now()) return null;
+        try {
+            const response = await request({timeout:ms, signal:AbortSignal.timeout(ms),
+                maxRedirects:0, maxContentLength:3 * 1024 * 1024});
+            if (response.status && response.status !== 200 && response.status !== 201) throw {response};
+            const value = parse(response.data);
+            if (!value) cooldown.set(source, now() + 30000);
+            return value;
+        } catch (error) {
+            const status = Number(error.response?.status) || 0;
+            const retry = Number(error.response?.headers?.['retry-after']);
+            const pause = [401,402,403,429].includes(status)
+                ? (Number.isFinite(retry) && retry > 0 ? Math.min(retry * 1000,3600000) : 300000)
+                : 60000;
+            cooldown.set(source, now() + pause);
+            if (source.startsWith('instagram') && status === 429) {
+                cooldown.set('instagram-web', now() + pause);
+                cooldown.set('instagram-page', now() + pause);
+            }
+            logger.warn('Instagram check attempt unavailable', {source,status});
+            return null;
+        }
+    }
+    return async function check(username) {
+        username = String(username || '').toLowerCase();
+        if (!/^[a-z0-9._]{1,30}$/.test(username)) return {valid:false,message:'صيغة اسم الحساب غير صحيحة.'};
+        const hit = cache.get(username);
+        if (hit && hit.until > now()) return {...hit.value};
+        if (pending.has(username)) return {...await pending.get(username)};
+        if (active >= 2) return unavailable();
+        const work = (async () => {
+            active++;
+            try {
+                let value = null;
+                if (token) value = await attempt('apify',7000, config => axios.post(
+                    'https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items',
+                    {usernames:[username], includeAboutSection:false},
+                    {...config, params:{timeout:10,clean:true},
+                        headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}}),
+                    items => Array.isArray(items) ? items.map(x => normalized(x,username,'apify',true)).find(Boolean) : null);
+                const headers = {'User-Agent':'Mozilla/5.0','Accept-Language':'en-US,en;q=0.9'};
+                if (!value) value = await attempt('instagram-web',3000, config => axios.get(
+                    `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
+                    {...config,headers:{...headers,'x-ig-app-id':'936619743392459'}}),
+                    data => normalized(data?.data?.user,username,'instagram-web'));
+                if (!value) value = await attempt('instagram-page',3000, config => axios.get(
+                    `https://www.instagram.com/${encodeURIComponent(username)}/`,{...config,headers}),
+                    data => pageProfile(data,username));
+                value ||= unavailable();
+                if (cache.size >= 2000) cache.delete(cache.keys().next().value);
+                cache.set(username,{value,until:now() + (value.valid ? 600000 : 120000)});
+                return value;
+            } finally { active--; }
+        })();
+        pending.set(username,work);
+        try { return {...await work}; } finally { pending.delete(username); }
     };
-    const check = createInstagramProvider({token,now:()=>clock,logger:{warn(){}},axios:{
-        post:(u,b,c)=>request('post',u,b,c),get:(u,c)=>request('get',u,null,c)}});
-    return {check,calls,advance:n=>clock+=n};
 }
-(async()=>{
-    let s = setup([[apifyUser]]);
-    const [a,b] = await Promise.all([s.check('buyer'),s.check('BUYER')]);
-    assert(a.valid && !a.isPrivate);assert.equal(a.followers,100);assert.deepEqual(a,b);assert.equal(s.calls.length,1);
-    await s.check('buyer');assert.equal(s.calls.length,1);
-    s = setup([new Error('timeout'),{data:{user:publicUser}}]);
-    assert.equal((await s.check('buyer')).source,'instagram-web');assert.equal(s.calls.length,2);
-    s = setup([[],{},'<script type="application/json">'+JSON.stringify({nested:{user:publicUser}})+'</script>']);
-    assert.equal((await s.check('buyer')).source,'instagram-page');assert.equal(s.calls.length,3);
-    s = setup([[{...apifyUser,private:true,followersCount:null}]]);
-    assert.equal((await s.check('buyer')).isPrivate,true);assert.equal(s.calls.length,1);
-    s = setup([[],{},'<html>Login required</html>']);
-    const failed=await s.check('buyer');assert.equal(failed.valid,false);assert.equal(failed.unreachable,true);assert.equal(failed.followers,undefined);
-    await s.check('buyer');assert.equal(s.calls.length,3);
-    s = setup([{data:{user:publicUser}}],'');assert.equal((await s.check('buyer')).source,'instagram-web');assert.equal(s.calls.length,1);
-    s = setup([[{...apifyUser,username:'someone_else'}],{data:{user:{username:'buyer',is_private:false}}},'']);
-    assert.equal((await s.check('buyer')).unreachable,true);
-    const limited = new Error('429');limited.response={status:429,headers:{'retry-after':'300'}};
-    s=setup([[],limited]);assert.equal((await s.check('buyer')).unreachable,true);assert.equal(s.calls.length,2,'Do not hammer same Instagram host via page after 429');
-    s=setup([[{...apifyUser,followersCount:0}]]);assert.equal((await s.check('buyer')).followers,0);
-    assert.equal((await s.check('../evil')).valid,false);
-    console.log('PASS: each fallback stage, private stop, unknown result, exact username/privacy/count, zero, no-token direct fallback, concurrency/cache, shared 429 cooldown, bounded timeout settings. Mock network only.');
-})().catch(error=>{console.error(error);process.exitCode=1;});
+module.exports = {createInstagramProvider};
