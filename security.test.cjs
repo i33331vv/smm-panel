@@ -114,6 +114,56 @@ const placed=await api('POST /api/order','buyer',{serviceId:'svc',link:'https://
 assert.equal(placed.body.success,true);assert.equal(store.get('users/buyer').balance,10);assert.equal(store.get('users/buyer').spent,10);
 await evaluate('handleTelegramCallback')('ord',{...cb,data:'ord_cancel_'+placed.body.orderId});
 assert.equal(store.get('users/buyer').balance,20);assert.equal(store.get('users/buyer').spent,0);
+// Social link validation and order creation: never use followers for media orders.
+assert(uses.some(x=>x[0]==='/api/links' && x.length===3));
+const parse=evaluate('parseServiceLink');
+const igFollowers={category:'انستقرام',name:'متابعين'};
+const igLikes={category:'انستقرام',name:'لايكات ريلز وبوست'};
+const ttFollowers={category:'تيك توك',name:'متابعين'};
+const ttViews={category:'تيك توك',name:'مشاهدات'};
+for(const link of ['https://instagram.com/p/ABC_12/?igsh=abc','https://www.instagram.com/reel/ABC-12/','https://instagram.com/share/reel/ABC/']) {
+ assert.equal(parse(link,igLikes).kind,'media');assert.equal(parse(link,igLikes).monitorFollowers,false);
+ assert.throws(()=>parse(link,igFollowers));
+}
+assert.equal(parse('https://tiktok.com/@test',ttFollowers).kind,'profile');
+assert.equal(parse('@test',ttFollowers).platform,'tiktok');
+for(const link of ['https://www.tiktok.com/@test/video/123456','https://www.tiktok.com/@test/photo/123456','https://vm.tiktok.com/ABC123/','https://vt.tiktok.com/ABC123/','https://www.tiktok.com/t/ABC123/']) assert.equal(parse(link,ttViews).platform,'tiktok');
+for(const link of ['https://instagram.com.evil.test/p/ABC/','https://instagram.com@evil.test/p/ABC/','javascript:alert(1)','https://127.0.0.1/a','https://www.tiktok.com/not-a-post','https://instagram.com/p/','https://www.instagram.com:444/p/ABC/','https://www.instagram.com/p/ABC/extra']) assert.throws(()=>parse(link,{}));
+assert.throws(()=>parse('https://tiktok.com/@test/video/123',igLikes));
+assert.throws(()=>parse('https://instagram.com/buyer',igLikes));
+assert.throws(()=>parse('https://vm.tiktok.com/ABC/',ttFollowers));
+context.profileCalls=0;
+evaluate("checkInstagramProfile = async () => { profileCalls++; return {valid:true,username:'buyer',followers:10,isPrivate:false}; };");
+const cases=[
+ [igLikes,'https://instagram.com/p/ABC/?igsh=keep'],
+ [igLikes,'https://instagram.com/reel/ABC/'],
+ [ttFollowers,'https://www.tiktok.com/@buyer'],
+ [ttViews,'https://www.tiktok.com/@buyer/video/12345'],
+ [ttViews,'https://www.tiktok.com/@buyer/photo/12345'],
+ [ttViews,'https://vm.tiktok.com/ABC123/']
+];
+for(let i=0;i<cases.length;i++) {
+ const [service,link]=cases[i],id='social'+i,sid='socialsvc'+i;
+ store.set('users/'+id,{username:id,email:id+'@test.com',balance:20,spent:0});
+ store.set('services/'+sid,{...service,price:1,baseQuantity:1000,minQty:100,maxQty:null});
+ const preview=await api('POST /api/links/check',id,{serviceId:sid,link});
+ assert.equal(preview.body.success,true);assert.equal(preview.body.followers,null);
+ const created=await api('POST /api/order',id,{serviceId:sid,link,quantity:1000},{ip:'test'});
+ assert.equal(created.body.success,true,JSON.stringify(created.body));
+ const order=store.get('orders/'+created.body.orderId);
+ assert.equal(order.link,link);assert.equal(order.ig_username,null);assert.equal(order.start_count,null);assert.equal(order.target_count,null);
+ assert.equal(store.get('users/'+id).balance,19);assert.equal(store.get('users/'+id).spent,1);
+ await evaluate('syncSingleOrderCount')(snapshot(doc('orders',created.body.orderId)));
+}
+assert.equal(context.profileCalls,0,'No Instagram scrape or follower monitoring for media/TikTok');
+const invalid=await api('POST /api/order','social0',{serviceId:'socialsvc0',link:'https://instagram.com/buyer',quantity:1000},{ip:'test'});
+assert.equal(invalid.code,400);assert.equal(store.get('users/social0').balance,19);
+const checked=await api('POST /api/links/check','buyer',{serviceId:'svc',link:'https://instagram.com/buyer'});
+assert.equal(checked.body.followers,10);assert.equal(context.profileCalls,1);
+evaluate("checkInstagramProfile = async () => ({valid:true,isPrivate:true,followers:10});");
+const privateOrder=await api('POST /api/order','buyer',{serviceId:'svc',link:'https://instagram.com/buyer',quantity:1000},{ip:'test'});
+assert.equal(privateOrder.code,400);assert.equal(store.get('users/buyer').balance,20);
+console.log('PASS: Instagram media, TikTok profiles/video/photo/short links, host/type rejection, preview/order agreement, real debit, no wrong follower monitoring.');
 // Conversion double submission cannot double credit, and cannot reward another user.
 const conversion={amountIQD:1000,requestId:crypto.randomUUID()};
 await Promise.all([api('POST /api/profits/convert','ref',conversion),api('POST /api/profits/convert','ref',conversion)]);
