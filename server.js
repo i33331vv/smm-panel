@@ -570,7 +570,7 @@ function buildOrderTelegramMessage(id, o) {
     const current = o.current_count ?? o.start_count;
 
     const counter = o.start_count == null
-        ? (o.verification_status === 'unverified' ? '\n⚠️ لم يتم التحقق من الحساب؛ لا يوجد عدد بداية موثوق. المراجعة والإكمال يدوياً.' : '')
+        ? (o.verification_status === 'unverified' ? (o.approximate_followers != null ? `\n📊 نحو ${o.approximate_followers} متابع (تقريبي)` : '') + '\n⚠️ لم يتم التحقق من الحساب؛ لا يوجد عدد بداية موثوق. المراجعة والإكمال يدوياً.' : '')
         : `\n📊 العدد: ${o.start_count}/${current} — الهدف: ${o.target_count}${
             o.account_private ? '\n⚠️ الحساب خاص' : ''
         }`;
@@ -936,9 +936,12 @@ async function validateOrderLink(input, service) {
             message: '⚠️ تعذر التحقق من الحساب. يمكنك إرسال الطلب دون عداد؛ تأكد من صحة الحساب وأنه عام. سيُخصم سعر الخدمة عند تأكيد الطلب.' };
     }
     if (info.isPrivate) throw fail('🔒 الحساب خاص؛ حوّله إلى عام قبل الطلب.');
+    if (info.approximate) return { ...parsed, username: info.username, followers: null,
+        approximateFollowers: info.followers, verified: false, isPrivate: null, verificationStatus: 'unverified',
+        message: `⚠️ نحو ${info.followers.toLocaleString('en-US')} متابع (عدد تقريبي). خصوصية الحساب غير معروفة؛ يمكنك إرسال الطلب دون عداد اكتمال آلي.` };
     if (!Number.isSafeInteger(info.followers) || info.followers < 0) throw fail('تعذر قراءة عدد المتابعين، حاول لاحقاً.');
-    return { ...parsed, verified: true, verificationStatus: 'verified', username: info.username, followers: info.followers,
-        message: `✅ الحساب (@${info.username}) عام — العدد الحالي: ${info.followers} متابع.` };
+    return { ...parsed, verified: info.isPrivate === false, isPrivate: info.isPrivate ?? null, verificationStatus: info.isPrivate === false ? 'verified' : 'privacy_unknown', username: info.username, followers: info.followers,
+        message: `✅ الحساب (@${info.username}) ${info.isPrivate === false ? 'عام' : 'خصوصية الحساب غير معروفة'} — العدد الحالي: ${info.followers} متابع.` };
 }
 
 app.use('/api/links', requireAuth, sensitiveLimit('link-check', 15, 10 * 60000, r => r.user.id));
@@ -1074,9 +1077,10 @@ app.post('/api/instagram/check', async (req, res) => {
     return res.json({
         success: true,
         username: info.username,
-        followers: info.followers,
-        message:
-            `✅ الحساب عام وجاهز | عدد المتابعين الحالي: ${info.followers}`
+        followers: info.approximate ? null : info.followers,
+        approximateFollowers: info.approximate ? info.followers : null,
+        isPrivate: info.isPrivate ?? null,
+        message: info.approximate ? `نحو ${info.followers} متابع (تقريبي)؛ الخصوصية غير معروفة.` : `عدد المتابعين: ${info.followers}؛ ${info.isPrivate === false ? 'الحساب عام' : 'الخصوصية غير معروفة'}`
     });
 });
 
@@ -1119,7 +1123,7 @@ async function syncSingleOrderCount(doc) {
         last_checked_ms: check.valid ? now : now - instagramMonitorMs + 300000
     }).catch(() => {});
 
-    if (!check.valid) return;
+    if (!check.valid || check.approximate) return;
 
     if (check.isPrivate) {
         if (!ord.account_private || !ord.private_notified) {
@@ -1187,7 +1191,7 @@ async function syncSingleOrderCount(doc) {
 
         const updates = {
             current_count: newCurrent,
-            account_private: false,
+            account_private: check.isPrivate ?? null,
             private_notified: false,
             status: nextStatus
         };
@@ -2781,6 +2785,7 @@ app.post(
                     start_count: startCount,
                     current_count: currentCount,
                     target_count: targetCount,
+                    approximate_followers: checkedLink.approximateFollowers ?? null,
                     verification_status: checkedLink.verificationStatus || 'syntax_only',
                     account_private: checkedLink.verified ? false : null,
                     private_notified: false,
@@ -2801,6 +2806,7 @@ app.post(
                 start_count: startCount,
                 current_count: currentCount,
                 target_count: targetCount,
+                approximate_followers: checkedLink.approximateFollowers ?? null,
                 verification_status: checkedLink.verificationStatus || 'syntax_only',
                 account_private: checkedLink.verified ? false : null,
                 status: 'قيد المعالجة',
