@@ -22,13 +22,13 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
             }[c]));
         }
 
-        function safeInstagramURL(value) {
+        function safeSocialURL(value) {
             try {
                 const url = new URL(String(value));
 
                 if (
                     !['https:', 'http:'].includes(url.protocol) ||
-                    !['instagram.com', 'www.instagram.com']
+                    !['instagram.com', 'www.instagram.com', 'tiktok.com', 'www.tiktok.com', 'm.tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com']
                         .includes(url.hostname.toLowerCase()) ||
                     url.username ||
                     url.password ||
@@ -457,26 +457,28 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
                     'mt-2 p-3 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200';
 
                 previewBox.innerText =
-                    '⚠️ يرجى وضع رابط حسابك في انستقرام أولاً.';
+                    '⚠️ اختر الخدمة وضع رابط الحساب أو المنشور المطلوب أولاً.';
 
                 previewBox.classList.remove('hidden');
                 return;
             }
 
+            const serviceId = document.getElementById('serviceSelect').value;
             checkBtn.disabled = true;
             checkBtn.innerText = 'جاري الفحص...';
             previewBox.classList.add('hidden');
 
             try {
-                const res = await apiFetch('/api/instagram/check', {
+                const res = await apiFetch('/api/links/check', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ link })
+                    body: JSON.stringify({ link, serviceId })
                 });
 
                 const data = await res.json();
+                if (document.getElementById('orderLink').value.trim() !== link || document.getElementById('serviceSelect').value !== serviceId) return;
 
                 previewBox.classList.remove('hidden');
 
@@ -485,7 +487,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
                         'mt-2 p-3 rounded-xl text-xs font-bold bg-green-50 text-green-700 border border-green-200';
 
                     previewBox.innerText =
-                        `✅ الحساب (@${data.username}) عام وصحيح — عدد حسابك الحالي: ${data.followers} متابع.`;
+                        data.message || 'صيغة الرابط مناسبة للخدمة.';
                 } else {
                     previewBox.className =
                         'mt-2 p-3 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200';
@@ -628,7 +630,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
                                     ${escapeHTML(order.service)}
                                 </td>
                                 <td class="p-3 text-blue-600 truncate max-w-xs">
-                                    <a href="${escapeHTML(safeInstagramURL(order.link))}"
+                                    <a href="${escapeHTML(safeSocialURL(order.link))}"
                                        target="_blank"
                                        rel="noopener noreferrer"
                                        class="hover:underline"
@@ -1549,7 +1551,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
 
                 submitBtn.disabled = true;
                 submitBtn.innerText =
-                    'جاري فحص رابط انستقرام وإنشاء الطلب...';
+                    'جاري فحص الرابط وإنشاء الطلب...';
 
                 try {
                     const res = await apiFetch('/api/order', {
@@ -1576,7 +1578,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
                                 dinars(data.newBalance);
 
                         okMsg.innerText =
-                            `✅ تم إنشاء الطلب #${data.orderId.substring(0, 6)} بنجاح! عدد حسابك هو ${data.startCount}/${data.currentCount} (يكتمل عند: ${data.targetCount})`;
+                            `✅ تم إنشاء الطلب #${data.orderId.substring(0, 6)} بنجاح!` + (data.startCount != null ? ` عدد حسابك هو ${data.startCount}/${data.currentCount} (الهدف: ${data.targetCount})` : ' يمكنك متابعة حالته من سجل الطلبات.');
 
                         okMsg.classList.remove('hidden');
 
@@ -1609,7 +1611,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
                 } finally {
                     submitBtn.disabled = false;
                     submitBtn.innerText =
-                        'فحص الحساب وتأكيد الطلب';
+                        'فحص الرابط وتأكيد الطلب';
                 }
             });
 
@@ -1759,3 +1761,5 @@ document.querySelector('[data-csp-bind="csp-32"]').addEventListener('click', fun
         if (!panel.hidden && event.relatedTarget && !widget.contains(event.relatedTarget)) setSupportOpen(false);
     });
 })();
+
+document.getElementById('orderLink').addEventListener('input', () => document.getElementById('igPreviewBox').classList.add('hidden'));
