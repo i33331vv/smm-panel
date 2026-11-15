@@ -164,6 +164,30 @@ evaluate("checkInstagramProfile = async () => ({valid:true,isPrivate:true,follow
 const privateOrder=await api('POST /api/order','buyer',{serviceId:'svc',link:'https://instagram.com/buyer',quantity:1000},{ip:'test'});
 assert.equal(privateOrder.code,400);assert.equal(store.get('users/buyer').balance,20);
 console.log('PASS: Instagram media, TikTok profiles/video/photo/short links, host/type rejection, preview/order agreement, real debit, no wrong follower monitoring.');
+// Same user + service + target: reject active duplicates atomically, including aliases.
+store.set('users/double',{username:'double',email:'double@test.com',balance:100,spent:0});
+store.set('services/ttf',{category:'تيك توك',name:'متابعين',price:1,baseQuantity:1000,minQty:1,maxQty:null});
+const dupeRequest={serviceId:'ttf',link:'https://www.tiktok.com/@Same_User?tracking=1',quantity:1000};
+const results=await Promise.all([api('POST /api/order','double',dupeRequest),api('POST /api/order','double',{...dupeRequest,link:'http://tiktok.com/@same_user/'})]);
+assert.equal(results.filter(r=>r.body.success).length,1);assert.equal(results.filter(r=>r.code===409).length,1);
+assert.equal(store.get('users/double').balance,99);assert.equal(store.get('users/double').spent,1);
+const firstId=results.find(r=>r.body.success).body.orderId;
+store.get('orders/'+firstId).status='قيد التنفيذ';
+assert.equal((await api('POST /api/order','double',{...dupeRequest,quantity:500})).code,409);
+assert.equal((await api('POST /api/order','double',{...dupeRequest,link:'https://tiktok.com/@different'})).body.success,true);
+await evaluate('handleTelegramCallback')('ord',{...cb,data:'ord_complete_'+firstId});
+const afterComplete=await api('POST /api/order','double',dupeRequest);assert.equal(afterComplete.body.success,true);
+await evaluate('handleTelegramCallback')('ord',{...cb,data:'ord_cancel_'+afterComplete.body.orderId});
+assert.equal((await api('POST /api/order','double',dupeRequest)).body.success,true);
+assert.equal(store.get('users/double').balance,97);assert.equal(store.get('users/double').spent,3);
+// Old rows have no target_key; the same matching rule applies without a migration.
+store.set('users/legacydup',{username:'legacydup',email:'legacydup@test.com',balance:50,spent:0});
+store.set('orders/legacydup',{username:'legacydup',service:'[تيك توك] متابعين',link:'https://www.tiktok.com/@Same_User/',status:'قيد المعالجة'});
+assert.equal((await api('POST /api/order','legacydup',dupeRequest)).code,409);assert.equal(store.get('users/legacydup').balance,50);
+assert.equal(evaluate("orderTargetKey('https://instagram.com/Some_User/?igsh=1', {category:'Instagram',name:'Followers'})"),evaluate("orderTargetKey('http://www.instagram.com/some_user', {category:'Instagram',name:'Followers'})"));
+assert.equal(evaluate("orderTargetKey('https://instagram.com/reel/ABC_1/?igsh=1', {category:'Instagram',name:'Likes'})"),evaluate("orderTargetKey('https://www.instagram.com/p/ABC_1/', {category:'Instagram',name:'Likes'})"));
+assert.notEqual(evaluate("orderTargetKey('https://instagram.com/p/ABC_1/', {})"),evaluate("orderTargetKey('https://instagram.com/p/abc_1/', {})"));
+console.log('PASS: concurrent duplicate rejected without debit; aliases/case/query normalized; different target allowed; completion/cancellation reopen; old records supported.');
 // Conversion double submission cannot double credit, and cannot reward another user.
 const conversion={amountIQD:1000,requestId:crypto.randomUUID()};
 await Promise.all([api('POST /api/profits/convert','ref',conversion),api('POST /api/profits/convert','ref',conversion)]);
@@ -199,11 +223,78 @@ await assert.rejects(()=>api('POST /api/admin/users/:id/action','admin',{action:
 await api('POST /api/admin/users/:id/action','admin',{action:'ban',requestId:crypto.randomUUID()},{params:{id:'payer'}});
 assert.equal(store.get('users/payer').disabled,true);
 await evaluate('issueSession')({headers:{}},sessionResponse,'payer');
-let banned;await evaluate('requireAuth')({headers:{cookie:savedCookie.name+'='+savedCookie.value}},response(),e=>banned=e);assert.equal(banned.status,401);
+let banned;await evaluate('requireAuth')({headers:{cookie:savedCookie.name+'='+savedCookie.value}},response(),e=>banned=e);assert.equal(banned.status,403);assert.equal(banned.code,'ACCOUNT_BANNED');
+const banCookie=savedCookie.name+'='+savedCookie.value;
+let gateError;await evaluate('rejectBannedSession')({headers:{cookie:banCookie}},response(),e=>gateError=e);
+assert.equal(gateError.code,'ACCOUNT_BANNED');
+assert(uses.some(x=>x[0]==='/api/register' && x[1]===evaluate('rejectBannedSession')));
+assert(uses.some(x=>x[0]==='/api/login' && x[1]===evaluate('rejectBannedSession')));
+let guestError;await evaluate('rejectBannedSession')({headers:{}},response(),e=>guestError=e);assert.equal(guestError,undefined);
+store.set('users/bannedlogin',{username:'bannedlogin',email:'bannedlogin@test.com',password:'hashed',disabled:true});
+await assert.rejects(()=>call('POST /api/login',{body:{email:'bannedlogin@test.com',password:'wrong'},headers:{}}),e=>e.status===401 && !e.code);
+let bannedLoginCookie;
+const lr=response();lr.cookie=(name,value)=>bannedLoginCookie=name+'='+value;
+const loginHandler=routes['POST /api/login'].at(-1);
+await assert.rejects(()=>loginHandler({body:{email:'bannedlogin@test.com',password:'correct-password'},headers:{}},lr),e=>e.code==='ACCOUNT_BANNED');
+assert(bannedLoginCookie);
+let renewedBan;await evaluate('requireAuth')({headers:{cookie:bannedLoginCookie}},response(),e=>renewedBan=e);assert.equal(renewedBan.code,'ACCOUNT_BANNED');
+const errorHandler=uses.find(u=>u.length===1 && u[0].length===4)[0];
+const er=response();errorHandler(banned,{},er,()=>{});assert.equal(er.code,403);assert.equal(er.body.code,'ACCOUNT_BANNED');
 await api('POST /api/admin/users/:id/action','admin',{action:'unban',requestId:crypto.randomUUID()},{params:{id:'payer'}});
 assert.equal(store.get('users/payer').disabled,false);
+let unbanError;const restoredReq={headers:{cookie:banCookie}};
+await evaluate('requireAuth')(restoredReq,response(),e=>unbanError=e);assert.equal(unbanError,undefined);assert.equal(restoredReq.user.id,'payer');
+// Exercise real frontend response handling with minimal DOM stubs.
+const nodes=new Map();const classes=new Set();let prompts=0,dashboards=0;
+function node(id){if(!nodes.has(id))nodes.set(id,{hidden:true,classList:{add(){},remove(){}},focus(){},textContent:''});return nodes.get(id)}
+let reply={status:403,ok:false,clone(){return {json:async()=>({code:'ACCOUNT_BANNED'})}}};
+const browser=vm.createContext({URL,window:{location:{origin:'https://mtnajm.com'}},document:{body:{classList:{add:x=>classes.add(x),remove:x=>classes.delete(x)}},getElementById:node,querySelectorAll:()=>[]},fetch:async()=>reply,currentUser:{username:'payer'},hideAllSections:()=>{},updateAdminVisibility:()=>{},toggleView:()=>{},openModal:()=>prompts++,showDashboard:()=>dashboards++});
+const js=fs.readFileSync(__dirname+'/public/app.csp.js','utf8');
+vm.runInContext(js.slice(js.indexOf('        let accountBanned'),js.indexOf('        function openModal')),browser);
+await vm.runInContext("apiFetch('/api/me')",browser);
+assert(classes.has('account-banned'));assert.equal(node('banned-page').hidden,false);assert.equal(prompts,0);
+await vm.runInContext('restoreSession(true)',browser);assert.equal(prompts,0);
+reply={status:200,ok:true,json:async()=>({success:true,user:{username:'payer',email:'payer@test.com',balance:35}})};
+await vm.runInContext('restoreSession()',browser);assert(!classes.has('account-banned'));assert.equal(node('banned-page').hidden,true);assert.equal(dashboards,1);
+reply={status:403,ok:false,clone(){return {json:async()=>({message:'غير مسموح'})}}};
+await vm.runInContext("apiFetch('/api/me')",browser);assert(!classes.has('account-banned'));
+console.log('PASS: ban screen for authenticated ban and valid banned login; no login prompt, wrong-password privacy, registration gate, unban recovery, ordinary 403 unaffected.');
 const list=await api('GET /api/admin/users','admin',{}, {query:{q:'payer@test.com',page:0}});
 assert.equal(list.body.users.length,1);assert.equal(list.body.users[0].balanceIQD,35000);assert(!('password' in list.body.users[0]));
 assert(uses.some(u=>u[0]==='/api/profits'));
+// Registration boundary check: 7 rejected, 8 letters/digits and longer accepted.
+const registerHandler=routes['POST /api/register'].at(-1);
+await assert.rejects(()=>registerHandler({body:{username:'shortpass',email:'shortpass@test.com',password:'1234567'},headers:{}},response()),e=>e.status===400);
+for(const [name,password] of [['eightdigits','12345678'],['eightletters','abcdefgh'],['longpassword','abcdefgh123456789']]) {
+ const r=response();await registerHandler({body:{username:name,email:name+'@test.com',password},headers:{}},r);assert.equal(r.body.success,true);
+}
+console.log('PASS: password lengths 7 rejected; 8 digits, 8 letters, and longer accepted.');
+// Real frontend unit conversion and submit handlers (network/DOM mocked).
+const frontendSource=fs.readFileSync(__dirname+'/public/app.csp.js','utf8');
+const convertContext=vm.createContext({});
+vm.runInContext(frontendSource.slice(frontendSource.indexOf('function thousandsToIQD'),frontendSource.indexOf('        let fetchedServices')),convertContext);
+const toDinar=vm.runInContext('thousandsToIQD',convertContext);
+for(const [input,expected] of [['1',1000],['10',10000],['100',100000],['0.5',500],['0.001',1]])assert.equal(toDinar(input),expected);
+for(const input of ['',0,-1,'NaN','Infinity','0.0001','100001','10foo'])assert.throws(()=>toDinar(input));
+const requests=[],jobs=[],events={};
+class FakeFormData {constructor(form){this.data=new Map(Object.entries(form||{}))}get(k){return this.data.get(k)}set(k,v){this.data.set(k,String(v))}append(k,v){this.set(k,v)}}
+const elements={depAmountInput:{value:'10'},depImageInput:{files:['receipt']},depositGateway:{value:'Binance'},depositSuccessMsg:{classList:{add(){},remove(){}}},manualDepositForm:{reset(){}}};
+const client=vm.createContext({thousandsToIQD:toDinar,document:{getElementById:id=>elements[id]||{addEventListener:(event,fn)=>events[id]=fn}},FormData:FakeFormData,currentUser:{email:'test@test.com'},promptLogin:()=>{},alert:msg=>{throw Error(msg)},confirm:()=>true,apiFetch:async(url,opts)=>{requests.push([url,opts.body]);return {json:async()=>({success:true})}},updateDepositInstructions:()=>{},request:async(url,data)=>requests.push([url,data]),moneyIQD:n=>n+' IQD',pending:new Map(),operation:()=>crypto.randomUUID(),refreshUserBalance:async()=>{},profits:async()=>{},message:{},run:(button,job)=>jobs.push(job())});
+vm.runInContext(frontendSource.slice(frontendSource.indexOf('        async function handleDepositSubmit'),frontendSource.indexOf('        // لوحة المدير')),client);
+for(const [gateway,value,expected] of [['Binance','1',1],['ZainCash','10',10],['Mastercard','100',100]]) {
+ elements.depAmountInput.value=value;elements.depositGateway.value=gateway;
+ await vm.runInContext('handleDepositSubmit({preventDefault(){}})',client);
+ const [url,form]=requests.at(-1);assert.equal(url,'/api/deposit/submit');assert.equal(Number(form.get('amount')),expected);assert.equal(form.get('gateway'),gateway);
+}
+const featuresSource=fs.readFileSync(__dirname+'/public/features.js','utf8');
+const handlerStart=featuresSource.indexOf("        document.getElementById('convertProfits').addEventListener");
+const handlerEnd=featuresSource.indexOf('\n    }\n    let page=',handlerStart);
+vm.runInContext(featuresSource.slice(handlerStart,handlerEnd),client);
+events.convertProfits({preventDefault(){},currentTarget:{amountIQD:'0.5'},submitter:{}});await Promise.all(jobs.splice(0));assert.equal(requests.at(-1)[1].amountIQD,500);
+events.withdrawProfits({preventDefault(){},currentTarget:{amountIQD:'10',card:'7111053109',barcode:'image'},submitter:{}});await Promise.all(jobs.splice(0));assert.equal(requests.at(-1)[0],'/api/profits/withdraw');assert.equal(requests.at(-1)[1].get('amountIQD'),'10000');
+// Service editing round trip keeps the existing base-unit price intact.
+assert(frontendSource.includes('Number(serv.price || 0);'));assert(frontendSource.includes("parseFloat(document.getElementById('servPrice').value),"));
+const html=fs.readFileSync(__dirname+'/public/index.html','utf8');assert(html.includes('بآلاف الدنانير'));assert(html.includes('minlength="8"'));
+console.log('PASS: UI 1/10/100 => 1000/10000/100000 IQD; all three gateways, 500-IQD conversion and 10000-IQD withdrawal; stored/API units unchanged.');
 console.log('PASS: security regression, currency conversion, referral ownership and once-only rewards, Asiacell limit, historic spent/refund, conversion idempotency, withdrawal debit/approve/cancel/replay/authorization, admin balance changes and ban.');
 })().catch(e=>{console.error(e);process.exitCode=1});
