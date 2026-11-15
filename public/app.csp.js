@@ -52,9 +52,27 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
             link.classList.toggle('flex', allowed);
         }
 
+        let accountBanned = false;
+        function showBannedPage() {
+            const first = !accountBanned;
+            accountBanned = true;
+            currentUser = null;
+            document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+            document.querySelectorAll('.modal.active').forEach(modal => modal.classList.remove('active'));
+            document.body.classList.add('account-banned');
+            document.getElementById('banned-page').hidden = false;
+            if (first) document.getElementById('banned-title').focus();
+        }
+        function clearBannedPage() {
+            accountBanned = false;
+            document.body.classList.remove('account-banned');
+            document.getElementById('banned-page').hidden = true;
+        }
+
         function promptLogin(
             message = 'سجّل دخولك مرة واحدة لحفظ جلستك على هذا الجهاز.'
         ) {
+            if (accountBanned) return showBannedPage();
             currentUser = null;
             hideAllSections();
             updateAdminVisibility();
@@ -83,6 +101,11 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
                 cache: 'no-store'
             });
 
+            if (response.status === 403) {
+                const error = await response.clone().json().catch(() => null);
+                if (error?.code === 'ACCOUNT_BANNED') showBannedPage();
+            }
+
             if (
                 response.status === 401 &&
                 promptOnUnauthorized &&
@@ -104,6 +127,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
                 });
 
                 if (!response.ok) {
+                    if (accountBanned) return false;
                     if (response.status !== 401) {
                         throw new Error(
                             'تعذر التحقق من الجلسة الآن. حاول تسجيل الدخول مجدداً.'
@@ -123,6 +147,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
                     throw new Error('تعذر التحقق من بيانات الحساب.');
                 }
 
+                clearBannedPage();
                 currentUser = data.user;
 
                 showDashboard(
@@ -150,6 +175,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
         }
 
         function openModal(id) {
+            if (accountBanned) return showBannedPage();
             document.getElementById(id).classList.add('active');
         }
 
@@ -158,6 +184,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
         }
 
         function toggleView(id) {
+            if (accountBanned) return showBannedPage();
             document.getElementById('landing-page')
                 .classList.add('hidden');
 
@@ -1763,3 +1790,15 @@ document.querySelector('[data-csp-bind="csp-32"]').addEventListener('click', fun
 })();
 
 document.getElementById('orderLink').addEventListener('input', () => document.getElementById('igPreviewBox').classList.add('hidden'));
+
+// Recheck explicitly after support lifts the ban; no permanent local ban flag.
+document.getElementById('ban-recheck').addEventListener('click', async function () {
+    this.disabled = true;
+    const status = document.getElementById('ban-status');
+    status.textContent = 'جاري التحقق من حالة الحساب…';
+    try {
+        if (!await restoreSession(false)) status.textContent = accountBanned
+            ? 'لم يتم رفع الحظر بعد، أو تعذر التحقق الآن. يمكنك التواصل مع الدعم ثم المحاولة مجدداً.'
+            : 'تعذر التحقق الآن. حدّث الصفحة وحاول مجدداً.';
+    } finally { this.disabled = false; }
+});
