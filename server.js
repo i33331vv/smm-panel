@@ -570,7 +570,7 @@ function buildOrderTelegramMessage(id, o) {
     const current = o.current_count ?? o.start_count;
 
     const counter = o.start_count == null
-        ? ''
+        ? (o.verification_status === 'unverified' ? '\n⚠️ لم يتم التحقق من الحساب؛ لا يوجد عدد بداية موثوق. المراجعة والإكمال يدوياً.' : '')
         : `\n📊 العدد: ${o.start_count}/${current} — الهدف: ${o.target_count}${
             o.account_private ? '\n⚠️ الحساب خاص' : ''
         }`;
@@ -929,10 +929,15 @@ async function validateOrderLink(input, service) {
     if (!parsed.monitorFollowers) return { ...parsed, followers: null,
         message: '✅ صيغة الرابط مناسبة للخدمة. لم يتم التحقق آلياً من وجود المحتوى أو خصوصيته؛ تأكد أنه عام ومتاح.' };
     const info = await checkInstagramProfile(parsed.link);
-    if (!info.valid) throw fail(info.message);
+    if (!info.valid) {
+        if (!info.unreachable) throw fail(info.message);
+        return { ...parsed, username: extractInstagramUsername(parsed.link), followers: null,
+            verified: false, verificationStatus: 'unverified',
+            message: '⚠️ تعذر التحقق من الحساب. يمكنك إرسال الطلب دون عداد؛ تأكد من صحة الحساب وأنه عام. سيُخصم سعر الخدمة عند تأكيد الطلب.' };
+    }
     if (info.isPrivate) throw fail('🔒 الحساب خاص؛ حوّله إلى عام قبل الطلب.');
     if (!Number.isSafeInteger(info.followers) || info.followers < 0) throw fail('تعذر قراءة عدد المتابعين، حاول لاحقاً.');
-    return { ...parsed, username: info.username, followers: info.followers,
+    return { ...parsed, verified: true, verificationStatus: 'verified', username: info.username, followers: info.followers,
         message: `✅ الحساب (@${info.username}) عام — العدد الحالي: ${info.followers} متابع.` };
 }
 
@@ -1030,208 +1035,26 @@ function parseCompactCount(str) {
     return isNaN(num) ? NaN : Math.round(num * mult);
 }
 
+const instagramProvider = require('./instagram-provider.cjs').createInstagramProvider({
+    axios, token: process.env.APIFY_TOKEN || ''
+});
+const configuredMonitorMinutes = Number(process.env.INSTAGRAM_MONITOR_MINUTES || 360);
+const instagramMonitorMs = (Number.isFinite(configuredMonitorMinutes)
+    ? Math.min(1440, Math.max(10, configuredMonitorMinutes)) : 360) * 60000;
+
 async function checkInstagramProfile(link) {
-    const igUser = extractInstagramUsername(link);
-
-    if (!igUser) {
-        return {
-            valid: false,
-            message:
-                '❌ الرابط خطأ! يرجى وضع رابط حساب انستقرام صحيح (مثال: https://instagram.com/username).'
-        };
-    }
-
-    const cacheBuster = Date.now();
-
-    // المحاولة الأولى: واجهة الويب.
-    try {
-        const res = await axios.get(
-            `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(igUser)}&_=${cacheBuster}`,
-            {
-                headers: {
-                    'x-ig-app-id': '936619743392459',
-                    'User-Agent':
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                    'Accept': '*/*',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Cache-Control':
-                        'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Referer':
-                        `https://www.instagram.com/${igUser}/`
-                },
-                timeout: 10000,
-                validateStatus: () => true
-            }
-        );
-
-        if (
-            res.status === 404 ||
-            (
-                res.status === 200 &&
-                res.data &&
-                res.data.data &&
-                res.data.data.user === null
-            )
-        ) {
-            return {
-                valid: false,
-                message:
-                    '❌ الرابط خطأ! هذا الحساب غير موجود في انستقرام.'
-            };
-        }
-
-        const user = res.data?.data?.user;
-
-        if (user) {
-            return {
-                valid: true,
-                username: igUser,
-                isPrivate: Boolean(user.is_private),
-                followers: Number(user.edge_followed_by?.count ?? 0)
-            };
-        }
-    } catch (error) {
-        console.warn('Instagram web check failed:', {
-            code: error.code || 'UNKNOWN',
-            status: error.response?.status || null
-        });
-    }
-
-    // المحاولة الثانية: واجهة الهاتف.
-    try {
-        const mobileRes = await axios.get(
-            `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(igUser)}&_=${cacheBuster}`,
-            {
-                headers: {
-                    'x-ig-app-id': '936619743392459',
-                    'User-Agent':
-                        'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 458229237)',
-                    'Cache-Control': 'no-cache'
-                },
-                timeout: 10000,
-                validateStatus: () => true
-            }
-        );
-
-        if (mobileRes.status === 404) {
-            return {
-                valid: false,
-                message:
-                    '❌ الرابط خطأ! هذا الحساب غير موجود في انستقرام.'
-            };
-        }
-
-        const mUser = mobileRes.data?.data?.user;
-
-        if (mUser) {
-            return {
-                valid: true,
-                username: igUser,
-                isPrivate: Boolean(mUser.is_private),
-                followers: Number(
-                    mUser.edge_followed_by?.count ??
-                    mUser.follower_count ??
-                    0
-                )
-            };
-        }
-    } catch (error) {
-        console.warn('Instagram mobile check failed:', {
-            code: error.code || 'UNKNOWN',
-            status: error.response?.status || null
-        });
-    }
-
-    // المحاولة الثالثة: قراءة صفحة الحساب مثل الكود القديم.
-    try {
-        const pageRes = await axios.get(
-            `https://www.instagram.com/${encodeURIComponent(igUser)}/?_=${cacheBuster}`,
-            {
-                headers: {
-                    'User-Agent':
-                        'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Cache-Control': 'no-cache'
-                },
-                timeout: 10000,
-                validateStatus: () => true
-            }
-        );
-
-        const html = String(pageRes.data || '');
-
-        if (
-            pageRes.status === 404 ||
-            html.includes('Page Not Found') ||
-            html.includes("Sorry, this page isn't available")
-        ) {
-            return {
-                valid: false,
-                message:
-                    '❌ الرابط خطأ! هذا الحساب غير موجود في انستقرام.'
-            };
-        }
-
-        const isPriv =
-            html.includes('"is_private":true') ||
-            html.includes('This Account is Private');
-
-        const exactJsonMatch = html.match(
-            /"edge_followed_by":\{"count":(\d+)\}/
-        );
-
-        const metaMatch = html.match(
-            /content="([\d.,KMkm]+)\s+Followers/i
-        );
-
-        if (exactJsonMatch) {
-            return {
-                valid: true,
-                username: igUser,
-                isPrivate: isPriv,
-                followers: parseInt(exactJsonMatch[1], 10)
-            };
-        }
-
-        if (metaMatch) {
-            const parsedCount = parseCompactCount(metaMatch[1]);
-
-            if (!isNaN(parsedCount)) {
-                return {
-                    valid: true,
-                    username: igUser,
-                    isPrivate: isPriv,
-                    followers: parsedCount
-                };
-            }
-        }
-
-        console.warn(
-            'Instagram page has no readable follower count:',
-            {
-                status: pageRes.status,
-                contentType: pageRes.headers['content-type'] || ''
-            }
-        );
-    } catch (error) {
-        console.warn('Instagram page check failed:', {
-            code: error.code || 'UNKNOWN',
-            status: error.response?.status || null
-        });
-    }
-
-    return {
-        valid: false,
-        unreachable: true,
-        message:
-            '⚠️ تعذر جلب بيانات الحساب من انستقرام حالياً. حاول مجدداً لاحقاً؛ هذا لا يعني أن الرابط خطأ.'
-    };
+    const username = extractInstagramUsername(link);
+    if (!username) return { valid: false, message: 'يرجى إدخال رابط حساب انستقرام صحيح.' };
+    return instagramProvider(username);
 }
 
 app.post('/api/instagram/check', async (req, res) => {
     const info = await checkInstagramProfile(req.body.link);
 
+    if (!info.valid && info.unreachable) return res.json({
+        success: true, verified: false, verificationStatus: 'unverified',
+        username: extractInstagramUsername(req.body.link), followers: null, message: info.message
+    });
     if (!info.valid) {
         return res.status(400).json({
             success: false,
@@ -1278,12 +1101,12 @@ async function syncSingleOrderCount(doc) {
         return;
     }
 
-    // فاصل 15 ثانية بين محاولات فحص الطلب.
+    // فحص دوري مدفوع؛ الافتراضي 6 ساعات ويمكن ضبطه من إعدادات السيرفر.
     const now = Date.now();
 
     if (
         ord.last_checked_ms &&
-        (now - ord.last_checked_ms) < 15000
+        (now - ord.last_checked_ms) < instagramMonitorMs
     ) {
         return;
     }
@@ -1293,7 +1116,7 @@ async function syncSingleOrderCount(doc) {
     );
 
     await doc.ref.update({
-        last_checked_ms: now
+        last_checked_ms: check.valid ? now : now - instagramMonitorMs + 300000
     }).catch(() => {});
 
     if (!check.valid) return;
@@ -2545,6 +2368,17 @@ app.get('/api/user/:email', async (req, res) => {
 // الشحن اليدوي وصور الإيصالات
 // ==========================================================
 
+function depositInputIQD(value) {
+    const raw = String(value ?? '').trim();
+    if (!/^(?:\d+(?:\.\d{1,3})?)$/.test(raw)) throw new Error('أدخل مبلغ شحن صحيحاً.');
+    const entered = Number(raw);
+    const scaled = entered < 1000 ? entered * 1000 : entered;
+    const iqd = Math.round(scaled);
+    if (!Number.isSafeInteger(iqd) || iqd < 1000 || iqd > 100000000 || Math.abs(scaled - iqd) > 0.000001)
+        throw new Error('الحد الأدنى للشحن 1,000 دينار. أدخل مبلغاً صحيحاً بالدينار أو مختصراً بالآلاف.');
+    return iqd;
+}
+
 app.post(
     '/api/deposit/submit',
     sensitiveLimit('deposit', 5, 3600000, r => r.user.id),
@@ -2553,7 +2387,14 @@ app.post(
         const email = req.user.email;
         const username = req.user.username;
         const gateway = String(req.body.gateway || '').trim();
-        const amount = Number(req.body.amount);
+        let amount;
+        if (Object.prototype.hasOwnProperty.call(req.body, 'amountInput')) {
+            try { amount = depositInputIQD(req.body.amountInput) / 1000; }
+            catch (error) { throw fail(error.message); }
+        } else {
+            // Older pages already send legacy units. Never reinterpret them as raw input.
+            amount = Number(req.body.amount);
+        }
 
         if (
             !req.file ||
@@ -2562,7 +2403,7 @@ app.post(
             gateway.length > 80 ||
             /wayl|وايل|وايلي/i.test(gateway) ||
             !Number.isFinite(amount) ||
-            amount <= 0 ||
+            amount < 1 ||
             amount > 100000
         ) {
             throw fail(
@@ -2940,7 +2781,8 @@ app.post(
                     start_count: startCount,
                     current_count: currentCount,
                     target_count: targetCount,
-                    account_private: false,
+                    verification_status: checkedLink.verificationStatus || 'syntax_only',
+                    account_private: checkedLink.verified ? false : null,
                     private_notified: false,
                     completion_notified: false,
                     last_checked_ms: Date.now(),
@@ -2959,7 +2801,8 @@ app.post(
                 start_count: startCount,
                 current_count: currentCount,
                 target_count: targetCount,
-                account_private: false,
+                verification_status: checkedLink.verificationStatus || 'syntax_only',
+                account_private: checkedLink.verified ? false : null,
                 status: 'قيد المعالجة',
                 created_at: dateTime
             };
@@ -2991,7 +2834,8 @@ app.post(
                 orderId,
                 startCount,
                 currentCount,
-                targetCount
+                targetCount,
+                verificationStatus: checkedLink.verificationStatus || 'syntax_only'
             });
         } catch (e) {
             if (e.message === 'INSUFFICIENT_BALANCE') {
