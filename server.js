@@ -133,6 +133,26 @@ async function issueSession(req, res, uid) {
     });
 }
 
+function bannedAccountError() {
+    const error = fail('لا تستطيع استخدام موقعنا بسبب حظر حسابك. يرجى مراسلة فريق الدعم للمساعدة في حل المشكلة.', 403);
+    error.code = 'ACCOUNT_BANNED';
+    return error;
+}
+
+// A known banned session cannot create a replacement account or log into another one.
+// No device fingerprinting: clearing cookies removes this browser association.
+async function rejectBannedSession(req, res, next) {
+    try {
+        const token = readCookie(req);
+        if (!token) return next();
+        const session = await db.collection('web_sessions').doc(hash(token)).get();
+        if (!session.exists || session.data().revoked) return next();
+        const user = await db.collection('users').doc(session.data().uid).get();
+        if (user.exists && user.data().disabled) throw bannedAccountError();
+        return next();
+    } catch (error) { return next(error); }
+}
+
 async function requireAuth(req, res, next) {
     try {
         const token = readCookie(req);
@@ -165,9 +185,8 @@ async function requireAuth(req, res, next) {
             .doc(session.data().uid)
             .get();
 
-        if (!user.exists || user.data().disabled) {
-            throw fail('الحساب غير متاح.', 401);
-        }
+        if (!user.exists) throw fail('الحساب غير متاح.', 401);
+        if (user.data().disabled) throw bannedAccountError();
 
         req.user = {
             ...safeUser(await rewards.initialiseSpent(user.ref)),
@@ -385,6 +404,8 @@ app.use(
     )
 );
 
+app.use('/api/login', rejectBannedSession);
+app.use('/api/register', rejectBannedSession);
 app.use('/api/order', requireAuth);
 app.use('/api/orders', requireAuth);
 app.use('/api/user', requireAuth);
@@ -2450,7 +2471,6 @@ app.post(
 
         if (
             !user ||
-            user.data().disabled ||
             !await bcrypt.compare(
                 password,
                 String(user.data().password || '')
@@ -2460,6 +2480,8 @@ app.post(
         }
 
         await issueSession(req, res, user.id);
+        // Preserve a session after valid credentials so refreshing keeps the ban screen.
+        if (user.data().disabled) throw bannedAccountError();
 
         res.json({
             success: true,
@@ -3076,6 +3098,7 @@ app.use((err, req, res, next) => {
 
     res.status(status).json({
         success: false,
+        ...(err.code === 'ACCOUNT_BANNED' ? { code: 'ACCOUNT_BANNED' } : {}),
         message: status === 500
             ? 'حدث خطأ في الخادم.'
             : err instanceof multer.MulterError
