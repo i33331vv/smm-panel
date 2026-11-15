@@ -1,0 +1,15 @@
+/* Dedicated ban view; no inline script/style, compatible with the existing CSP. */
+#banned-page[hidden]{display:none!important}
+body.account-banned> :not(#banned-page){display:none!important}
+body.account-banned{margin:0;background:#fdf2f4;overflow:auto}
+#banned-page{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;font-family:Tajawal,Arial,sans-serif;color:#253040}
+.ban-card{width:100%;max-width:540px;background:#fff;border:1px solid #f7d6dd;border-radius:24px;padding:32px 24px;text-align:center;box-shadow:0 16px 50px #53142312}
+.ban-brand{background:#701b30;color:white;font-size:28px;font-weight:800;border-radius:18px;width:64px;height:64px;display:grid;place-items:center;margin:0 auto 20px}
+.ban-card h1{font-size:28px;font-weight:800;margin:0 0 16px}
+.ban-card p{line-height:1.9;margin:0 0 20px}
+.ban-actions{display:grid;gap:12px}
+.ban-actions a{display:block;background:#701b30;color:white;border-radius:12px;padding:14px 12px;text-decoration:none;font-weight:700}
+#ban-recheck{margin-top:20px;background:#fff;color:#701b30;border:1px solid #701b30;border-radius:12px;padding:12px 20px;cursor:pointer;font:inherit;font-weight:700}
+#ban-recheck:disabled{opacity:.6;cursor:wait}
+#ban-status{margin:16px 0 0;font-size:14px}
+.ban-card a:focus-visible,.ban-card button:focus-visible{outline:3px solid #253040;outline-offset:3px}
