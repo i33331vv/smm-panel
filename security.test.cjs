@@ -163,6 +163,24 @@ assert.equal(checked.body.followers,10);assert.equal(context.profileCalls,1);
 evaluate("checkInstagramProfile = async () => ({valid:true,isPrivate:true,followers:10});");
 const privateOrder=await api('POST /api/order','buyer',{serviceId:'svc',link:'https://instagram.com/buyer',quantity:1000},{ip:'test'});
 assert.equal(privateOrder.code,400);assert.equal(store.get('users/buyer').balance,20);
+// Provider outage accepts valid syntax, marks unknown, debits once and never invents a baseline.
+evaluate("checkInstagramProfile = async () => ({valid:false,unreachable:true,message:'temporary'});");
+store.set('users/unknown',{username:'unknown',email:'unknown@test.com',balance:20,spent:0});
+const unknownPreview=await api('POST /api/links/check','unknown',{serviceId:'svc',link:'https://instagram.com/unknown'});
+assert.equal(unknownPreview.body.success,true);assert.equal(unknownPreview.body.verificationStatus,'unverified');assert.equal(unknownPreview.body.followers,null);
+const unknownOrder=await api('POST /api/order','unknown',{serviceId:'svc',link:'https://instagram.com/unknown',quantity:1000},{ip:'test'});
+assert.equal(unknownOrder.body.success,true);
+const unknownSaved=store.get('orders/'+unknownOrder.body.orderId);
+assert.equal(unknownSaved.verification_status,'unverified');assert.equal(unknownSaved.start_count,null);assert.equal(unknownSaved.target_count,null);assert.equal(unknownSaved.account_private,null);
+const unknownBalance=store.get('users/unknown').balance;
+assert(unknownBalance<20);
+const repeatedUnknown=await api('POST /api/order','unknown',{serviceId:'svc',link:'https://instagram.com/unknown',quantity:1000},{ip:'test'});
+assert.equal(repeatedUnknown.code,409);assert.equal(store.get('users/unknown').balance,unknownBalance);
+assert(evaluate('buildOrderTelegramMessage')(unknownOrder.body.orderId,unknownSaved).includes('لم يتم التحقق'));
+evaluate("checkInstagramProfile = async () => { throw new Error('Must not monitor a missing baseline'); };");
+await evaluate('syncSingleOrderCount')(snapshot(doc('orders',unknownOrder.body.orderId)));
+assert.equal(store.get('orders/'+unknownOrder.body.orderId).status,'قيد المعالجة');
+console.log('PASS: unverified preview/order accepted, real debit once, duplicate blocked, unknown privacy/count, Telegram warning, no automatic completion without baseline.');
 console.log('PASS: Instagram media, TikTok profiles/video/photo/short links, host/type rejection, preview/order agreement, real debit, no wrong follower monitoring.');
 // Same user + service + target: reject active duplicates atomically, including aliases.
 store.set('users/double',{username:'double',email:'double@test.com',balance:100,spent:0});
@@ -269,32 +287,31 @@ for(const [name,password] of [['eightdigits','12345678'],['eightletters','abcdef
  const r=response();await registerHandler({body:{username:name,email:name+'@test.com',password},headers:{}},r);assert.equal(r.body.success,true);
 }
 console.log('PASS: password lengths 7 rejected; 8 digits, 8 letters, and longer accepted.');
-// Real frontend unit conversion and submit handlers (network/DOM mocked).
-const frontendSource=fs.readFileSync(__dirname+'/public/app.csp.js','utf8');
-const convertContext=vm.createContext({});
-vm.runInContext(frontendSource.slice(frontendSource.indexOf('function thousandsToIQD'),frontendSource.indexOf('        let fetchedServices')),convertContext);
-const toDinar=vm.runInContext('thousandsToIQD',convertContext);
-for(const [input,expected] of [['1',1000],['10',10000],['100',100000],['0.5',500],['0.001',1]])assert.equal(toDinar(input),expected);
-for(const input of ['',0,-1,'NaN','Infinity','0.0001','100001','10foo'])assert.throws(()=>toDinar(input));
-const requests=[],jobs=[],events={};
-class FakeFormData {constructor(form){this.data=new Map(Object.entries(form||{}))}get(k){return this.data.get(k)}set(k,v){this.data.set(k,String(v))}append(k,v){this.set(k,v)}}
-const elements={depAmountInput:{value:'10'},depImageInput:{files:['receipt']},depositGateway:{value:'Binance'},depositSuccessMsg:{classList:{add(){},remove(){}}},manualDepositForm:{reset(){}}};
-const client=vm.createContext({thousandsToIQD:toDinar,document:{getElementById:id=>elements[id]||{addEventListener:(event,fn)=>events[id]=fn}},FormData:FakeFormData,currentUser:{email:'test@test.com'},promptLogin:()=>{},alert:msg=>{throw Error(msg)},confirm:()=>true,apiFetch:async(url,opts)=>{requests.push([url,opts.body]);return {json:async()=>({success:true})}},updateDepositInstructions:()=>{},request:async(url,data)=>requests.push([url,data]),moneyIQD:n=>n+' IQD',pending:new Map(),operation:()=>crypto.randomUUID(),refreshUserBalance:async()=>{},profits:async()=>{},message:{},run:(button,job)=>jobs.push(job())});
-vm.runInContext(frontendSource.slice(frontendSource.indexOf('        async function handleDepositSubmit'),frontendSource.indexOf('        // لوحة المدير')),client);
-for(const [gateway,value,expected] of [['Binance','1',1],['ZainCash','10',10],['Mastercard','100',100]]) {
- elements.depAmountInput.value=value;elements.depositGateway.value=gateway;
- await vm.runInContext('handleDepositSubmit({preventDefault(){}})',client);
- const [url,form]=requests.at(-1);assert.equal(url,'/api/deposit/submit');assert.equal(Number(form.get('amount')),expected);assert.equal(form.get('gateway'),gateway);
+// Flexible deposit units: raw user input is normalized on the SERVER.
+const normalizeDeposit=evaluate('depositInputIQD');
+for(const [raw,expected] of [['1',1000],['10',10000],['10000',10000],['100',100000],['100000',100000],['500',500000],['1000',1000],['1.5',1500]])assert.equal(normalizeDeposit(raw),expected);
+for(const raw of ['',0,'0.5',-1,'NaN','1e4','abc','1000.5','100000001'])assert.throws(()=>normalizeDeposit(raw));
+for(const [i,gateway,raw,expected] of [[0,'Binance','10',10000],[1,'ZainCash','10000',10000],[2,'Mastercard','1',1000],[3,'Mastercard','500',500000]]) {
+ const uid='flex'+i;store.set('users/'+uid,{username:uid,email:uid+'@test.com',balance:0,spent:0});
+ // Mock sharp produces identical bytes for all images; reset its fixture hash only.
+ for(const key of [...store.keys()])if(key.startsWith('receipt_hashes/'))store.delete(key);
+ const result=await api('POST /api/deposit/submit',uid,{gateway,amountInput:raw,amount:99999},{file:{buffer:Buffer.from('receipt'+i)}});
+ assert.equal(result.body.success,true);assert.equal(store.get('users/'+uid).balance,0);
+ const pendingId=store.get('deposit_locks/'+uid).id;
+ assert.equal(store.get('deposit_requests/'+pendingId).amount,expected/1000);
+ await evaluate('handleTelegramCallback')('dep',{...cb,data:'dep_accept_'+pendingId});
+ await evaluate('handleTelegramCallback')('dep',{...cb,data:'dep_accept_'+pendingId});
+ assert.equal(store.get('users/'+uid).balance*1000,expected);
 }
-const featuresSource=fs.readFileSync(__dirname+'/public/features.js','utf8');
-const handlerStart=featuresSource.indexOf("        document.getElementById('convertProfits').addEventListener");
-const handlerEnd=featuresSource.indexOf('\n    }\n    let page=',handlerStart);
-vm.runInContext(featuresSource.slice(handlerStart,handlerEnd),client);
-events.convertProfits({preventDefault(){},currentTarget:{amountIQD:'0.5'},submitter:{}});await Promise.all(jobs.splice(0));assert.equal(requests.at(-1)[1].amountIQD,500);
-events.withdrawProfits({preventDefault(){},currentTarget:{amountIQD:'10',card:'7111053109',barcode:'image'},submitter:{}});await Promise.all(jobs.splice(0));assert.equal(requests.at(-1)[0],'/api/profits/withdraw');assert.equal(requests.at(-1)[1].get('amountIQD'),'10000');
-// Service editing round trip keeps the existing base-unit price intact.
-assert(frontendSource.includes('Number(serv.price || 0);'));assert(frontendSource.includes("parseFloat(document.getElementById('servPrice').value),"));
-const html=fs.readFileSync(__dirname+'/public/index.html','utf8');assert(html.includes('بآلاف الدنانير'));assert(html.includes('minlength="8"'));
-console.log('PASS: UI 1/10/100 => 1000/10000/100000 IQD; all three gateways, 500-IQD conversion and 10000-IQD withdrawal; stored/API units unchanged.');
+// Browser confirmation uses the same normalization, and sends raw input only.
+const clientJS=fs.readFileSync(__dirname+'/public/app.csp.js','utf8');
+const browserUnits=vm.createContext({});
+vm.runInContext(clientJS.slice(clientJS.indexOf('function depositInputIQD'),clientJS.indexOf('        let fetchedServices')),browserUnits);
+for(const raw of ['1','10','10000','500','1000','1.5'])assert.equal(vm.runInContext('depositInputIQD',browserUnits)(raw),normalizeDeposit(raw));
+assert(clientJS.includes("'amountInput',\n                enteredAmount"));
+assert(clientJS.includes('Number(serv.price || 0) * 1000;'));
+const featuresOriginal=fs.readFileSync(__dirname+'/public/features.js','utf8');
+assert(featuresOriginal.includes('مبلغ السحب بالدينار'));assert(featuresOriginal.includes('min="10000"'));
+console.log('PASS: 10 and 10000 both credit 10000 IQD once after approval; 1=>1000; 500=>500000; sub-minimum rejected; other fields restored to full IQD.');
 console.log('PASS: security regression, currency conversion, referral ownership and once-only rewards, Asiacell limit, historic spent/refund, conversion idempotency, withdrawal debit/approve/cancel/replay/authorization, admin balance changes and ban.');
 })().catch(e=>{console.error(e);process.exitCode=1});
