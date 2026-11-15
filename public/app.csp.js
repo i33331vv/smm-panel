@@ -522,7 +522,7 @@ function depositInputIQD(value) {
 
                 if (data.success) {
                     previewBox.className =
-                        data.verificationStatus === 'unverified'
+                        ['unverified', 'privacy_unknown'].includes(data.verificationStatus)
                             ? 'mt-2 p-3 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200'
                             : 'mt-2 p-3 rounded-xl text-xs font-bold bg-green-50 text-green-700 border border-green-200';
 
@@ -614,7 +614,7 @@ function depositInputIQD(value) {
 
                         let counterCell =
                             order.verification_status === 'unverified'
-                            ? '<span class="text-red-700">لم يتم التحقق — بدون عداد</span>'
+                            ? `<span class="text-red-700">${order.approximate_followers != null ? 'نحو ' + escapeHTML(order.approximate_followers) + ' متابع (تقريبي)<br>' : ''}لم يتم التحقق — بدون عداد</span>`
                             : '<span class="text-gray-400">-</span>';
 
                         if (
