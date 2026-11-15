@@ -15,9 +15,24 @@
 
     <link rel="stylesheet" href="/styles.csp.css?v=iqd-rewards-1">
 <link rel="stylesheet" href="/features.css?v=iqd-rewards-1">
+    <link rel="stylesheet" href="/ban.css?v=1">
 </head>
 
 <body class="text-gray-800 antialiased selection:bg-primary selection:text-white">
+
+    <main id="banned-page" hidden dir="rtl" aria-labelledby="banned-title">
+        <section class="ban-card">
+            <div class="ban-brand" aria-hidden="true">MT</div>
+            <h1 id="banned-title" tabindex="-1">الحساب محظور</h1>
+            <p>لا تستطيع استخدام موقعنا بسبب حظر حسابك. يرجى مراسلة فريق الدعم للمساعدة في حل المشكلة.</p>
+            <div class="ban-actions">
+                <a href="https://wa.me/9647783826405" target="_blank" rel="noopener noreferrer">مراسلة الدعم عبر واتساب</a>
+                <a href="https://t.me/Mtnajm" target="_blank" rel="noopener noreferrer">مراسلة الدعم عبر تليكرام</a>
+            </div>
+            <button type="button" id="ban-recheck">التحقق من رفع الحظر</button>
+            <p id="ban-status" role="status" aria-live="polite"></p>
+        </section>
+    </main>
 
     <!-- الصفحة الرئيسية -->
     <div id="landing-page" class="min-h-screen flex flex-col transition-opacity duration-300">
@@ -666,7 +681,7 @@
             <span>المساعدة والدعم</span>
         </button>
     </aside>
-<script src="/app.csp.js?v=social-links-2" defer></script>
+<script src="/app.csp.js?v=ban-screen-1" defer></script>
 <script src="/features.js?v=iqd-rewards-1" defer></script>
 </body>
 </html>
