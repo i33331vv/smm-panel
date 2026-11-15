@@ -910,6 +910,20 @@ function parseServiceLink(input, service) {
         monitorFollowers: platform === 'instagram' && kind === 'profile' && rules.followers };
 }
 
+// Stable target identity ignores tracking query strings and profile-name case.
+function orderTargetKey(link, service) {
+    const parsed = parseServiceLink(link, service);
+    const u = new URL(parsed.link);
+    const parts = u.pathname.split('/').filter(Boolean);
+    if (parsed.kind === 'profile') return `${parsed.platform}:profile:${parts[0].replace(/^@/, '').toLowerCase()}`;
+    if (parsed.platform === 'instagram') {
+        // p/reel/reels/tv aliases refer to a shortcode. Share tokens are separate.
+        return parts[0] === 'share' ? `instagram:share:${parts.slice(1).join('/')}` : `instagram:media:${parts[1]}`;
+    }
+    if (parsed.kind === 'media') return `tiktok:media:${parts[2]}`;
+    return `tiktok:short:${parts.at(-1)}`;
+}
+
 async function validateOrderLink(input, service) {
     const parsed = parseServiceLink(input, service);
     if (!parsed.monitorFollowers) return { ...parsed, followers: null,
@@ -2823,6 +2837,7 @@ app.post(
             const checkedLink = await validateOrderLink(link, serv);
             const igUsername = checkedLink.monitorFollowers ? checkedLink.username : null;
             const cleanLink = checkedLink.link;
+            const targetKey = orderTargetKey(cleanLink, serv);
             const startCount = checkedLink.followers;
             const currentCount = startCount;
             const targetCount = startCount === null ? null : startCount + qty;
@@ -2876,6 +2891,20 @@ app.post(
                     throw fail('رصيد الحساب غير صالح.');
                 }
 
+                // Read existing orders inside the debit transaction. Concurrent requests
+                // also update this same user document, so Firestore retries the loser.
+                const ownedOrders = await transaction.get(db.collection('orders').where('user_id', '==', req.user.id));
+                const namedOrders = await transaction.get(db.collection('orders').where('username', '==', username));
+                const priorOrders = [...ownedOrders.docs, ...namedOrders.docs.filter(d => !d.data().user_id)];
+                const duplicate = priorOrders.some(d => {
+                    const previous = d.data();
+                    if (!['قيد المعالجة', 'قيد التنفيذ'].includes(previous.status)) return false;
+                    if (previous.service_id ? previous.service_id !== serviceId : previous.service !== serviceFullTitle) return false;
+                    try { return (previous.target_key || orderTargetKey(previous.link, serv)) === targetKey; }
+                    catch { return false; }
+                });
+                if (duplicate) throw fail('لديك طلب سابق لنفس الخدمة على هذا الحساب أو الرابط لم يكتمل بعد. يرجى انتظار اكتماله قبل إرسال طلب جديد.', 409);
+
                 if (currentBalance < calculatedCharge) {
                     throw new Error('INSUFFICIENT_BALANCE');
                 }
@@ -2902,6 +2931,7 @@ app.post(
                     service: serviceFullTitle,
                     service_id: serviceId,
                     link: cleanLink,
+                    target_key: targetKey,
                     ig_username: igUsername,
                     link_platform: checkedLink.platform,
                     link_kind: checkedLink.kind,
