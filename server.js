@@ -828,6 +828,92 @@ if (process.env.ENABLE_BACKGROUND_JOBS !== 'false') {
 // فحص إنستقرام
 // ==========================================================
 
+// Validate link structure without fetching user-controlled URLs or redirects.
+function serviceLinkRules(service) {
+    const text = `${service.category || ''} ${service.name || ''}`.toLowerCase()
+        .normalize('NFKC').replace(/[\u064B-\u065F\u0670]/g, '').replace(/[أإآ]/g, 'ا');
+    const ig = /instagram|انست[قغك]رام|انستا/.test(text);
+    const tt = /tik\s*tok|تيك\s*توك|تيكتوك/.test(text);
+    const name = String(service.name || '').toLowerCase();
+    const followers = /follow|متابع|فولو/.test(name);
+    const media = /like|view|comment|share|save|reel|post|لايك|اعجاب|إعجاب|مشاهد|تعليق|مشارك|حفظ|ريل|بوست|منشور/.test(name);
+    return { platform: ig !== tt ? (ig ? 'instagram' : 'tiktok') : null,
+        kind: followers && !media ? 'profile' : media && !followers ? 'media' : null,
+        followers: followers && !media };
+}
+
+function parseServiceLink(input, service) {
+    const rules = serviceLinkRules(service);
+    let raw = typeof input === 'string' ? input.trim() : '';
+    if (!raw || raw.length > 300 || /[\s\\\u0000-\u001f]/.test(raw)) throw fail('ضع رابطاً صحيحاً بدون مسافات.');
+    // Bare usernames are unambiguous only for explicitly identified profile services.
+    if (rules.kind === 'profile' && rules.platform && /^@?[a-zA-Z0-9._]{1,30}$/.test(raw)
+        && !/^(www\.|instagram\.com|tiktok\.com)/i.test(raw)) {
+        raw = rules.platform === 'instagram' ? `https://www.instagram.com/${raw.replace(/^@/, '')}/`
+            : `https://www.tiktok.com/@${raw.replace(/^@/, '')}`;
+    }
+    if (!/^https?:\/\//i.test(raw)) raw = `https://${raw}`;
+    let u;
+    try { u = new URL(raw); } catch { throw fail('صيغة الرابط غير صحيحة.'); }
+    if (!['https:', 'http:'].includes(u.protocol) || u.username || u.password || u.port)
+        throw fail('صيغة الرابط غير مسموحة.');
+    const host = u.hostname.toLowerCase();
+    const path = u.pathname;
+    let platform, kind, username = null;
+    if (['instagram.com', 'www.instagram.com'].includes(host)) {
+        platform = 'instagram';
+        if (/^\/(p|reel|reels|tv)\/[A-Za-z0-9_-]+\/?$/.test(path)) kind = 'media';
+        else if (/^\/share\/(p|reel)\/[A-Za-z0-9_-]+\/?$/.test(path)) kind = 'media';
+        else {
+            username = extractInstagramUsername(u.href);
+            if (username) kind = 'profile';
+        }
+    } else if (['tiktok.com', 'www.tiktok.com', 'm.tiktok.com'].includes(host)) {
+        platform = 'tiktok';
+        if (/^\/@[A-Za-z0-9._]{1,30}\/(video|photo)\/\d+\/?$/.test(path)) kind = 'media';
+        else if (/^\/@[A-Za-z0-9._]{1,30}\/?$/.test(path)) kind = 'profile';
+        else if (/^\/t\/[A-Za-z0-9_-]+\/?$/.test(path)) kind = 'short';
+    } else if (['vm.tiktok.com', 'vt.tiktok.com'].includes(host)) {
+        platform = 'tiktok';
+        if (/^\/[A-Za-z0-9_-]+\/?$/.test(path)) kind = 'short';
+    }
+    if (!platform || !kind) throw fail('استخدم رابط حساب أو منشور/ريلز إنستغرام، أو حساب/فيديو/صور تيك توك.');
+    if (rules.platform && rules.platform !== platform) throw fail('منصة الرابط لا تطابق الخدمة المختارة.');
+    if (rules.kind && kind !== 'short' && rules.kind !== kind)
+        throw fail(rules.kind === 'profile' ? 'هذه خدمة متابعين؛ ضع رابط الحساب.' : 'هذه الخدمة تحتاج رابط المنشور أو الفيديو، وليس رابط الحساب.');
+    // Short links are accepted structurally, never claimed to identify a verified target.
+    if (kind === 'short' && rules.kind === 'profile') throw fail('لخدمة المتابعين ضع رابط حساب تيك توك الكامل: https://www.tiktok.com/@username');
+    u.protocol = 'https:';
+    u.hash = '';
+    return { link: u.href, platform, kind, username,
+        monitorFollowers: platform === 'instagram' && kind === 'profile' && rules.followers };
+}
+
+async function validateOrderLink(input, service) {
+    const parsed = parseServiceLink(input, service);
+    if (!parsed.monitorFollowers) return { ...parsed, followers: null,
+        message: '✅ صيغة الرابط مناسبة للخدمة. لم يتم التحقق آلياً من وجود المحتوى أو خصوصيته؛ تأكد أنه عام ومتاح.' };
+    const info = await checkInstagramProfile(parsed.link);
+    if (!info.valid) throw fail(info.message);
+    if (info.isPrivate) throw fail('🔒 الحساب خاص؛ حوّله إلى عام قبل الطلب.');
+    if (!Number.isSafeInteger(info.followers) || info.followers < 0) throw fail('تعذر قراءة عدد المتابعين، حاول لاحقاً.');
+    return { ...parsed, username: info.username, followers: info.followers,
+        message: `✅ الحساب (@${info.username}) عام — العدد الحالي: ${info.followers} متابع.` };
+}
+
+app.use('/api/links', requireAuth, sensitiveLimit('link-check', 15, 10 * 60000, r => r.user.id));
+app.post('/api/links/check', async (req, res) => {
+    try {
+        if (!validId(req.body.serviceId)) throw fail('اختر الخدمة أولاً.');
+        const snap = await db.collection('services').doc(req.body.serviceId).get();
+        if (!snap.exists) throw fail('الخدمة المختارة غير موجودة.');
+        const info = await validateOrderLink(req.body.link, serviceInput(snap.data()));
+        return res.json({ success: true, ...info });
+    } catch (error) {
+        return res.status(error.status || 400).json({ success: false, message: error.message });
+    }
+});
+
 function extractInstagramUsername(input) {
     const raw = String(input || '').trim();
 
@@ -2712,31 +2798,12 @@ app.post(
                 throw fail('تكلفة الطلب غير صالحة.');
             }
 
-            const igCheck = await checkInstagramProfile(link);
-
-            if (!igCheck.valid) {
-                return res.status(400).json({
-                    success: false,
-                    message: igCheck.message
-                });
-            }
-
-            if (igCheck.isPrivate) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        '🔒 حسابك خاص! قم بتحويله إلى عام (Public) ثم اطلب من جديد.'
-                });
-            }
-
-            const igUsername = igCheck.username;
-
-            const cleanLink =
-                `https://www.instagram.com/${igUsername}/`;
-
-            const startCount = igCheck.followers;
-            const currentCount = igCheck.followers;
-            const targetCount = startCount + qty;
+            const checkedLink = await validateOrderLink(link, serv);
+            const igUsername = checkedLink.monitorFollowers ? checkedLink.username : null;
+            const cleanLink = checkedLink.link;
+            const startCount = checkedLink.followers;
+            const currentCount = startCount;
+            const targetCount = startCount === null ? null : startCount + qty;
 
             const userSnap = await db.collection('users')
                 .where('username', '==', username)
@@ -2814,6 +2881,8 @@ app.post(
                     service_id: serviceId,
                     link: cleanLink,
                     ig_username: igUsername,
+                    link_platform: checkedLink.platform,
+                    link_kind: checkedLink.kind,
                     quantity: qty,
                     charge: calculatedCharge,
                     start_count: startCount,
@@ -2880,9 +2949,9 @@ app.post(
                 });
             }
 
-            res.status(500).json({
+            res.status(e.status || 500).json({
                 success: false,
-                message: 'حدث خطأ أثناء إنشاء الطلب.'
+                message: e.status ? e.message : 'حدث خطأ أثناء إنشاء الطلب.'
             });
         }
     }
