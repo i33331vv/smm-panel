@@ -1,13 +1,15 @@
 // Legacy monetary API units remain stable; every user-facing amount is IQD.
 function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' د.ع'; }
 
-// Money input is in thousands of IQD; the wire amounts retain their existing units.
-function thousandsToIQD(value) {
+function depositInputIQD(value) {
     const raw = String(value ?? '').trim();
-    if (!/^(?:\d+(?:\.\d{1,3})?|\.\d{1,3})$/.test(raw)) throw new Error('أدخل المبلغ بالآلاف، مثلاً 10 = 10,000 دينار و0.5 = 500 دينار.');
-    const amount = Math.round(Number(raw) * 1000);
-    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 100000000) throw new Error('أدخل مبلغاً موجباً لا يتجاوز 100,000 ألف دينار.');
-    return amount;
+    if (!/^(?:\d+(?:\.\d{1,3})?)$/.test(raw)) throw new Error('أدخل مبلغ شحن صحيحاً.');
+    const entered = Number(raw);
+    const scaled = entered < 1000 ? entered * 1000 : entered;
+    const iqd = Math.round(scaled);
+    if (!Number.isSafeInteger(iqd) || iqd < 1000 || iqd > 100000000 || Math.abs(scaled - iqd) > 0.000001)
+        throw new Error('الحد الأدنى للشحن 1,000 دينار. أدخل مبلغاً صحيحاً بالدينار أو مختصراً بالآلاف.');
+    return iqd;
 }
 
         let fetchedServices = [];
@@ -520,7 +522,9 @@ function thousandsToIQD(value) {
 
                 if (data.success) {
                     previewBox.className =
-                        'mt-2 p-3 rounded-xl text-xs font-bold bg-green-50 text-green-700 border border-green-200';
+                        data.verificationStatus === 'unverified'
+                            ? 'mt-2 p-3 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200'
+                            : 'mt-2 p-3 rounded-xl text-xs font-bold bg-green-50 text-green-700 border border-green-200';
 
                     previewBox.innerText =
                         data.message || 'صيغة الرابط مناسبة للخدمة.';
@@ -609,7 +613,9 @@ function thousandsToIQD(value) {
                         }
 
                         let counterCell =
-                            '<span class="text-gray-400">-</span>';
+                            order.verification_status === 'unverified'
+                            ? '<span class="text-red-700">لم يتم التحقق — بدون عداد</span>'
+                            : '<span class="text-gray-400">-</span>';
 
                         if (
                             order.start_count !== null &&
@@ -1143,10 +1149,11 @@ function thousandsToIQD(value) {
             msgBox.className =
                 'hidden mt-4 max-w-xl text-xs p-3 rounded-xl font-bold text-center';
 
-            let amountIQD;
-            try { amountIQD = thousandsToIQD(document.getElementById('depAmountInput').value); }
+            const enteredAmount = document.getElementById('depAmountInput').value.trim();
+            let actualIQD;
+            try { actualIQD = depositInputIQD(enteredAmount); }
             catch (error) { return alert(error.message); }
-            if (!confirm('إرسال إيصال شحن بمبلغ ' + amountIQD.toLocaleString('en-US') + ' دينار عراقي؟')) return;
+            if (!confirm('تأكيد إرسال طلب شحن بقيمة ' + actualIQD.toLocaleString('en-US') + ' دينار عراقي؟')) return;
             const formData = new FormData();
 
             formData.append('email', session.email);
@@ -1157,8 +1164,8 @@ function thousandsToIQD(value) {
             );
 
             formData.append(
-                'amount',
-                amountIQD / 1000
+                'amountInput',
+                enteredAmount
             );
 
             formData.append(
@@ -1345,8 +1352,7 @@ function thousandsToIQD(value) {
             document.getElementById('servBaseQty').value =
                 serv.baseQuantity || 1000;
             document.getElementById('servPrice').value =
-                Number(serv.price || 0);
-            document.getElementById('servPrice').dispatchEvent(new Event('input'));
+                Number(serv.price || 0) * 1000;
             document.getElementById('servMinQty').value =
                 serv.minQty || 100;
             document.getElementById('servMaxQty').value =
@@ -1451,7 +1457,7 @@ function thousandsToIQD(value) {
                     baseQuantity:
                         parseInt(document.getElementById('servBaseQty').value) || 1000,
                     price:
-                        parseFloat(document.getElementById('servPrice').value),
+                        parseFloat(document.getElementById('servPrice').value) / 1000,
                     minQty:
                         parseInt(document.getElementById('servMinQty').value) || 100,
                     maxQty:
@@ -1619,7 +1625,7 @@ function thousandsToIQD(value) {
                                 dinars(data.newBalance);
 
                         okMsg.innerText =
-                            `✅ تم إنشاء الطلب #${data.orderId.substring(0, 6)} بنجاح!` + (data.startCount != null ? ` عدد حسابك هو ${data.startCount}/${data.currentCount} (الهدف: ${data.targetCount})` : ' يمكنك متابعة حالته من سجل الطلبات.');
+                            `✅ تم إنشاء الطلب #${data.orderId.substring(0, 6)} بنجاح!` + (data.startCount != null ? ` عدد حسابك هو ${data.startCount}/${data.currentCount} (الهدف: ${data.targetCount})` : data.verificationStatus === 'unverified' ? ' تم إرسال الطلب دون تحقق آلي أو عداد متابعين. يمكنك متابعة حالته من سجل الطلبات.' : ' يمكنك متابعة حالته من سجل الطلبات.');
 
                         okMsg.classList.remove('hidden');
 
@@ -1816,16 +1822,3 @@ document.getElementById('ban-recheck').addEventListener('click', async function 
             : 'تعذر التحقق الآن. حدّث الصفحة وحاول مجدداً.';
     } finally { this.disabled = false; }
 });
-
-// Explicit full-dinar previews prevent accidental thousand-fold input mistakes.
-for (const [inputId, outputId] of [['depAmountInput', 'depAmountPreview'], ['servPrice', 'servPricePreview']]) {
-    const input = document.getElementById(inputId), output = document.getElementById(outputId);
-    const update = () => {
-        const amount = Number(input.value);
-        output.textContent = input.value && Number.isFinite(amount) && amount > 0
-            ? 'المبلغ الفعلي: ' + dinars(amount) : '1 = 1,000 دينار | 10 = 10,000 دينار | 0.5 = 500 دينار';
-    };
-    input.addEventListener('input', update);
-    input.form?.addEventListener('reset', () => setTimeout(update, 0));
-    update();
-}
