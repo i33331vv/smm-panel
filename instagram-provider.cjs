@@ -1,4 +1,5 @@
 'use strict';
+const {readPageCount} = require('./instagram-page-count.cjs');
 
 // Three attempts, shared per-profile cache, and no invented privacy/count values.
 function createInstagramProvider({ axios, token, now = Date.now, logger = console }) {
@@ -10,9 +11,8 @@ function createInstagramProvider({ axios, token, now = Date.now, logger = consol
         if (!user || user.error || typeof user.username !== 'string' || user.username.toLowerCase() !== username) return null;
         const privacy = apify ? user.private : user.is_private;
         const count = apify ? user.followersCount : (user.edge_followed_by?.count ?? user.follower_count);
-        if (typeof privacy !== 'boolean') return null;
-        if (!privacy && (!Number.isSafeInteger(count) || count < 0)) return null;
-        return {valid:true, username, isPrivate:privacy,
+        if (privacy !== true && (!Number.isSafeInteger(count) || count < 0)) return null;
+        return {valid:true, username, isPrivate:typeof privacy === 'boolean' ? privacy : null,
             followers:Number.isSafeInteger(count) && count >= 0 ? count : null,
             checkedAt:now(), source};
     }
@@ -32,7 +32,7 @@ function createInstagramProvider({ axios, token, now = Date.now, logger = consol
                 for (const value of Object.values(obj)) if (value && typeof value === 'object') stack.push(value);
             }
         }
-        return null;
+        return readPageCount(html, username);
     }
     async function attempt(source, ms, request, parse) {
         if ((cooldown.get(source) || 0) > now()) return null;
