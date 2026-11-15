@@ -1,3 +1,5 @@
+// Legacy monetary API units remain stable; every user-facing amount is IQD.
+function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' د.ع'; }
 
         let fetchedServices = [];
 
@@ -174,8 +176,9 @@
                 .innerText = username.charAt(0).toUpperCase();
 
             document.getElementById('displayBalance')
-                .innerText = '$' + parseFloat(balance).toFixed(2);
+                .innerText = dinars(balance);
 
+            document.getElementById('displaySpent').textContent = dinars(currentUser?.spent);
             updateAdminVisibility();
 
             closeModal('loginModal');
@@ -204,8 +207,9 @@
 
                     document.getElementById('displayBalance')
                         .innerText =
-                            '$' + Number(currentUser.balance).toFixed(2);
+                            dinars(currentUser.balance);
 
+                    document.getElementById('displaySpent').textContent = dinars(currentUser.spent);
                     updateAdminVisibility();
                 }
             } catch (_) {
@@ -334,7 +338,7 @@
 
                 serviceSelect.add(
                     new Option(
-                        `${serv.name} — (${baseQ} بـ $${parseFloat(serv.price).toFixed(2)})`,
+                        `${serv.name} — (${baseQ} بـ ${dinars(serv.price)})`,
                         String(serv.id)
                     )
                 );
@@ -431,8 +435,8 @@
                 const baseQ = targetServ.baseQuantity || 1000;
 
                 charge.value = (
-                    (qty / baseQ) * parseFloat(targetServ.price)
-                ).toFixed(4);
+                    (qty / baseQ) * parseFloat(targetServ.price) * 1000
+                ).toFixed(1);
             } else {
                 charge.value = '';
             }
@@ -637,7 +641,7 @@
                                     ${counterCell}
                                 </td>
                                 <td class="p-3 font-bold">
-                                    $${parseFloat(order.charge || 0).toFixed(4)}
+                                    ${dinars(order.charge)}
                                 </td>
                                 <td class="p-3">
                                     <span class="${statusColor} px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">
@@ -832,7 +836,7 @@
             }
 
             showAsiaMessage(
-                `تم اختيار شحن ${usd}$ (سيتم تحويل ${usd * 1000} دينار من رصيدك). اضغط "شحن الرصيد الآن" للمتابعة.`,
+                `تم اختيار شحن ${usd * 1000} دينار من رصيدك. اضغط "شحن الرصيد الآن" للمتابعة.`,
                 'info'
             );
         }
@@ -956,7 +960,7 @@
 
             if (!amountUSD || amountUSD < 1 || amountUSD > 10) {
                 return showAsiaMessage(
-                    '⚠️ يرجى اختيار المبلغ الذي تريد شحنه أولاً (من 1$ إلى 10$).',
+                    '⚠️ يرجى اختيار المبلغ الذي تريد شحنه أولاً (من 1,000 إلى 10,000 دينار).',
                     'error'
                 );
             }
@@ -1057,10 +1061,11 @@
                     showAsiaMessage(data.message, 'success');
 
                     session.balance = data.newBalance;
+                        refreshUserBalance();
 
                     document.getElementById('displayBalance')
                         .innerText =
-                            '$' + parseFloat(data.newBalance).toFixed(2);
+                            dinars(data.newBalance);
 
                     setTimeout(() => {
                         resetAsiaFlow();
@@ -1111,7 +1116,7 @@
 
             formData.append(
                 'amount',
-                document.getElementById('depAmountInput').value
+                Number(document.getElementById('depAmountInput').value) / 1000
             );
 
             formData.append(
@@ -1193,7 +1198,7 @@
 
                     document.getElementById('adminTotalSales')
                         .innerText =
-                            parseFloat(data.totalSales).toFixed(2);
+                            dinars(data.totalSales);
                 }
 
                 if (servData.success) {
@@ -1227,7 +1232,7 @@
                             </td>
                             <td class="p-3 font-bold">
                                 ${escapeHTML(baseQ)}
-                                مقابل $${parseFloat(serv.price).toFixed(2)}
+                                مقابل ${dinars(serv.price)}
                             </td>
                             <td class="p-3 text-xs font-bold text-gray-600">
                                 أدنى: ${escapeHTML(minQ)}
@@ -1298,7 +1303,7 @@
             document.getElementById('servBaseQty').value =
                 serv.baseQuantity || 1000;
             document.getElementById('servPrice').value =
-                serv.price || '';
+                Number(serv.price || 0) * 1000;
             document.getElementById('servMinQty').value =
                 serv.minQty || 100;
             document.getElementById('servMaxQty').value =
@@ -1403,7 +1408,7 @@
                     baseQuantity:
                         parseInt(document.getElementById('servBaseQty').value) || 1000,
                     price:
-                        parseFloat(document.getElementById('servPrice').value),
+                        parseFloat(document.getElementById('servPrice').value) / 1000,
                     minQty:
                         parseInt(document.getElementById('servMinQty').value) || 100,
                     maxQty:
@@ -1534,7 +1539,7 @@
                     document.getElementById('charge').value
                 );
 
-                if (session.balance < charge) {
+                if (session.balance * 1000 < charge) {
                     errMsg.innerText =
                         '⚠️ رصيدك غير كافٍ لإتمام هذا الطلب.';
 
@@ -1564,10 +1569,11 @@
 
                     if (data.success) {
                         session.balance = data.newBalance;
+                        refreshUserBalance();
 
                         document.getElementById('displayBalance')
                             .innerText =
-                                '$' + data.newBalance.toFixed(2);
+                                dinars(data.newBalance);
 
                         okMsg.innerText =
                             `✅ تم إنشاء الطلب #${data.orderId.substring(0, 6)} بنجاح! عدد حسابك هو ${data.startCount}/${data.currentCount} (يكتمل عند: ${data.targetCount})`;
