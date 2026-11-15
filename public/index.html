@@ -421,17 +421,18 @@
 
                             <aside id="depositReceiptNotice" role="note" aria-labelledby="depositReceiptNoticeTitle" class="p-4 bg-[#fdf2f4] border border-[#f7d6dd] rounded-xl text-sm text-[#531423] space-y-4" dir="rtl">
                                 <h3 id="depositReceiptNoticeTitle" class="font-bold">ملاحظة مهمة قبل إرسال طلب الشحن</h3>
-                                <p>يرجى الاحتفاظ بإيصال التحويل وإرفاق صورة واضحة وكاملة منه، مع إدخال المبلغ المحوّل بدقة. لن يُعتمد طلب الشحن في حال عدم إرفاق الإيصال أو عدم تطابق المبلغ المُدخل مع بيانات التحويل.</p>
-                                <p>للتحويلات بعملة مختلفة عبر بينانس، أدخل ما يعادل المبلغ بالدينار العراقي وفق قيمة الشحن المعتمدة في الموقع.</p>
+                                <p>يرجى الاحتفاظ بإيصال التحويل وإرفاق صورة واضحة وكاملة منه، مع إدخال المبلغ المحوّل بوحدة آلاف الدنانير: اكتب 1 مقابل 1,000 دينار، و10 مقابل 10,000 دينار، و100 مقابل 100,000 دينار. لن يُعتمد طلب الشحن في حال عدم إرفاق الإيصال أو عدم تطابق المبلغ المُدخل مع بيانات التحويل.</p>
+                                <p>للتحويلات بعملة مختلفة عبر بينانس، أدخل ما يعادل المبلغ بآلاف الدنانير العراقية وفق قيمة الشحن المعتمدة في الموقع.</p>
                                 <p class="font-bold">إرفاق صورة لا تخص إيصال التحويل أو تقديم إيصال مزوّر يؤدي إلى رفض الطلب وحظر الحساب نهائياً بعد المراجعة والتحقق.</p>
                                 <p>يرجى مراجعة المبلغ والإيصال قبل الإرسال لضمان معالجة طلبك بصورة صحيحة.</p>
                             </aside>
 
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">
-                                    المبلغ المراد شحنه (دينار عراقي)
+                                    المبلغ المراد شحنه (بآلاف الدنانير العراقية)
                                 </label>
-                                <input type="number" step="1" min="1" id="depAmountInput" placeholder="10000" class="w-full px-3 py-2 border rounded-xl bg-white text-sm">
+                                <input type="number" step="0.001" min="0.001" max="100000" id="depAmountInput" placeholder="مثلاً: 10 لشحن 10,000 دينار" aria-describedby="depAmountPreview" required class="w-full px-3 py-2 border rounded-xl bg-white text-sm">
+                                <p id="depAmountPreview" class="text-xs font-bold text-primary" aria-live="polite">1 = 1,000 دينار | 10 = 10,000 دينار | 0.5 = 500 دينار</p>
                             </div>
 
                             <div>
@@ -506,9 +507,10 @@
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
                                         <label class="block text-xs font-bold text-gray-700 mb-1">
-                                            السعر لهذا العدد (د.ع)
+                                            السعر لهذا العدد (بآلاف الدنانير)
                                         </label>
-                                        <input type="number" step="0.1" min="0.1" id="servPrice" placeholder="10000 أو 500" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
+                                        <input type="number" step="0.0001" min="0.0001" id="servPrice" placeholder="10 أو 0.5" aria-describedby="servPricePreview" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
+                                <p id="servPricePreview" class="text-xs font-bold text-primary" aria-live="polite">1 = 1,000 دينار | 10 = 10,000 دينار | 0.5 = 500 دينار</p>
                                     </div>
 
                                     <div>
@@ -681,7 +683,7 @@
             <span>المساعدة والدعم</span>
         </button>
     </aside>
-<script src="/app.csp.js?v=ban-screen-1" defer></script>
-<script src="/features.js?v=iqd-rewards-1" defer></script>
+<script src="/app.csp.js?v=thousands-orders-1" defer></script>
+<script src="/features.js?v=thousands-orders-1" defer></script>
 </body>
 </html>
