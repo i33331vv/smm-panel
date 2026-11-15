@@ -180,6 +180,19 @@ assert(evaluate('buildOrderTelegramMessage')(unknownOrder.body.orderId,unknownSa
 evaluate("checkInstagramProfile = async () => { throw new Error('Must not monitor a missing baseline'); };");
 await evaluate('syncSingleOrderCount')(snapshot(doc('orders',unknownOrder.body.orderId)));
 assert.equal(store.get('orders/'+unknownOrder.body.orderId).status,'قيد المعالجة');
+evaluate("checkInstagramProfile = async () => ({valid:true,username:'approx',followers:556000,isPrivate:null,approximate:true});");
+store.set('users/approx',{username:'approx',email:'approx@test.com',balance:20,spent:0});
+const approxPreview=await api('POST /api/links/check','approx',{serviceId:'svc',link:'https://instagram.com/approx'});
+assert.equal(approxPreview.body.followers,null);assert.equal(approxPreview.body.approximateFollowers,556000);
+const approxOrder=await api('POST /api/order','approx',{serviceId:'svc',link:'https://instagram.com/approx',quantity:1000});
+assert.equal(approxOrder.body.success,true);
+const approxSaved=store.get('orders/'+approxOrder.body.orderId);
+assert.equal(approxSaved.approximate_followers,556000);assert.equal(approxSaved.start_count,null);assert.equal(approxSaved.target_count,null);assert.equal(approxSaved.account_private,null);
+assert(evaluate('buildOrderTelegramMessage')(approxOrder.body.orderId,approxSaved).includes('تقريبي'));
+evaluate("checkInstagramProfile = async () => ({valid:true,username:'buyer',followers:555996,isPrivate:null});");
+const unknownPrivacy=await api('POST /api/links/check','buyer',{serviceId:'svc',link:'https://instagram.com/buyer'});
+assert.equal(unknownPrivacy.body.success,true);assert.equal(unknownPrivacy.body.followers,555996);assert.equal(unknownPrivacy.body.isPrivate,null);assert.equal(unknownPrivacy.body.verificationStatus,'privacy_unknown');
+console.log('PASS: approximate preview/order preserves estimate separately from baseline; Telegram approximate label; unknown privacy with exact count accepted.');
 console.log('PASS: unverified preview/order accepted, real debit once, duplicate blocked, unknown privacy/count, Telegram warning, no automatic completion without baseline.');
 console.log('PASS: Instagram media, TikTok profiles/video/photo/short links, host/type rejection, preview/order agreement, real debit, no wrong follower monitoring.');
 // Same user + service + target: reject active duplicates atomically, including aliases.
