@@ -62,14 +62,22 @@
         ${data.code ? `<label>كودك الخاص<input id="myReferral" dir="ltr" readonly value="${escapeHTML(data.code)}"></label><button type="button" id="copyReferral" class="feature-button">نسخ الكود</button>` : '<button type="button" id="activateReferral" class="feature-button">تفعيل كود الأرباح</button>'}
         <hr><h3>دعم مستخدم</h3>
         ${data.supporterCode ? `<p>أنت تدعم الكود <b dir="ltr">${escapeHTML(data.supporterCode)}</b> بشكل دائم. لا يمكن تغيير المستخدم.</p>` : `<form id="supportUser"><label>كود الشخص الذي تريد دعمه<input name="code" maxlength="12" pattern="[A-Fa-f0-9]{12}" required dir="ltr" ${data.code?'':'disabled'}></label><p>يمكنك دعم شخص واحد فقط. الاختيار نهائي.</p><button class="feature-button" ${data.code?'':'disabled'}>تأكيد دعم المستخدم نهائياً</button></form>`}
-        <hr><h3>تحويل إلى رصيد الخدمات</h3><form id="convertProfits"><label>المبلغ بالدينار<input name="amountIQD" type="number" min="1" step="1" max="${data.profitIQD}" required></label><button class="feature-button">تحويل الأرباح إلى رصيد الخدمات</button></form>
+        <hr><h3>تحويل إلى رصيد الخدمات</h3><form id="convertProfits"><label>المبلغ بآلاف الدنانير (1 = 1,000 دينار)<input name="amountIQD" type="number" min="0.001" step="0.001" max="${data.profitIQD / 1000}" required></label><button class="feature-button">تحويل الأرباح إلى رصيد الخدمات</button></form>
         <hr><h3>سحب الأرباح</h3><p>الحد الأدنى 10,000 دينار. يُخصم المبلغ عند إرسال الطلب ويُعاد إذا ألغته الإدارة.</p>
-        <form id="withdrawProfits"><label>مبلغ السحب بالدينار<input name="amountIQD" type="number" min="10000" step="1" max="${data.profitIQD}" required></label>
+        <form id="withdrawProfits"><label>مبلغ السحب بآلاف الدنانير (10 = 10,000 دينار)<input name="amountIQD" type="number" min="10" step="0.001" max="${data.profitIQD / 1000}" required></label>
         <label>رقم الماستر كارد / رقم الاستلام<input name="card" inputmode="numeric" dir="ltr" pattern="[0-9 -]{8,23}" maxlength="23" required autocomplete="off"></label>
         <p>لا تدخل رمز CVV أو الرقم السري أو رمز OTP؛ نحتاج رقم الاستلام والباركود فقط.</p>
         <label>صورة الباركود<input name="barcode" type="file" accept="image/png,image/jpeg,image/webp" required></label>
         <button class="feature-button" ${data.profitIQD>=10000?'':'disabled'}>طلب سحب الأرباح</button></form>
         <hr><h3>طلبات السحب</h3><button type="button" id="refreshProfits" class="feature-button">تحديث الرصيد وحالة السحب</button><div>${data.withdrawals.length?data.withdrawals.map(w=>`<article class="withdrawal-row"><b>${moneyIQD(w.amountIQD)}</b><span>${escapeHTML(w.status)}</span><small>${new Date(w.created_ms).toLocaleString('ar-IQ')}</small></article>`).join(''):'لا توجد طلبات سحب.'}</div>`;
+        content.querySelectorAll('input[name="amountIQD"]').forEach(input => {
+            const preview = document.createElement('p'); preview.setAttribute('aria-live', 'polite');
+            input.parentElement.append(preview);
+            input.addEventListener('input', () => {
+                try { preview.textContent = 'المبلغ الفعلي: ' + moneyIQD(thousandsToIQD(input.value)); }
+                catch { preview.textContent = 'اكتب المبلغ بالآلاف: 10 = 10,000 دينار.'; }
+            });
+        });
         document.getElementById('refreshProfits').addEventListener('click', e => run(e.currentTarget, async () => { await profits(); await refreshUserBalance(); message.textContent='تم تحديث البيانات.'; }));
         document.getElementById('activateReferral')?.addEventListener('click',e=>run(e.currentTarget,async()=>{await request('/api/profits/activate',{});await profits();message.textContent='تم تفعيل كودك.';}));
         document.getElementById('copyReferral')?.addEventListener('click',e=>run(e.currentTarget,async()=>{
@@ -82,13 +90,15 @@
             run(e.submitter,async()=>{await request('/api/profits/support',{code});await profits();message.textContent='تم تثبيت اختيارك.';});
         });
         document.getElementById('convertProfits').addEventListener('submit',e=>{
-            e.preventDefault();const amount=Number(new FormData(e.currentTarget).get('amountIQD'));
+            e.preventDefault();let amount;
+            try { amount=thousandsToIQD(new FormData(e.currentTarget).get('amountIQD')); } catch(error) {message.textContent=error.message;return;}
             if(!confirm('تحويل '+moneyIQD(amount)+' إلى رصيد الخدمات؟'))return;
             const key='convert:'+amount;
             run(e.submitter,async()=>{await request('/api/profits/convert',{amountIQD:amount,requestId:operation(key)});pending.delete(key);await refreshUserBalance();await profits();message.textContent='تم تحويل الأرباح إلى رصيد الخدمات.';});
         });
         document.getElementById('withdrawProfits').addEventListener('submit',e=>{
             e.preventDefault();const form=new FormData(e.currentTarget);
+            try { form.set('amountIQD',thousandsToIQD(form.get('amountIQD'))); } catch(error) {message.textContent=error.message;return;}
             if(!confirm('إرسال طلب السحب وخصم '+moneyIQD(form.get('amountIQD'))+' من أرباحك؟'))return;
             const key='withdraw:'+form.get('amountIQD')+':'+form.get('card');
             form.set('requestId',operation(key));
@@ -114,8 +124,8 @@
             const {uid,action}=button.dataset;
             let amount=0;
             if(['add','subtract'].includes(action)){
-                const raw=prompt('أدخل المبلغ بالدينار العراقي:');if(raw===null)return;
-                amount=Number(raw);if(!Number.isSafeInteger(amount)||amount<=0){message.textContent='أدخل مبلغاً صحيحاً موجباً.';return;}
+                const raw=prompt('أدخل المبلغ بآلاف الدنانير: 1 = 1,000 دينار، 10 = 10,000 دينار، 0.5 = 500 دينار:');if(raw===null)return;
+                try { amount=thousandsToIQD(raw); } catch(error) {message.textContent=error.message;return;}
             }
             if(!confirm('تأكيد '+button.textContent+(amount?' بمبلغ '+moneyIQD(amount):'')+' لهذا المستخدم؟'))return;
             const key='admin:'+uid+':'+action+':'+amount;
