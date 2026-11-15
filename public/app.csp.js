@@ -1,6 +1,15 @@
 // Legacy monetary API units remain stable; every user-facing amount is IQD.
 function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' د.ع'; }
 
+// Money input is in thousands of IQD; the wire amounts retain their existing units.
+function thousandsToIQD(value) {
+    const raw = String(value ?? '').trim();
+    if (!/^(?:\d+(?:\.\d{1,3})?|\.\d{1,3})$/.test(raw)) throw new Error('أدخل المبلغ بالآلاف، مثلاً 10 = 10,000 دينار و0.5 = 500 دينار.');
+    const amount = Math.round(Number(raw) * 1000);
+    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 100000000) throw new Error('أدخل مبلغاً موجباً لا يتجاوز 100,000 ألف دينار.');
+    return amount;
+}
+
         let fetchedServices = [];
 
         // الهوية تعتمد على جلسة السيرفر، وليس بيانات localStorage.
@@ -1134,6 +1143,10 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
             msgBox.className =
                 'hidden mt-4 max-w-xl text-xs p-3 rounded-xl font-bold text-center';
 
+            let amountIQD;
+            try { amountIQD = thousandsToIQD(document.getElementById('depAmountInput').value); }
+            catch (error) { return alert(error.message); }
+            if (!confirm('إرسال إيصال شحن بمبلغ ' + amountIQD.toLocaleString('en-US') + ' دينار عراقي؟')) return;
             const formData = new FormData();
 
             formData.append('email', session.email);
@@ -1145,7 +1158,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
 
             formData.append(
                 'amount',
-                Number(document.getElementById('depAmountInput').value) / 1000
+                amountIQD / 1000
             );
 
             formData.append(
@@ -1332,7 +1345,8 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
             document.getElementById('servBaseQty').value =
                 serv.baseQuantity || 1000;
             document.getElementById('servPrice').value =
-                Number(serv.price || 0) * 1000;
+                Number(serv.price || 0);
+            document.getElementById('servPrice').dispatchEvent(new Event('input'));
             document.getElementById('servMinQty').value =
                 serv.minQty || 100;
             document.getElementById('servMaxQty').value =
@@ -1437,7 +1451,7 @@ function dinars(value) { return (Math.round(Number(value || 0) * 10000) / 10).to
                     baseQuantity:
                         parseInt(document.getElementById('servBaseQty').value) || 1000,
                     price:
-                        parseFloat(document.getElementById('servPrice').value) / 1000,
+                        parseFloat(document.getElementById('servPrice').value),
                     minQty:
                         parseInt(document.getElementById('servMinQty').value) || 100,
                     maxQty:
@@ -1802,3 +1816,16 @@ document.getElementById('ban-recheck').addEventListener('click', async function 
             : 'تعذر التحقق الآن. حدّث الصفحة وحاول مجدداً.';
     } finally { this.disabled = false; }
 });
+
+// Explicit full-dinar previews prevent accidental thousand-fold input mistakes.
+for (const [inputId, outputId] of [['depAmountInput', 'depAmountPreview'], ['servPrice', 'servPricePreview']]) {
+    const input = document.getElementById(inputId), output = document.getElementById(outputId);
+    const update = () => {
+        const amount = Number(input.value);
+        output.textContent = input.value && Number.isFinite(amount) && amount > 0
+            ? 'المبلغ الفعلي: ' + dinars(amount) : '1 = 1,000 دينار | 10 = 10,000 دينار | 0.5 = 500 دينار';
+    };
+    input.addEventListener('input', update);
+    input.form?.addEventListener('reset', () => setTimeout(update, 0));
+    update();
+}
