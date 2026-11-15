@@ -83,7 +83,6 @@ function fail(message, status = 400) {
 function safeUser(u) {
     return {
         username: u.username,
-        email: u.email,
         balance: u.balance || 0,
         role: u.role || 'user',
         spent: u.spent || 0,
@@ -440,7 +439,7 @@ const upload = multer({
     }
 });
 
-const rewards = installRewards({ app, db, requireAuth, upload, sharp, fail, money, htmlEscape, telegram, DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, ADMIN_TELEGRAM_USER_ID, APP_ORIGIN, hash, sensitiveLimit });
+const rewards = installRewards({ app, db, requireAuth, upload, sharp, fail, money, htmlEscape, telegram, DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, ADMIN_TELEGRAM_USER_ID, APP_ORIGIN, hash, sensitiveLimit, findUserByUsername });
 
 // ==========================================================
 // التاريخ
@@ -1842,12 +1841,10 @@ app.post('/api/asiacell/initiate-transfer', async (req, res) => {
 });
 
 app.post('/api/asiacell/confirm-transfer', async (req, res) => {
-    const email = req.user.email;
     const cleanPhone = String(req.body.phone || '').trim();
     const finalOtp = String(req.body.transferOtp || '').trim();
 
     if (
-        !email ||
         !/^077\d{8}$/.test(cleanPhone) ||
         !/^\d{4,6}$/.test(finalOtp)
     ) {
@@ -1864,24 +1861,8 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
     let operatorConfirmed = false;
 
     try {
-        const userSnap = await db.collection('users')
-            .where('email', '==', req.user.email)
-            .get();
-
-        if (userSnap.empty) {
-            return res.status(400).json({
-                success: false,
-                message: 'المستخدم غير موجود.'
-            });
-        }
-
-        const userDoc = userSnap.docs.find(
-            d => d.id === req.user.id
-        );
-
-        if (!userDoc) {
-            throw fail('هوية الحساب غير مطابقة.', 403);
-        }
+        const userDoc = await db.collection('users').doc(req.user.id).get();
+        if (!userDoc.exists) throw fail('المستخدم غير موجود.', 404);
 
         const s = await db.runTransaction(async tx => {
             const doc = await tx.get(sessionRef);
@@ -2013,7 +1994,6 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
             tx.set(depositRef, {
                 user_id: req.user.id,
                 username: currentUser.data().username || '',
-                email,
                 gateway: 'Asiacell OTP Auto',
                 sender_phone: cleanPhone,
                 amount: usdAmount,
@@ -2036,7 +2016,7 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
             DEPOSIT_BOT_TOKEN,
             ADMIN_CHAT_ID,
             `✅ <b>شحن آسياسيل تلقائي ناجح (OTP):</b>
-المستخدم: ${htmlEscape(email)}
+المستخدم: ${htmlEscape(req.user.username)}
 المبلغ: ${s.amountIQD} د.ع
 من الرقم: ${cleanPhone}`
         );
@@ -2190,70 +2170,63 @@ app.get('/api/admin/data', async (req, res) => {
 // تسجيل الحسابات وتسجيل الدخول
 // ==========================================================
 
+// Existing accounts keep the same document ID, password hash, balance and sessions.
+// Exact legacy spelling takes precedence if old records have case-colliding names.
+async function findUserByUsername(input) {
+    const username = String(input || '').trim();
+    const users = db.collection('users');
+    const exact = await users.where('username', '==', username).limit(2).get();
+    if (exact.size === 1) return exact.docs[0];
+    if (exact.size > 1) return null;
+    const key = username.toLowerCase();
+    const index = await db.collection('unique_accounts').doc('name_' + hash(key)).get();
+    if (index.exists && typeof index.data().uid === 'string') {
+        const doc = await users.doc(index.data().uid).get();
+        if (doc.exists && String(doc.data().username || '').toLowerCase() === key) return doc;
+    }
+    const all = await users.get();
+    const matches = all.docs.filter(d => String(d.data().username || '').trim().toLowerCase() === key);
+    return matches.length === 1 ? matches[0] : null;
+}
+
 app.post(
     '/api/register',
     sensitiveLimit('register', 5, 3600000, r => r.ip),
     async (req, res) => {
         const username = String(req.body.username || '').trim();
 
-        const email = String(req.body.email || '')
-            .trim()
-            .toLowerCase();
-
         const password = req.body.password;
 
         if (
             !/^[\p{L}\p{N}_.-]{3,40}$/u.test(username) ||
-            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-            email.length > 254 ||
             typeof password !== 'string' ||
             password.length < 8 ||
             Buffer.byteLength(password) > 72
         ) {
             throw fail(
-                'أدخل اسماً من 3–40 حرفاً وبريداً صحيحاً وكلمة مرور من 8 أحرف أو أرقام على الأقل (72 بايت كحد أقصى).'
+                'أدخل اسماً من 3–40 حرفاً وكلمة مرور من 8 أحرف أو أرقام على الأقل (72 بايت كحد أقصى).'
             );
         }
 
         const passwordHash = await bcrypt.hash(password, 12);
         const ref = db.collection('users').doc();
 
-        const emailRef = db.collection('unique_accounts')
-            .doc('email_' + hash(email));
-
         const nameRef = db.collection('unique_accounts')
             .doc('name_' + hash(username.toLowerCase()));
 
         await db.runTransaction(async tx => {
-            const e = await tx.get(emailRef);
             const n = await tx.get(nameRef);
 
-            const oldEmail = await tx.get(
-                db.collection('users')
-                    .where('email', '==', email)
-                    .limit(1)
-            );
-
-            const oldName = await tx.get(
-                db.collection('users')
-                    .where('username', '==', username)
-                    .limit(1)
-            );
-
-            if (
-                e.exists ||
-                n.exists ||
-                !oldEmail.empty ||
-                !oldName.empty
-            ) {
-                throw fail(
-                    'اسم المستخدم أو البريد مستخدم مسبقاً.'
-                );
+            // Include legacy accounts which do not have a normalized-name index.
+            // No email or balance migration is needed. Keep this read inside the transaction.
+            const existing = await tx.get(db.collection('users'));
+            if (n.exists || existing.docs.some(d => String(d.data().username || '').trim().toLowerCase() === username.toLowerCase())) {
+                throw fail('اسم المستخدم مستخدم مسبقاً. اختر اسماً آخر.');
             }
 
             tx.create(ref, {
                 username,
-                email,
+                username_key: username.toLowerCase(),
                 password: passwordHash,
                 balance: 0,
                 spent: 0,
@@ -2262,7 +2235,6 @@ app.post(
                 created_at: getFormattedDateTime()
             });
 
-            tx.create(emailRef, { uid: ref.id });
             tx.create(nameRef, { uid: ref.id });
         });
 
@@ -2272,7 +2244,6 @@ app.post(
             success: true,
             message: 'تم إنشاء الحساب بنجاح!',
             username,
-            email,
             balance: 0
         });
     }
@@ -2284,31 +2255,22 @@ app.post(
         'login',
         10,
         15 * 60000,
-        r => String(r.body.email || '').trim().toLowerCase()
+        r => String(r.body.username || '').trim().toLowerCase()
     ),
     async (req, res) => {
-        const email = String(req.body.email || '')
-            .trim()
-            .toLowerCase();
+        const username = String(req.body.username || '').trim();
 
         const password = req.body.password;
 
         if (
-            email.length > 254 ||
+            !username || username.length > 40 ||
             typeof password !== 'string' ||
             Buffer.byteLength(password) > 72
         ) {
             throw fail('بيانات الدخول غير صحيحة.', 401);
         }
 
-        const snap = await db.collection('users')
-            .where('email', '==', email)
-            .limit(2)
-            .get();
-
-        const user = snap.size === 1
-            ? snap.docs[0]
-            : null;
+        const user = await findUserByUsername(username);
 
         if (
             !user ||
@@ -2354,18 +2316,9 @@ app.get('/api/me', requireAuth, (req, res) => {
     });
 });
 
-app.get('/api/user/:email', async (req, res) => {
-    if (
-        req.params.email.toLowerCase() !==
-        req.user.email.toLowerCase()
-    ) {
-        throw fail('غير مسموح.', 403);
-    }
-
-    res.json({
-        success: true,
-        user: safeUser(req.user)
-    });
+app.get('/api/user/:username', async (req, res) => {
+    if (req.params.username !== req.user.username) throw fail('غير مسموح.', 403);
+    res.json({ success: true, user: safeUser(req.user) });
 });
 
 // ==========================================================
@@ -2388,8 +2341,7 @@ app.post(
     sensitiveLimit('deposit', 5, 3600000, r => r.user.id),
     upload.single('receiptImage'),
     async (req, res) => {
-        const email = req.user.email;
-        const username = req.user.username;
+            const username = req.user.username;
         const gateway = String(req.body.gateway || '').trim();
         let amount;
         if (Object.prototype.hasOwnProperty.call(req.body, 'amountInput')) {
@@ -2483,7 +2435,6 @@ app.post(
             tx.create(depRef, {
                 user_id: req.user.id,
                 username,
-                email,
                 gateway,
                 amount: money(amount),
                 receipt_image: depRef.id,
@@ -2515,7 +2466,6 @@ app.post(
             ADMIN_CHAT_ID,
             `📥 <b>طلب شحن رصيد</b>
 👤 ${htmlEscape(username)}
-📧 ${htmlEscape(email)}
 💰 ${toIQD(amount)} د.ع
 💳 ${htmlEscape(gateway)}
 <a href="${htmlEscape(url)}">عرض الإيصال (الرابط صالح 7 أيام)</a>`,
