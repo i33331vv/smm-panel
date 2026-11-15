@@ -5,10 +5,12 @@
   "description": "SMM panel with authenticated server routes",
   "main": "server.js",
   "type": "commonjs",
-  "engines": { "node": "24.x" },
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js",
+    "check": "node --check server.js && node --check rewards.cjs && node --check public/app.csp.js && node --check public/features.js",
     "test": "node security.test.cjs"
   },
   "dependencies": {
