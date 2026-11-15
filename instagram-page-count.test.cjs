@@ -1,0 +1,14 @@
+'use strict';
+const assert = require('node:assert/strict');
+const {compactCount,readPageCount} = require('./instagram-page-count.cjs');
+for (const [text,expected] of [['٥٥٦ ألف متابع',556000],['556K Followers',556000],['1.2M followers',1200000],['١٫٢ مليون متابع',1200000],['555,996 Followers',555996],['0 followers',0],['1,2K followers',1200],['1003 following',null],['556 likes',null]]) assert.equal(compactCount(text),expected,text);
+const html = '<meta property="og:url" content="https://www.instagram.com/buyer/"><meta property="og:description" content="٥٥٦ ألف متابع، ١٠٠٣ أتابع">';
+const result = readPageCount(html,'buyer');
+assert.equal(result.followers,556000);assert.equal(result.approximate,true);assert.equal(result.isPrivate,null);
+assert.equal(readPageCount(html,'another'),null);
+assert.equal(readPageCount('<p>556K followers</p>','buyer'),null);
+assert.equal(readPageCount('<title>Instagram Login</title><p>Sorry page not found</p>','buyer'),null);
+const header = '<title>Someone (@buyer) • Instagram</title><main><header><h2>buyer</h2><span>556K followers</span></header></main>';
+assert.equal(readPageCount(header,'buyer').followers,556000);
+assert.equal(readPageCount('<title>Someone (@buyer) • Instagram</title><main><article>556K followers</article></main>','buyer'),null);
+console.log('PASS: Arabic/English compact counts, separators, zero, matched profile metadata/header, unrelated content rejection, approximate label and unknown privacy.');
