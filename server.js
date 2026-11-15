@@ -2366,11 +2366,11 @@ app.post(
             !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
             email.length > 254 ||
             typeof password !== 'string' ||
-            password.length < 12 ||
+            password.length < 8 ||
             Buffer.byteLength(password) > 72
         ) {
             throw fail(
-                'أدخل اسماً من 3–40 حرفاً وبريداً صحيحاً وكلمة مرور 12 حرفاً على الأقل (72 بايت كحد أقصى).'
+                'أدخل اسماً من 3–40 حرفاً وبريداً صحيحاً وكلمة مرور من 8 أحرف أو أرقام على الأقل (72 بايت كحد أقصى).'
             );
         }
 
