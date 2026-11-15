@@ -10,7 +10,7 @@ const amountIQD = value => {
 };
 module.exports = { RATE, toIQD, rewardFor, amountIQD, install };
 
-function install({ app, db, requireAuth, upload, sharp, fail, money, htmlEscape, telegram, DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, ADMIN_TELEGRAM_USER_ID, APP_ORIGIN, hash, sensitiveLimit }) {
+function install({ app, db, requireAuth, upload, sharp, fail, money, htmlEscape, telegram, DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, ADMIN_TELEGRAM_USER_ID, APP_ORIGIN, hash, sensitiveLimit, findUserByUsername }) {
     const users = db.collection('users');
     const withdrawals = db.collection('profit_withdrawals');
     const ops = db.collection('profit_operations');
@@ -138,7 +138,7 @@ function install({ app, db, requireAuth, upload, sharp, fail, money, htmlEscape,
             if (Number(u.data().profitIQD || 0) < amount) throw fail('رصيد الأرباح غير كافٍ.');
             tx.update(u.ref, { profitIQD: u.data().profitIQD - amount });
             tx.create(op, { user_id:u.id, type:'withdrawal', amountIQD:amount, created_ms:Date.now() });
-            tx.create(ref, { user_id:u.id, username:u.data().username, email:u.data().email, amountIQD:amount, card, status:'معلق', created_ms:Date.now(), notification:'pending', receiptToken:secret, imageId:imageRef.id });
+            tx.create(ref, { user_id:u.id, username:u.data().username, amountIQD:amount, card, status:'معلق', created_ms:Date.now(), notification:'pending', receiptToken:secret, imageId:imageRef.id });
             tx.create(imageRef, { owner:u.id, bytes, tokenHash:hash(secret), tokenExpires:Date.now()+7*86400000 });
             tx.set(lock, { id:ref.id });
         });
@@ -172,7 +172,7 @@ function install({ app, db, requireAuth, upload, sharp, fail, money, htmlEscape,
         return true;
     }
     function withdrawCaption(id,w) {
-        return `طلب سحب أرباح #${id}\nالمستخدم: ${w.username}\nالبريد: ${w.email}\nالمبلغ: ${w.amountIQD.toLocaleString('en-US')} دينار\nرقم الاستلام: ${w.card}\nالحالة: ${w.status}`;
+        return `طلب سحب أرباح #${id}\nالمستخدم: ${w.username}\nالمبلغ: ${w.amountIQD.toLocaleString('en-US')} دينار\nرقم الاستلام: ${w.card}\nالحالة: ${w.status}`;
     }
     let notifying = false;
     async function notifyPending() {
@@ -211,8 +211,8 @@ function install({ app, db, requireAuth, upload, sharp, fail, money, htmlEscape,
         // Exact lookup avoids downloading all accounts to the browser.
         let docs;
         if (q) {
-            const [a,b] = await Promise.all([users.where('email','==',q).limit(50).get(), users.where('username','==',String(req.query.q).trim()).limit(50).get()]);
-            docs = [...new Map([...a.docs,...b.docs].map(d=>[d.id,d])).values()];
+            const match = await findUserByUsername(String(req.query.q).trim());
+            docs = match ? [match] : [];
         } else {
             docs = (await users.orderBy('__name__').offset(page*25).limit(26).get()).docs;
         }
@@ -220,7 +220,7 @@ function install({ app, db, requireAuth, upload, sharp, fail, money, htmlEscape,
         const result=[];
         for (const d of docs.slice(0, q?50:25)) {
             const u=await initialiseSpent(d.ref);
-            result.push({id:d.id,username:u.username,email:u.email,balanceIQD:toIQD(u.balance),spentIQD:toIQD(u.spent),profitIQD:u.profitIQD||0,disabled:!!u.disabled,role:u.role||'user'});
+            result.push({id:d.id,username:u.username,balanceIQD:toIQD(u.balance),spentIQD:toIQD(u.spent),profitIQD:u.profitIQD||0,disabled:!!u.disabled,role:u.role||'user'});
         }
         res.json({success:true,users:result,more});
     });
