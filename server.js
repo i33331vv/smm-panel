@@ -72,6 +72,7 @@ const validId = value =>
     /^[A-Za-z0-9_-]{1,128}$/.test(value);
 
 const money = n => Math.round(Number(n) * 10000) / 10000;
+const { install: installRewards, toIQD } = require('./rewards.cjs');
 
 function fail(message, status = 400) {
     const e = new Error(message);
@@ -84,7 +85,9 @@ function safeUser(u) {
         username: u.username,
         email: u.email,
         balance: u.balance || 0,
-        role: u.role || 'user'
+        role: u.role || 'user',
+        spent: u.spent || 0,
+        profitIQD: u.profitIQD || 0
     };
 }
 
@@ -167,7 +170,7 @@ async function requireAuth(req, res, next) {
         }
 
         req.user = {
-            ...safeUser(user.data()),
+            ...safeUser(await rewards.initialiseSpent(user.ref)),
             id: user.id,
             ref: user.ref
         };
@@ -416,6 +419,8 @@ const upload = multer({
     }
 });
 
+const rewards = installRewards({ app, db, requireAuth, upload, sharp, fail, money, htmlEscape, telegram, DEPOSIT_BOT_TOKEN, ADMIN_CHAT_ID, ADMIN_TELEGRAM_USER_ID, APP_ORIGIN, hash, sensitiveLimit });
+
 // ==========================================================
 // التاريخ
 // ==========================================================
@@ -555,7 +560,7 @@ function buildOrderTelegramMessage(id, o) {
 📌 ${htmlEscape(o.service)}
 🔗 ${htmlEscape(o.link)}
 📦 ${o.quantity}
-💵 $${Number(o.charge).toFixed(4)}${counter}
+💵 ${toIQD(o.charge)} د.ع${counter}
 🕒 ${htmlEscape(formatSafeDate(o.created_at))}
 الحالة: <b>${htmlEscape(o.status)}</b>`;
 }
@@ -594,6 +599,7 @@ async function handleTelegramCallback(token, cb) {
         return;
     }
 
+    if (await rewards.handleWithdrawal(token, cb)) return;
     const data = String(cb.data || '');
 
     const match = data.match(
@@ -662,6 +668,8 @@ async function handleTelegramCallback(token, cb) {
                 throw fail('بيانات الرصيد غير صالحة.');
             }
 
+            const applyReward = await rewards.prepareReward(tx, user.data(), amount, id);
+            applyReward();
             tx.update(userRef, {
                 balance: money(balance + amount)
             });
@@ -682,7 +690,7 @@ async function handleTelegramCallback(token, cb) {
                 `طلب الشحن ${htmlEscape(id)}
 الحالة: ${result.status}${
                     result.amount
-                        ? '\nالمبلغ: $' + result.amount
+                        ? '\nالمبلغ: ' + toIQD(result.amount) + ' د.ع'
                         : ''
                 }`
             );
@@ -692,6 +700,10 @@ async function handleTelegramCallback(token, cb) {
     }
 
     const ref = db.collection('orders').doc(id);
+    if (action === 'ord_cancel') {
+        const existingOrder = await ref.get();
+        if (validId(existingOrder.data()?.user_id)) await rewards.initialiseSpent(db.collection('users').doc(existingOrder.data().user_id));
+    }
 
     const updated = await db.runTransaction(async tx => {
         const snap = await tx.get(ref);
@@ -731,7 +743,8 @@ async function handleTelegramCallback(token, cb) {
             }
 
             tx.update(uref, {
-                balance: money(balance + amount)
+                balance: money(balance + amount),
+                spent: money(Math.max(0, Number(u.data().spent || 0) - amount))
             });
         }
 
@@ -2039,9 +2052,11 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
                 return balance;
             }
 
+            const applyReward = await rewards.prepareReward(tx, currentUser.data(), usdAmount, depositRef.id);
             const updatedBalance = Number(
                 (balance + usdAmount).toFixed(2)
             );
+            applyReward();
 
             tx.update(userDoc.ref, {
                 balance: updatedBalance
@@ -2074,14 +2089,14 @@ app.post('/api/asiacell/confirm-transfer', async (req, res) => {
             ADMIN_CHAT_ID,
             `✅ <b>شحن آسياسيل تلقائي ناجح (OTP):</b>
 المستخدم: ${htmlEscape(email)}
-المبلغ: $${usdAmount} (${s.amountIQD} د.ع)
+المبلغ: ${s.amountIQD} د.ع
 من الرقم: ${cleanPhone}`
         );
 
         return res.json({
             success: true,
             message:
-                `🎉 تم شحن رصيدك بنجاح بمبلغ $${usdAmount}!`,
+                `🎉 تم شحن رصيدك بنجاح بمبلغ ${toIQD(usdAmount)} دينار!`,
             newBalance
         });
     } catch (e) {
@@ -2293,6 +2308,8 @@ app.post(
                 email,
                 password: passwordHash,
                 balance: 0,
+                spent: 0,
+                profitIQD: 0,
                 role: 'user',
                 created_at: getFormattedDateTime()
             });
@@ -2418,7 +2435,8 @@ app.post(
 
         if (
             !req.file ||
-            !gateway ||
+            !['ZainCash', 'Mastercard', 'Binance'].includes(gateway) ||
+            !Number.isInteger(toIQD(amount)) ||
             gateway.length > 80 ||
             /wayl|وايل|وايلي/i.test(gateway) ||
             !Number.isFinite(amount) ||
@@ -2531,7 +2549,7 @@ app.post(
             `📥 <b>طلب شحن رصيد</b>
 👤 ${htmlEscape(username)}
 📧 ${htmlEscape(email)}
-💰 $${money(amount)}
+💰 ${toIQD(amount)} د.ع
 💳 ${htmlEscape(gateway)}
 <a href="${htmlEscape(url)}">عرض الإيصال (الرابط صالح 7 أيام)</a>`,
             {
@@ -2780,8 +2798,10 @@ app.post(
                     ).toFixed(4)
                 );
 
+                if (freshUser.data().disabled) throw fail('الحساب محظور.', 403);
                 transaction.update(userRef, {
-                    balance: newBalance
+                    balance: newBalance,
+                    spent: money(Number(freshUser.data().spent || 0) + calculatedCharge)
                 });
 
                 const newOrderRef = db.collection('orders').doc();
