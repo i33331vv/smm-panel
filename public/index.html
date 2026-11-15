@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mtnajm - MT</title>
+    <title>ام تي نجم | mtnajm للدعم الرقمي</title>
+    <meta name="description" content="منصة ام تي نجم mtnajm لخدمات الدعم الرقمي، مع خيارات شحن متنوعة ودعم مباشر.">
+    <link rel="icon" type="image/png" href="/favicon.png">
 
     
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -11,7 +13,8 @@
 
     
 
-    <link rel="stylesheet" href="/styles.csp.css?v=support-1">
+    <link rel="stylesheet" href="/styles.csp.css?v=iqd-rewards-1">
+<link rel="stylesheet" href="/features.css?v=iqd-rewards-1">
 </head>
 
 <body class="text-gray-800 antialiased selection:bg-primary selection:text-white">
@@ -86,6 +89,7 @@
             </div>
 
             <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+                <button type="button" id="openProfits" class="feature-button">تفعيل كود الأرباح / أرباحي</button>
                 <a href="#" id="navNewOrder" data-csp-bind="csp-4" class="flex items-center px-4 py-3 bg-[#fdf2f4] text-primary rounded-xl font-medium transition cursor-pointer">
                     <i class="fa-solid fa-plus-circle w-6 text-center text-lg me-3"></i>
                     طلب جديد
@@ -118,7 +122,8 @@
                     <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-1.5 rounded-full flex items-center text-sm font-bold shadow-sm">
                         <i class="fa-solid fa-coins me-2 text-yellow-500"></i>
                         الرصيد:
-                        <span id="displayBalance" class="ms-1" dir="ltr">$0.00</span>
+                        <span id="displayBalance" class="ms-1" dir="ltr">0 د.ع</span>
+                        <span class="spent-summary">المصروف: <b id="displaySpent" dir="ltr">0 د.ع</b></span>
                     </div>
 
                     <div class="flex items-center bg-gray-50 p-2 rounded-lg transition">
@@ -201,9 +206,9 @@
 
                                         <div>
                                             <label class="block text-sm font-bold text-gray-700 mb-2">
-                                                السعر الإجمالي ($)
+                                                السعر الإجمالي (د.ع)
                                             </label>
-                                            <input type="text" id="charge" readonly placeholder="0.00" class="block w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-100 text-gray-500 font-bold cursor-not-allowed">
+                                            <input type="text" id="charge" readonly placeholder="0" class="block w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-100 text-gray-500 font-bold cursor-not-allowed">
                                         </div>
                                     </div>
 
@@ -239,7 +244,7 @@
                                         <th class="p-3">الرابط</th>
                                         <th class="p-3">الكمية</th>
                                         <th class="p-3">عداد الحساب</th>
-                                        <th class="p-3">السعر ($)</th>
+                                        <th class="p-3">السعر (د.ع)</th>
                                         <th class="p-3">الحالة</th>
                                         <th class="p-3">التاريخ</th>
                                     </tr>
@@ -276,7 +281,7 @@
                         <!-- آسياسيل -->
                         <div id="asiaAutoBox" class="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
                             <div class="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs font-bold text-center">
-                                شحن تلقائي فوري عبر آسياسيل (كل 1$ يعادل 1,000 دينار رصيد)
+                                شحن تلقائي عبر آسياسيل — الحد الأقصى للعملية 10,000 دينار
                             </div>
 
                             <div id="asiaStep1" class="space-y-4">
@@ -319,52 +324,52 @@
 
                                     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5" id="amountButtonsGrid">
                                         <button type="button" data-csp-bind="csp-16" id="amtBtn_1" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
-                                            <span class="font-extrabold text-base">1$</span>
+                                            <span class="font-extrabold text-base">1,000 د.ع</span>
                                             <span class="text-[11px] opacity-80">1,000 د.ع</span>
                                         </button>
 
                                         <button type="button" data-csp-bind="csp-17" id="amtBtn_2" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
-                                            <span class="font-extrabold text-base">2$</span>
+                                            <span class="font-extrabold text-base">2,000 د.ع</span>
                                             <span class="text-[11px] opacity-80">2,000 د.ع</span>
                                         </button>
 
                                         <button type="button" data-csp-bind="csp-18" id="amtBtn_3" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
-                                            <span class="font-extrabold text-base">3$</span>
+                                            <span class="font-extrabold text-base">3,000 د.ع</span>
                                             <span class="text-[11px] opacity-80">3,000 د.ع</span>
                                         </button>
 
                                         <button type="button" data-csp-bind="csp-19" id="amtBtn_4" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
-                                            <span class="font-extrabold text-base">4$</span>
+                                            <span class="font-extrabold text-base">4,000 د.ع</span>
                                             <span class="text-[11px] opacity-80">4,000 د.ع</span>
                                         </button>
 
                                         <button type="button" data-csp-bind="csp-20" id="amtBtn_5" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
-                                            <span class="font-extrabold text-base">5$</span>
+                                            <span class="font-extrabold text-base">5,000 د.ع</span>
                                             <span class="text-[11px] opacity-80">5,000 د.ع</span>
                                         </button>
 
                                         <button type="button" data-csp-bind="csp-21" id="amtBtn_6" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
-                                            <span class="font-extrabold text-base">6$</span>
+                                            <span class="font-extrabold text-base">6,000 د.ع</span>
                                             <span class="text-[11px] opacity-80">6,000 د.ع</span>
                                         </button>
 
                                         <button type="button" data-csp-bind="csp-22" id="amtBtn_7" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
-                                            <span class="font-extrabold text-base">7$</span>
+                                            <span class="font-extrabold text-base">7,000 د.ع</span>
                                             <span class="text-[11px] opacity-80">7,000 د.ع</span>
                                         </button>
 
                                         <button type="button" data-csp-bind="csp-23" id="amtBtn_8" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
-                                            <span class="font-extrabold text-base">8$</span>
+                                            <span class="font-extrabold text-base">8,000 د.ع</span>
                                             <span class="text-[11px] opacity-80">8,000 د.ع</span>
                                         </button>
 
                                         <button type="button" data-csp-bind="csp-24" id="amtBtn_9" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
-                                            <span class="font-extrabold text-base">9$</span>
+                                            <span class="font-extrabold text-base">9,000 د.ع</span>
                                             <span class="text-[11px] opacity-80">9,000 د.ع</span>
                                         </button>
 
                                         <button type="button" data-csp-bind="csp-25" id="amtBtn_10" class="amount-btn border border-gray-300 bg-white hover:border-red-500 rounded-xl p-2.5 text-center transition flex flex-col items-center">
-                                            <span class="font-extrabold text-base">10$</span>
+                                            <span class="font-extrabold text-base">10,000 د.ع</span>
                                             <span class="text-[11px] opacity-80">10,000 د.ع</span>
                                         </button>
                                     </div>
@@ -401,9 +406,9 @@
 
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">
-                                    المبلغ المراد شحنه ($ USD)
+                                    المبلغ المراد شحنه (دينار عراقي)
                                 </label>
-                                <input type="number" step="0.01" id="depAmountInput" placeholder="10" class="w-full px-3 py-2 border rounded-xl bg-white text-sm">
+                                <input type="number" step="1" min="1" id="depAmountInput" placeholder="10000" class="w-full px-3 py-2 border rounded-xl bg-white text-sm">
                             </div>
 
                             <div>
@@ -437,11 +442,12 @@
 
                                 <div class="bg-green-50 text-green-700 px-4 py-2 rounded-xl text-sm font-bold">
                                     إجمالي المبيعات:
-                                    $<span id="adminTotalSales">0.00</span>
+                                    <span id="adminTotalSales">0.00</span>
                                 </div>
                             </div>
                         </div>
 
+                        <button type="button" id="openUserManager" class="feature-button">المستخدمون — البحث وإدارة الرصيد والحظر</button>
                         <div class="mt-4 bg-gray-50 p-6 rounded-2xl border border-gray-200">
                             <h4 id="adminFormTitle" class="font-bold text-lg text-dark mb-4">
                                 <i class="fa-solid fa-plus-circle text-primary me-2"></i>
@@ -477,9 +483,9 @@
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
                                         <label class="block text-xs font-bold text-gray-700 mb-1">
-                                            السعر لهذا العدد ($)
+                                            السعر لهذا العدد (د.ع)
                                         </label>
-                                        <input type="number" step="0.01" id="servPrice" placeholder="10 أو 0.5" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
+                                        <input type="number" step="0.1" min="0.1" id="servPrice" placeholder="10000 أو 500" class="w-full px-4 py-2 border rounded-xl bg-white text-sm" required>
                                     </div>
 
                                     <div>
@@ -624,6 +630,8 @@
     </div>
 
     
+    <button id="openAbout" type="button" class="about-fixed">من نحن</button>
+
     <!-- الدعم متاح خارج أقسام الموقع حتى يبقى ظاهراً في جميع الصفحات -->
     <aside id="support-widget" class="support-widget" aria-label="المساعدة والدعم">
         <section id="support-panel" class="support-panel" aria-labelledby="support-title" hidden>
@@ -639,7 +647,7 @@
                 <span><strong>واتساب</strong><span dir="ltr">07783826405</span></span>
                 <span class="support-open-label">فتح المحادثة ↗</span>
             </a>
-            <a class="support-channel support-telegram" href="https://t.me/mtnajm" target="_blank" rel="noopener noreferrer">
+            <a class="support-channel support-telegram" href="https://t.me/Mtnajm" target="_blank" rel="noopener noreferrer">
                 <i class="fa-brands fa-telegram" aria-hidden="true"></i>
                 <span><strong>تليكرام</strong><span dir="ltr">@mtnajm</span></span>
                 <span class="support-open-label">فتح المحادثة ↗</span>
@@ -650,6 +658,7 @@
             <span>المساعدة والدعم</span>
         </button>
     </aside>
-<script src="/app.csp.js?v=support-1" defer></script>
+<script src="/app.csp.js?v=iqd-rewards-1" defer></script>
+<script src="/features.js?v=iqd-rewards-1" defer></script>
 </body>
 </html>
